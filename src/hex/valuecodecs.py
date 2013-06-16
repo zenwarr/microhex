@@ -38,6 +38,14 @@ class IntegerCodec(GenericCodec):
         self.endianess = endianess
         self.dataSize = self._t.get(self.binaryFormat)
 
+    @property
+    def maximal(self):
+        return 255 ** self.dataSize
+
+    @property
+    def minimal(self):
+        return -self.maximal if self.signed else 0
+
 
 class FloatCodec(GenericCodec):
     FormatFloat = 'f'

@@ -53,21 +53,12 @@ class LargeScrollBar(QScrollBar):
             self._exactValue = new_value
 
             ticks = self._valueToTicks(new_value)
-            self._valueRange = (self._ticksToValue(ticks), self._ticksToValue(ticks + 1))
+            self._valueRange = (int(self._ticksToValue(ticks)), int(self._ticksToValue(ticks + 1)))
             self.setValue(ticks)
 
     def setRangeLarge(self, new_min, new_max):
         self._min = min(new_min, new_max)
         self._max = max(new_min, new_max)
-
-        # new_value = self.valueLarge()
-        # if new_value > self.maximumLarge():
-        #     new_value = self.maximumLarge() - self.pageStepLarge()
-        # if new_value < self.minimumLarge():
-        #     new_value = self.minimumLarge()
-        #
-        # if new_value != self.valueLarge():
-        #     self.setValueLarge(new_value)
 
         if self._max - self._min < self._ticks:
             self.setRange(0, int(self._max - self._min))
@@ -88,8 +79,11 @@ class LargeScrollBar(QScrollBar):
 
     def _onValueChanged(self, ticks):
         value = round(self._ticksToValue(ticks))
-        self.setValueLarge(value)
-        self.valueChangedLarge.emit(value)
+        if not (self._valueRange[0] <= value <= self._valueRange[1]):
+            self.setValueLarge(value)
+            self.valueChangedLarge.emit(value)
 
-    def _onSliderMoved(self, new_value):
-        self.sliderMovedLarge.emit(self._valueToTicks(new_value))
+    def _onSliderMoved(self, ticks):
+        value = round(self._ticksToValue(ticks))
+        if not (self._valueRange[0] <= value <= self._valueRange[1]):
+            self.sliderMovedLarge.emit(self._valueToTicks(value))

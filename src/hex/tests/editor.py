@@ -1,5 +1,7 @@
 import unittest
 from hex.editor import Editor, Span, DataSpan, FillSpan, OutOfBoundsError
+from hex.devices import BufferDevice
+from PyQt4.QtCore import QBuffer, QByteArray
 
 
 class TestEditor(unittest.TestCase):
@@ -30,16 +32,6 @@ class TestEditor(unittest.TestCase):
         self.assertEqual(len(editor.spanAtPosition(1)), 3)
         self.assertEqual(len(editor.spanAtPosition(6)), 12)
 
-        self.assertRaises(OutOfBoundsError, lambda: editor.insertSpan(30, DataSpan(editor, b'!!!')))
-        self.assertRaises(OutOfBoundsError, lambda: editor.insertSpan(-1, DataSpan(editor, b'!!!')))
-
-        self.assertEqual(editor.readAll(), b'H!!!ello, World!')
-        self.assertEqual(len(editor.spans), 3)
-        self.assertEqual(len(editor), len(data_span) + 3)
-        self.assertEqual(len(editor.spanAtPosition(0)), 1)
-        self.assertEqual(len(editor.spanAtPosition(1)), 3)
-        self.assertEqual(len(editor.spanAtPosition(6)), 12)
-
         editor.remove(1, 3)
         self.assertEqual(len(editor.spans), 2)
         self.assertEqual(editor.readAll(), b'Hello, World!')
@@ -55,7 +47,7 @@ class TestEditor(unittest.TestCase):
         self.assertEqual(len(editor.spans), 0)
 
         editor.writeSpan(0, data_span)
-        self.assertEqual(len(editor.takeSpans(2, 3)[0]), 1)
+        self.assertEqual(len(editor.takeSpans(2, 3)), 1)
         self.assertEqual(len(editor.spans), 3)
         self.assertEqual(len(editor.spans[0]), 2)
         self.assertEqual(len(editor.spans[1]), 3)
@@ -64,3 +56,61 @@ class TestEditor(unittest.TestCase):
         self.assertEqual(editor.readAtEnd(5, 20), b', World!')
 
         self.assertTrue(editor.isModified)
+
+        self.undoTest()
+
+    def undoTest(self):
+        editor = Editor(BufferDevice(QByteArray(b'Hello, World!'), read_only=True))
+
+        editor.insertSpan(3, DataSpan(editor, b'000'))
+        self.assertEqual(editor.readAll(), b'Hel000lo, World!')
+        self.assertTrue(editor.isModified)
+
+        self.assertTrue(editor.canUndo())
+        self.assertFalse(editor.canRedo())
+
+        editor.undo()
+        self.assertEqual(editor.readAll(), b'Hello, World!')
+        self.assertFalse(editor.isModified)
+
+        editor.redo()
+        self.assertEqual(editor.readAll(), b'Hel000lo, World!')
+
+        # and again...
+        editor.undo()
+        self.assertEqual(editor.readAll(), b'Hello, World!')
+        self.assertFalse(editor.isModified)
+
+        self.assertFalse(editor.canUndo())
+        self.assertTrue(editor.canRedo())
+
+        # how we will create another action. New redo branch should be created
+        editor.appendSpan(DataSpan(editor, b' Yeah!'))
+        self.assertEqual(editor.readAll(), b'Hello, World! Yeah!')
+
+        self.assertTrue(editor.canUndo())
+        self.assertFalse(editor.canRedo())
+
+        editor.undo()
+
+        self.assertEqual(editor.readAll(), b'Hello, World!')
+
+        # at this point we should have two redo branches
+        branches = editor.alternativeBranches()
+        self.assertEqual(len(branches), 1)
+
+        # try to switch to another branch
+        editor.redo(branches[0])
+        self.assertEqual(editor.readAll(), b'Hel000lo, World!')
+
+        editor.undo()
+        self.assertEqual(editor.readAll(), b'Hello, World!')
+
+        # still be should have two branches at this point
+        self.assertEqual(len(editor.alternativeBranches()), 1)
+
+        editor.remove(0, 7)
+        self.assertEqual(editor.readAll(), b'World!')
+
+        editor.undo()
+        self.assertEqual(editor.readAll(), b'Hello, World!')

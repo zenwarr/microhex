@@ -1,10 +1,12 @@
 import unittest
 import hex.tests.editor
+import hex.tests.integeredit
 
 
-if __name__ == '__main__':
+def runTests():
     module_list = (
         hex.tests.editor,
+        hex.tests.integeredit
     )
 
     for module in module_list:

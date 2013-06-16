@@ -42,10 +42,8 @@ class IntegerFormatter(object):
 
     def _decorationLength(self):
         if self.style == self.StyleC:
-            if self.base in (2, 16):
+            if self.base in (2, 8, 16):
                 return 2
-            elif self.base == 8:
-                return 1
         elif self.style == self.StyleAsm:
             if self.base in (2, 8, 16):
                 return 1
@@ -56,7 +54,7 @@ class IntegerFormatter(object):
             if self.base == 16:
                 return '0x' + value
             elif self.base == 8:
-                return '0' + value
+                return '0o' + value
             elif self.base == 2:
                 return '0b' + value
         elif self.style == self.StyleAsm:
@@ -74,8 +72,8 @@ class IntegerFormatter(object):
                 if value.startswith('0x'):
                     return value[2:]
             elif self.base == 8:
-                if value.startswith('0'):
-                    return value[1:]
+                if value.startswith('0o'):
+                    return value[2:]
             elif self.base == 2:
                 if value.startswith('0b'):
                     return value[2:]
@@ -93,6 +91,8 @@ class IntegerFormatter(object):
             return (IntegerFormatter.StyleC, 16)
         elif text.startswith('0b'):
             return (IntegerFormatter.StyleC, 2)
+        elif text.startswith('0o'):
+            return (IntegerFormatter.StyleC, 8)
         elif text.endswith('h'):
             return (IntegerFormatter.StyleAsm, 16)
         elif text.endswith('o'):
@@ -102,7 +102,7 @@ class IntegerFormatter(object):
         return None
 
     def validate(self, text):
-        if not text:
+        if not text or text == '-':
             return QValidator.Intermediate
         try:
             undecorated = self._undecorate(text)
@@ -120,6 +120,15 @@ def parseInteger(text):
         return IntegerFormatter().parse(text)
     else:
         return IntegerFormatter(guessed[1], guessed[0]).parse(text)
+
+
+def styleFromName(name):
+    name = name.lower()
+    if name == 'c':
+        return IntegerFormatter.StyleC
+    elif name in ('asm', 'assembler'):
+        return IntegerFormatter.StyleAsm
+    return IntegerFormatter.StyleNone
 
 
 class FloatFormatter(object):

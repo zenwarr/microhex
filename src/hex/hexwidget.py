@@ -1,13 +1,17 @@
-from PyQt4.QtCore import pyqtSignal, QObject, Qt, QPointF, QRectF, QPoint, QRect, QSizeF, QEvent, QTimer, QLineF, QSize
+from PyQt4.QtCore import pyqtSignal, QObject, Qt, QPointF, QRectF, QPoint, QRect, QSizeF, QEvent, QTimer, QLineF, QSize, \
+                        QTextEncoder, QTextDecoder
 from PyQt4.QtGui import QColor, QFont, QFontMetricsF, QPolygonF, QWidget, QScrollBar, QVBoxLayout, QHBoxLayout, \
                         QPainter, QBrush, QPalette, QPen, QApplication, QRegion, QLineEdit, QValidator, \
-                        QTextEdit, QTextOption, QSizePolicy, QStyle, QStyleOptionFrameV2, QTextCursor
-from hex.utils import first
+                        QTextEdit, QTextOption, QSizePolicy, QStyle, QStyleOptionFrameV2, QTextCursor, QTextDocument, \
+                        QTextBlockFormat, QPlainTextDocumentLayout, QAbstractTextDocumentLayout
 import math
+import html
 from hex.valuecodecs import IntegerCodec
 from hex.formatters import IntegerFormatter
 from hex.editor import DataSpan
 from hex.proxystyle import ProxyStyle
+import hex.encodings as encodings
+import hex.utils as utils
 
 
 # Why we need to make different model/view classes? Why not to use existing ones?
@@ -289,6 +293,8 @@ class HexColumnModel(ColumnModel):
         self._rowCount = 0
         self._bytesOnRow = columns_on_row * self.valuecodec.dataSize
         self._columnsOnRow = columns_on_row
+        min_value, max_value = self.valuecodec.minimal, self.valuecodec.maximal
+        self._cellTextSize = max(len(self.formatter.format(min_value)), len(self.formatter.format(max_value)))
         self._updateRowCount()
 
     def rowCount(self):
@@ -302,15 +308,15 @@ class HexColumnModel(ColumnModel):
 
     def realColumnCount(self, row):
         if row + 1 >= self._rowCount:
-            return (len(self.editor) % self.bytesOnRow) // self.valuecodec.dataSize
+            count = (len(self.editor) % self.bytesOnRow) // self.valuecodec.dataSize
+            return count or self._columnsOnRow
         elif row >= self._rowCount:
             return 0
         return self._columnsOnRow
 
     def indexFromPosition(self, editor_position):
-        return ModelIndex(int(editor_position // self.bytesOnRow),
-                          int(editor_position % self.bytesOnRow) // self.valuecodec.dataSize,
-                          self)
+        return self.index(int(editor_position // self.bytesOnRow),
+                          int(editor_position % self.bytesOnRow) // self.valuecodec.dataSize)
 
     def indexData(self, index, role=Qt.DisplayRole):
         if not index or self.editor is None:
@@ -319,7 +325,7 @@ class HexColumnModel(ColumnModel):
 
         if role == Qt.DisplayRole or role == Qt.EditRole:
             if editor_position >= len(self.editor):
-                return '..' #TODO: replace with '.' * self.cellTextSize
+                return '.' * self._cellTextSize
             else:
                 editor_data = self.editor.read(editor_position, self.valuecodec.dataSize)
                 return self.formatter.format(self.valuecodec.decode(editor_data))
@@ -339,15 +345,19 @@ class HexColumnModel(ColumnModel):
             if role == self.EditorDataRole:
                 position = self.indexData(index, ColumnModel.EditorPositionRole)
                 if position is not None and position >= 0:
-                    self.editor.writeSpan(position, DataSpan(self.editor, value))
-                    return True
+                    if value != index.data(self.EditorDataRole):
+                        try:
+                            self.editor.writeSpan(position, DataSpan(self.editor, value))
+                            return True
+                        except IOError:
+                            pass
         return False
 
     def indexFlags(self, index):
         flags = ColumnModel.FlagEditable
         if index.row >= self._rowCount or (index.row == self._rowCount - 1 and index > self.lastRealIndex):
             flags |= ColumnModel.FlagVirtual
-        if self.editor is not None and self.editor.isRangeModified(index.data(self.EditorPositionRole),
+        elif self.editor is not None and self.editor.isRangeModified(index.data(self.EditorPositionRole),
                                                                    index.data(self.DataSizeRole)):
             flags |= ColumnModel.FlagModified
         return flags
@@ -361,7 +371,9 @@ class HexColumnModel(ColumnModel):
         self.dataChanged.emit(self.indexFromPosition(start), self.indexFromPosition(start + length - 1))
 
     def onEditorDataResized(self, new_size):
+        old_last_index = self.lastRealIndex
         self._updateRowCount()
+        self.dataChanged.emit(old_last_index, self.lastRealIndex)
 
     @property
     def preferSpaced(self):
@@ -370,8 +382,140 @@ class HexColumnModel(ColumnModel):
     def _updateRowCount(self):
         self._rowCount = len(self.editor) // self.bytesOnRow + bool(len(self.editor) % self.bytesOnRow)
 
-    def createEditWidget(self, parent, index, style_options):
-        return HexColumnEditWidget(parent, index, style_options)
+    def createEditWidget(self, parent, index):
+        return HexColumnEditWidget(parent, index)
+
+
+class CharColumnModel(ColumnModel):
+    """This column displays data as characters in one of possible encodings. It depends on encoding how many bytes
+    will occupy each cell. Since even cells of one row can have different number of bytes, we can either have constant
+    number of bytes for row or constant number of columns in it. In first case this leads to awful (unaligned) look of widget in
+    case of multi-byte encodings (utf-8, for example). Second case leads to awful behaviour - CharColumn and HexColumn
+    cannot be synchronized to display same bytes on same rows (this behaviour is common to other hex-editors).
+    """
+
+    ReplacementCharacter = '·'
+
+    def __init__(self, editor, codec, bytes_on_row=16):
+        ColumnModel.__init__(self, editor)
+        self._rowCount = 0
+        self._codec = codec
+
+        # number of bytes on row should be multiplier of codec.unitSize
+        if bytes_on_row % codec.unitSize:
+            raise ValueError('number of bytes on row should be multiplier of encoding unit size')
+        self._bytesOnRow = bytes_on_row
+
+        self._updateRowCount()
+
+    @property
+    def codec(self):
+        return self._codec
+
+    def _updateRowCount(self):
+        self._rowCount = len(self.editor) // self._bytesOnRow + bool(len(self.editor) % self._bytesOnRow)
+
+    def rowCount(self):
+        return -1
+
+    def columnCount(self, row):
+        return self._bytesOnRow // self._codec.unitSize
+
+    def realRowCount(self):
+        return self._rowCount
+
+    def realColumnCount(self, row):
+        position = row * self._bytesOnRow
+        if position >= len(self.editor):
+            return 0
+        elif row + 1 == self._rowCount:
+            bytes_left = position % self._bytesOnRow
+            return bytes_left // self._codec.unitSize + bool(bytes_left % self._codec.unitSize)
+        else:
+            return self._bytesOnRow // self._codec.unitSize
+
+    def indexFromPosition(self, position):
+        return self.index(position // self._bytesOnRow,
+                         (position % self._bytesOnRow) // self._codec.unitSize)
+
+    def indexData(self, index, role=Qt.DisplayRole):
+        if not index or self.editor is None:
+            return None
+
+        position = index.row * self._bytesOnRow + index.column * self._codec.unitSize
+        is_virtual = position >= len(self.editor)
+
+        if role == self.EditorPositionRole:
+            return position
+        elif role == self.DataSizeRole:
+            if is_virtual:
+                return self._codec.unitSize
+            try:
+                return self._codec.getCharacterSize(self.editor, position)
+            except encodings.EncodingError:
+                return 1
+        elif role == self.EditorDataRole:
+            if is_virtual:
+                return bytes()
+            try:
+                return self.editor.readAtEnd(self._codec.findCharacterStart(self.editor, position),
+                                         self._codec.getCharacterSize(self.editor, position))
+            except encodings.EncodingError:
+                return self.editor.readAtEnd(position, 1)
+        elif role in (Qt.DisplayRole, Qt.EditRole):
+            if is_virtual:
+                return '.'
+            try:
+                character_start = self._codec.findCharacterStart(self.editor, position)
+                if character_start != position:
+                    return ' '
+                else:
+                    decoded = self._codec.decodeCharacter(self.editor, position)
+                    if not decoded:
+                        print('empty!')
+                    return self._translateToVisualCharacter(decoded)
+            except encodings.EncodingError:
+                return '∎'
+        return None
+
+    def indexFlags(self, index):
+        flags = self.FlagEditable
+        if index.row >= self._rowCount and index > self.lastRealIndex:
+            flags |= self.FlagVirtual
+        elif self.editor.isRangeModified(index.data(self.EditorPositionRole), index.data(self.DataSizeRole)):
+            flags |= self.FlagModified
+        return flags
+
+    def setIndexData(self, index, value, role=Qt.DisplayRole):
+        if not (index and self.editor is not None and role == Qt.EditorDataRole):
+            return False
+
+        position = self.indexData(index, self.EditorPositionRole)
+        old_size = self._codec.getCharacterSize(self.editor, position)
+        encoded = self._codec.encodeString(value)
+
+        self.editor.beginComplexAction()
+        try:
+            self.editor.remove(position, old_size)
+            self.editor.insertSpan(position, DataSpan(self.editor, encoded))
+            return True
+        finally:
+            self.editor.endComplexAction()
+
+    def _translateToVisualCharacter(self, text):
+        import unicodedata
+
+        result = ''
+        for char in text:
+            if unicodedata.category(char) in ('Cc', 'Cf', 'Cn', 'Co', 'Cs', 'Lm', 'Mc', 'Zl', 'Zp'):
+                result += self.ReplacementCharacter
+            else:
+                result += char
+        return result
+
+    @property
+    def preferSpaced(self):
+        return False
 
 
 class AddressColumnModel(ColumnModel):
@@ -468,6 +612,9 @@ class FrameProxyModel(ColumnModel):
     """This proxy model displays only number of rows starting after given first row. Proxy model does not check
     if there are indexes on these rows."""
 
+    frameScrolled = pyqtSignal(int, int)  # first argument is new first frame row, second one is old first frame row
+    frameResized = pyqtSignal(int, int)  # first argument is new frame size, second one is old frame size
+
     def __init__(self, source_model):
         ColumnModel.__init__(self, None)
         self.__firstRow = 0
@@ -477,9 +624,20 @@ class FrameProxyModel(ColumnModel):
         self.sourceModel.modelReset.connect(self.modelReset)
 
     def setFrame(self, first_row, row_count):
-        self.__firstRow = first_row
-        self.__rowCount = row_count
-        self.modelReset.emit()
+        self.resizeFrame(row_count)
+        self.scrollFrame(first_row)
+
+    def scrollFrame(self, new_first_row):
+        if self.__firstRow != new_first_row:
+            old_first_row = self.__firstRow
+            self.__firstRow = new_first_row
+            self.frameScrolled.emit(new_first_row, old_first_row)
+
+    def resizeFrame(self, new_frame_size):
+        if self.__rowCount != new_frame_size:
+            old_size = self.__rowCount
+            self.__rowCount = new_frame_size
+            self.frameResized.emit(new_frame_size, old_size)
 
     def rowCount(self):
         model_row_count = self.sourceModel.rowCount()
@@ -570,6 +728,7 @@ ModifiedTextColor = QColor(Qt.red)
 class RowData(object):
     def __init__(self):
         self.text = ''
+        self.html = ''
         self.items = []
 
 
@@ -602,8 +761,10 @@ class Column(QObject):
         QObject.__init__(self)
         self.sourceModel = model
         self.model = FrameProxyModel(model)
-        self.model.dataChanged.connect(self._updateCache)
+        self.model.dataChanged.connect(self._onDataChanged)
         self.model.modelReset.connect(self._updateCache)
+        self.model.frameScrolled.connect(self._onFrameScrolled)
+        self.model.frameResized.connect(self._onFrameResized)
 
         self._geom = QRectF()
         self._font = DefaultFont
@@ -615,6 +776,7 @@ class Column(QObject):
 
         self._spaced = self.sourceModel.preferSpaced
         self._cache = []
+        self._document = None
 
     @property
     def geometry(self):
@@ -633,7 +795,7 @@ class Column(QObject):
     def scrollToFirstRow(self, source_row_index):
         if self._firstVisibleRow != source_row_index:
             self._firstVisibleRow = source_row_index
-            self.model.setFrame(self._firstVisibleRow, self._visibleRows)
+            self.model.scrollFrame(self._firstVisibleRow)
 
     @property
     def lastFullVisibleRow(self):
@@ -675,6 +837,7 @@ class Column(QObject):
     def font(self, new_font):
         self._font = new_font
         self._fontMetrics = QFontMetricsF(new_font)
+        self._document = None
         self._updateGeometry()
 
     @property
@@ -705,27 +868,23 @@ class Column(QObject):
         index = self.model.fromSourceIndex(index)
         index_data = self.getIndexCachedData(index)
         if index_data is not None:
-            x = self._fontMetrics.width(self.getRowCachedData(index.row).text[:index_data.firstCharIndex]) + VisualSpace
-            y = self._fontMetrics.height() * index.row
-            width = self._fontMetrics.width(index_data.text)
-            return QRectF(x, y, width, self._fontMetrics.height())
-        return QRectF()
-
-    def getRectForChar(self, index, char_offset):
-        index_rect = self.getRectForIndex(index)
-        if index_rect.width() and index_rect.height() and char_offset < len(index.data()):
-            char_x = self._fontMetrics.width(index.data()[:char_offset])
-            index_rect.setLeft(index_rect.left() + char_x)
-            index_rect.setWidth(self._fontMetrics.width(index.data()[char_offset]))
-            return index_rect
+            block = self._document.findBlockByLineNumber(index.row)
+            if block.isValid():
+                block_rect = self._document.documentLayout().blockBoundingRect(block)
+                line = block.layout().lineAt(0)
+                x = line.cursorToX(index_data.firstCharIndex)[0] + VisualSpace
+                y = block_rect.y() + line.position().y()
+                width = self._fontMetrics.width(index_data.text)
+                return QRectF(x, y, width, self._fontMetrics.height())
         return QRectF()
 
     def getRectForRow(self, visible_row_index):
-        row_data = self.getRowCachedData(visible_row_index)
-        if row_data is not None:
-            last_index_rect = self.getRectForIndex(self.model.lastRowIndex(visible_row_index))
-            return QRectF(QPointF(VisualSpace, self._fontMetrics.height() * visible_row_index),
-                          last_index_rect.bottomRight())
+        if 0 <= visible_row_index < self._visibleRows:
+            block = self._document.findBlockByLineNumber(visible_row_index)
+            if block.isValid():
+                rect = block.layout().lineAt(0).rect()
+                rect.translate(VisualSpace, 0)
+                return rect
         return QRectF()
 
     def getPolygonsForRange(self, first_index, last_index):
@@ -774,12 +933,16 @@ class Column(QObject):
                 return range_polygon,
 
     def indexFromPoint(self, point):
-        """Point should be in column relative coordinates"""
+        point = QPointF(point.x() - VisualSpace, point.y())
         row_index = int(point.y() / self._fontMetrics.height())
-        if 0 <= row_index < self._visibleRows:
-            for column in range(self.model.columnCount(row_index)):
-                index_rect = self.getRectForIndex(self.model.index(row_index, column))
-                if point.x() <= index_rect.right():
+        char_position = self._document.documentLayout().hitTest(point, Qt.ExactHit)
+        block = self._document.findBlock(char_position)
+        if block.isValid():
+            line_char_index = char_position - block.position()
+            row_data = self._cache[row_index]
+            for column in range(len(row_data.items)):
+                index_data = row_data.items[column]
+                if index_data.firstCharIndex + len(index_data.text) >= line_char_index:
                     return self.model.toSourceIndex(self.model.index(row_index, column))
         return ModelIndex()
 
@@ -787,59 +950,18 @@ class Column(QObject):
         painter = paint_data.painter
         painter.save()
 
-        first_row = int(paint_data.dirtyRect.top() / self._fontMetrics.height())
-        last_row = int(math.ceil(paint_data.dirtyRect.bottom() / self._fontMetrics.height()))
+        painter.setPen(TextColor if is_leading else InactiveTextColor)
+        painter.translate(VisualSpace, 0)
+        if self._document is None:
+            self._generateDocument()
 
-        for row_index in range(first_row, last_row):
-            self.paintRow(paint_data, is_leading, row_index)
+        # little trick to quickly change default text color for document without re-generating it
+        paint_context = QAbstractTextDocumentLayout.PaintContext()
+        paint_context.palette.setColor(QPalette.Text, TextColor if is_leading else InactiveTextColor)
+        # standard QTextDocument.draw also sets clip rect here, but we already have one
+        self._document.documentLayout().draw(painter, paint_context)
 
         painter.restore()
-
-    def paintRow(self, paint_data, is_leading, row_index):
-        if not (0 <= row_index < self._visibleRows):
-            return
-
-        painter = paint_data.painter
-        painter.setFont(self.font)
-        default_color = TextColor if is_leading else InactiveTextColor
-        row_data = self.getRowCachedData(row_index)
-
-        if not row_data.items:
-            return
-
-        # determine number of items that should be painted in one color
-        cur_color = default_color
-        cur_text = ''
-        first_item = None
-        item_index = 0
-
-        # enumerate items until end of until we get item with another color
-        for item in row_data.items:
-            item_color = item.color or default_color
-            if item_color != cur_color:
-                # if this item has different color, draw previous ones (if we have text)
-                if cur_text:
-                    if item_index is not None:
-                        painter.setPen(cur_color)
-                        rect = QRectF(self.getRectForIndex(first_item.index).topLeft(),
-                                      self.getRectForIndex(item.index.previous).bottomRight())
-                        painter.drawText(rect, Qt.AlignVCenter, cur_text)
-                cur_text = ''
-                first_item = item
-                cur_color = item_color
-
-            next_item_char = len(row_data.text) if item_index + 1 >= len(row_data.items) else row_data.items[item_index + 1].firstCharIndex
-            cur_text += row_data.text[item.firstCharIndex:next_item_char]
-            item_index += 1
-
-        # if we reached end, we should draw items that are left
-        if cur_text:
-            if first_item is None:
-                first_item = row_data.items[0]
-            painter.setPen(cur_color)
-            rect = QRectF(self.getRectForIndex(first_item.index).topLeft(),
-                          self.getRectForIndex(self.model.lastRowIndex(row_index)).bottomRight())
-            painter.drawText(rect, Qt.AlignVCenter, cur_text)
 
     def paintCaret(self, paint_data, is_leading, caret_position):
         painter = paint_data.painter
@@ -863,45 +985,179 @@ class Column(QObject):
     def _updateGeometry(self):
         self._fullVisibleRows = int(self._geom.height() // self._fontMetrics.height())
         self._visibleRows = self._fullVisibleRows + bool(int(self._geom.height()) % int(self._fontMetrics.height()))
-        self.model.setFrame(self._firstVisibleRow, self._visibleRows)
-        self._updateCache()
-        self.updateRequested.emit()
+        self.model.resizeFrame(self._visibleRows)
 
     def _updateCache(self):
-        old_cache = self._cache
-        self._cache = []
+        self._cache = [None for row in range(self._visibleRows)]
+        self._document = None
 
-        max_row_width = 0
-        for row_index in range(self.visibleRows):
-            row_data = RowData()
-            column_count = self.model.columnCount(row_index)
-            for column_index in range(column_count):
-                index = self.model.index(row_index, column_index)
-                index_data = IndexData(index)
-                index_data.firstCharIndex = len(row_data.text)
+        for row in range(self._visibleRows):
+            self._updateCachedRow(row)
+        self._generateDocument()
 
-                index_text = index_data.data()
+        self.updateRequested.emit()
 
-                if index_text is not None:
-                    row_data.text += index_text
+    def _generateDocument(self):
+        if self._document is None:
+            self._document = QTextDocument()
+            self._document.setDocumentMargin(0)
+            self._document.setDefaultFont(self.font)
 
-                    if self.spaced and column_index != column_count - 1:
-                        row_data.text += ' '
+            self._document.setDefaultStyleSheet("""
+                .cell-mod {{
+                    color: {mod_color};
+                }}
 
-                    if index.flags & ColumnModel.FlagModified:
-                        index_data.color = ModifiedTextColor
+                .highlight {{
+                    color: green;
+                }}
+            """.format(mod_color=ModifiedTextColor.name()))
 
-                row_data.items.append(index_data)
+            cursor = QTextCursor(self._document)
+            block_format = self._documentBlockFormat
+            for row_data in self._cache:
+                cursor.movePosition(QTextCursor.End)
+                cursor.insertHtml(row_data.html)
+                cursor.insertBlock()
+                cursor.setBlockFormat(block_format)
 
-            row_width = self._fontMetrics.width(row_data.text) + VisualSpace * 2
-            if row_width > max_row_width:
-                max_row_width = row_width
+            ideal_width = self._document.idealWidth() + VisualSpace * 2
+            if ideal_width != self._geom.width():
+                self.resizeRequested.emit(QSizeF(ideal_width, self._geom.height()))
 
-            self._cache.append(row_data)
+    def _updateCachedRow(self, row_index):
+        assert(0 <= row_index < len(self._cache))
 
-        if max_row_width != self._geom.width():
-            self.resizeRequested.emit(QSizeF(max_row_width, self._geom.height()))
+        row_data = RowData()
+        column_count = self.model.columnCount(row_index)
+        for column_index in range(column_count):
+            index = self.model.toSourceIndex(self.model.index(row_index, column_index))
+            index_data = IndexData(index)
+            index_data.firstCharIndex = len(row_data.text)
+            index_text = index_data.data()
 
+            if index_text is not None:
+                cell_classes = []
+                if index.flags & ColumnModel.FlagModified:
+                    cell_classes.append('cell-mod')
+                if index.flags & ColumnModel.FlagVirtual:
+                    cell_classes.append('highlight')
+
+                prepared_text = html.escape(index_text)
+                prepared_text = prepared_text.replace(' ', '&nbsp;')
+                if cell_classes:
+                    index_html = '<span class={0}>{1}</span>'.format(' '.join(cell_classes), prepared_text)
+                else:
+                    index_html = prepared_text
+
+                row_data.html += index_html
+                row_data.text += index_text
+
+            if self.spaced and column_index + 1 < column_count:
+                row_data.text += ' '
+                row_data.html += '<span> </span>'
+
+            row_data.items.append(index_data)
+
+        if self._document is not None:
+            block = self._document.findBlockByLineNumber(row_index)
+            cursor = QTextCursor(block)
+            cursor.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+            cursor.removeSelectedText()
+            cursor.insertHtml(row_data.html)
+
+        self._cache[row_index] = row_data
+
+    def _insertDocumentLine(self, index=-1):
+        if index < 0:
+            cursor = QTextCursor(self._document)
+            cursor.movePosition(QTextCursor.End)
+        else:
+            block = self._document.findBlockByLineNumber(index)
+            cursor = QTextCursor(block)
+
+        cursor.insertBlock()
+        cursor.setBlockFormat(self._documentBlockFormat)
+
+    @property
+    def _documentBlockFormat(self):
+        block_format = QTextBlockFormat()
+        block_format.setLineHeight(self._fontMetrics.height(), QTextBlockFormat.FixedHeight)
+        return block_format
+
+    def _removeDocumentLine(self, line_index):
+        block = self._document.findBlockByLineNumber(line_index)
+        if block.isValid():
+            cursor = QTextCursor(block)
+            cursor.select(QTextCursor.BlockUnderCursor)
+            cursor.removeSelectedText()
+            if line_index == 0:
+                cursor.deleteChar()
+
+    def _onFrameScrolled(self, new_first_row, old_first_row):
+        # do we have any rows that can be kept in cache?
+        if new_first_row > old_first_row and new_first_row < old_first_row + len(self._cache):
+            # frame is scrolled down, we can copy some rows from bottom to top
+            scrolled_by = new_first_row - old_first_row
+            valid_rows = len(self._cache) - scrolled_by
+            self._cache[:valid_rows] = self._cache[-valid_rows:]
+
+            if self._document is not None:
+                # remove first scrolled_by rows from document
+                for i in range(scrolled_by):
+                    self._removeDocumentLine(0)
+                    # and insert some rows into end
+                    self._insertDocumentLine()
+
+            for row in range(scrolled_by):
+                self._updateCachedRow(valid_rows + row)
+        elif new_first_row < old_first_row and new_first_row + len(self._cache) > old_first_row:
+            # frame is scrolled up, we can copy some rows from top to bottom
+            scrolled_by = old_first_row - new_first_row
+            valid_rows = len(self._cache) - scrolled_by
+            self._cache[-valid_rows:] = self._cache[:valid_rows]
+
+            if self._document is not None:
+                # remove last scrolled_by rows from document
+                for i in range(scrolled_by):
+                    self._removeDocumentLine(valid_rows)
+                # and insert some rows into beginning
+                for i in range(scrolled_by):
+                    self._insertDocumentLine(0)
+
+            for row in range(scrolled_by):
+                self._updateCachedRow(row)
+        else:
+            # unfortunately... we should totally reset cache
+            self._updateCache()
+        self.updateRequested.emit()
+
+    def _onFrameResized(self, new_frame_size, old_frame_size):
+        if new_frame_size < old_frame_size:
+            # just remove some rows...
+            self._cache[new_frame_size:] = []
+
+            if self._document is not None:
+                for i in range(old_frame_size - new_frame_size):
+                    self._removeDocumentLine(new_frame_size)
+        else:
+            # add new rows and initialize them
+            self._cache += [RowData()] * (new_frame_size - old_frame_size)
+
+            if self._document is not None:
+                for i in range(new_frame_size - old_frame_size):
+                    self._insertDocumentLine()
+
+            for row in range(new_frame_size - old_frame_size):
+                self._updateCachedRow(row + old_frame_size)
+
+        self.updateRequested.emit()
+
+    def _onDataChanged(self, first_index, last_index):
+        current_row = first_index.row
+        while current_row <= last_index.row:
+            self._updateCachedRow(current_row)
+            current_row += 1
         self.updateRequested.emit()
 
     def isIndexVisible(self, index, full_visible=False):
@@ -912,8 +1168,8 @@ class Column(QObject):
         rows_count = self.fullVisibleRows if full_visible else self.visibleRows
         return bool(self.model.toSourceIndex(index) and index.row < rows_count)
 
-    def createEditWidget(self, parent, index, widget_options):
-        return self.sourceModel.createEditWidget(parent, self.model.toSourceIndex(index), widget_options)
+    def createEditWidget(self, parent, index):
+        return self.sourceModel.createEditWidget(parent, self.model.toSourceIndex(index))
 
 
 def _translate(x, dx, dy=0):
@@ -975,9 +1231,8 @@ class HexWidget(QWidget):
         address_bar = AddressColumnModel(hex_column)
         self.appendColumn(address_bar)
         self.appendColumn(hex_column)
-        self.appendColumn(HexColumnModel(self.editor, IntegerCodec(IntegerCodec.Format8Bit, False),
-                                         IntegerFormatter(16, padding=2)))
-        # self.leadingColumn = hex_column
+        self.appendColumn(CharColumnModel(self.editor, encodings.getCodec('UTF-8')))
+        self.leadingColumn = self._columns[1]
 
     @property
     def editor(self):
@@ -1035,7 +1290,7 @@ class HexWidget(QWidget):
             self.view.update()
 
     def columnFromIndex(self, index):
-        return first(cd for cd in self._columns if cd.sourceModel is index.model or cd.model is index.model)
+        return utils.first(cd for cd in self._columns if cd.sourceModel is index.model or cd.model is index.model)
 
     def _columnToAbsolute(self, column, d):
         if column is None:
@@ -1057,10 +1312,6 @@ class HexWidget(QWidget):
         pass
 
     def _paint(self, event):
-        import time
-
-        start = time.time()
-
         if self._editMode:
             self._updateActiveEditWidget()
 
@@ -1071,9 +1322,6 @@ class HexWidget(QWidget):
 
         for column in self._columns:
             self._paintColumn(pd, column)
-
-        paint_time = time.time() - start
-        # print('repainted in {0} s'.format(paint_time))
 
     def _paintColumn(self, pd, column):
         painter = pd.painter
@@ -1109,7 +1357,6 @@ class HexWidget(QWidget):
         """Delta is number of rows to scroll by. Negative means scroll up, positive - down."""
         if row_delta and self._leadingColumn is not None:
             new_first_row = self.leadingColumn.firstVisibleRow + row_delta
-
             model_row_count = self._leadingColumn.sourceModel.rowCount()
             if new_first_row < 0:
                 new_first_row = 0
@@ -1311,6 +1558,8 @@ class HexWidget(QWidget):
         elif event.key() == Qt.Key_F2:
             if not self._editMode:
                 self.startEditMode()
+        elif event.key() == Qt.Key_Delete:
+            self.deleteSelected()
 
     def selectionBetweenIndexes(self, first, second):
         if not first or not second:
@@ -1447,25 +1696,23 @@ class HexWidget(QWidget):
             self.font = None
 
     def startEditMode(self):
-        if not self._editMode:
+        if not self._editMode and not self._editor.readOnly:
             caret_index = self._leadingColumn.sourceModel.indexFromPosition(self._caretPosition)
             # check if current index is editable
             if caret_index and caret_index.flags & ColumnModel.FlagEditable:
-                # prepare data for edit widget: initialize options object
-                widget_options = self.EditWidgetOptions()
-                widget_options.font = self.font()
-
                 # try to create edit widget
-                edit_widget = self._leadingColumn.createEditWidget(self, caret_index, widget_options)
+                edit_widget = self._leadingColumn.createEditWidget(self, caret_index)
                 if edit_widget is None or not isinstance(edit_widget, QWidget):
                     return
+                edit_widget.setFont(self.font())
                 self._activeEditWidget = edit_widget
                 self._editMode = True
 
+                edit_widget.setIndex(caret_index, AbstractEditWidget.InitReason)
+
                 self._updateActiveEditWidget()
 
-                edit_widget.commitRequested.connect(self._onEditWidgetCommitRequested)
-                edit_widget.rejectRequested.connect(self._onEditWidgetRejectRequested)
+                edit_widget.closeRequested.connect(self._onEditWidgetCloseRequested)
                 edit_widget.nextRequested.connect(self._onEditWidgetNextRequested)
 
                 self.view.setFocusProxy(edit_widget)
@@ -1499,14 +1746,14 @@ class HexWidget(QWidget):
             self._activeEditWidget.resize(index_rect.size().toSize())
             self._activeEditWidget.move(index_rect.topLeft().toPoint())
 
-    def _onEditWidgetCommitRequested(self):
-        self.endEditMode(True)
-
-    def _onEditWidgetRejectRequested(self):
-        self.endEditMode(False)
+    def _onEditWidgetCloseRequested(self):
+        self.endEditMode()
 
     def _onEditWidgetNextRequested(self, next_index, commit):
         if self._activeEditWidget is not None and next_index:
+            if commit:
+                self._activeEditWidget.commit()
+
             reason = AbstractEditWidget.MoveReason
             if next_index == self.caretIndex(self._leadingColumn).next:
                 reason = AbstractEditWidget.MoveNextReason
@@ -1515,6 +1762,55 @@ class HexWidget(QWidget):
 
             self.caretPosition = next_index.data(ColumnModel.EditorPositionRole)
             self._activeEditWidget.setIndex(next_index, reason)
+
+    def clearSelection(self):
+        self._selections = []
+        self.view.update()
+
+    def selectAll(self):
+        if self.editor is not None:
+            self._selections = [Selection(0, len(self._editor))]
+            self.view.update()
+
+    def copy(self):
+        if len(self._selections) == 1:
+            from hex.clipboard import Clipboard
+
+            clb = Clipboard()
+            clb.copy(self.editor, self._selections[0].start, self._selections[0].length)
+
+    def paste(self):
+        from hex.clipboard import Clipboard
+
+        clb = Clipboard()
+        span = clb.spanFromData(self.editor)
+        if span is not None:
+            try:
+                self.editor.insertSpan(self.caretPosition, span)
+            except IOError:
+                pass
+
+    def undo(self):
+        try:
+            self.editor.undo()
+        except IOError:
+            pass
+
+    def redo(self, branch=None):
+        try:
+            self.editor.redo(branch)
+        except IOError:
+            pass
+
+    def deleteSelected(self):
+        """Deletes all bytes that are selected"""
+        if not self._editor.readOnly and not self._editor.fixedSize:
+            self._editor.beginComplexAction()
+            try:
+                for selection in self._selections:
+                    self._editor.remove(selection.start, selection.length)
+            finally:
+                self._editor.endComplexAction()
 
 
 class Selection(object):
@@ -1537,17 +1833,79 @@ class Selection(object):
 
 
 class AbstractEditWidget(object):
+    """Widget that will be used to edit cell in table. You should extend this class to create you own
+    edit widget. Widget operates on single model index. Widget can change any index data and can support
+    precommitting. Precommitting allows user to see changes he makes on-the-fly. For example, without
+    precommitting data for index will be written only when return is pressed or user has requested a commit in
+    another way. But when precommitting is supported, changes will be commited just as user types characters and
+    changes are rejected when user presses (for example) escape key.
+    Widget emits nextRequested signal when wants to start editing another index. First argument of this signal
+    determines which index should be selected next. If second argument is True, HexWidget will make edit widget
+    to commit data before selecting another index. Note that data is committed only when next index is valid and
+    can be edited.
+    closeRequested signal is emitted when edit widget wants to close.
+    """
+
     UnknownReason, InitReason, MoveReason, MoveNextReason, MovePreviousReason = range(5)
+
+    def __init__(self, index):
+        self._index = index
+        self._precommitted = False
+
+    @property
+    def index(self):
+        return self._index
+
+    @property
+    def modified(self):
+        """Should return True if data was modified by user"""
+        raise NotImplementedError()
+
+    @property
+    def data(self):
+        raise NotImplementedError()
+
+    def setIndex(self, new_index, reason=UnknownReason):
+        """Reason argument helps to determine which action had caused index change."""
+        if self._index != new_index:
+            self._index = new_index
+            self._precommitted = False
+
+    def precommit(self):
+        editor = self._index.model.editor
+        if not self._precommitted:
+            editor.beginUndoAction()
+        editor.write(self._index.data(ColumnModel.EditorPositionRole), self.data, ColumnModel.EditorDataRole)
+
+    def commit(self):
+        if self._precommitted:
+            self._index.model.editor.endUndoAction()
+        if self.modified:
+            editor = self._index.model.editor
+            self._index.model.setIndexData(self._index, self.data, ColumnModel.EditorDataRole)
+
+    def rollback(self):
+        if self._precommitted:
+            editor = self._index.model.editor
+            editor.endUndoAction()
+            editor.undo()
 
 
 class StandardTextEditWidget(QLineEdit, AbstractEditWidget):
-    commitRequested = pyqtSignal()
-    rejectRequested = pyqtSignal()
     nextRequested = pyqtSignal(ModelIndex, bool)
+    closeRequested = pyqtSignal()
 
-    def __init__(self, parent, index, style_options):
+    def __init__(self, parent, index):
         QLineEdit.__init__(self, parent)
+        AbstractEditWidget.__init__(self, index)
 
+        self.overwriteMode = False # when override mode is True, typed character will not be inserted, but
+                                  # will replace one after the caret
+        self.allowCursorAfterText = True
+        self.blockCursor = False
+        self._modified = False
+
+        # override standard palette to make widget look like HexWidget
         palette = self.palette()
         palette.setColor(QPalette.Base, BackgroundColor)
         palette.setColor(QPalette.WindowText, TextColor)
@@ -1555,61 +1913,94 @@ class StandardTextEditWidget(QLineEdit, AbstractEditWidget):
         palette.setColor(QPalette.HighlightedText, TextColor)
         self.setPalette(palette)
 
+        # this style allows us to control width of text cursor drawn
         self.setStyle(StandardTextEditWidgetProxyStyle(self.style()))
         self._updateCursorWidth()
 
-        self.returnPressed.connect(self.commitRequested)
+        self.returnPressed.connect(self._onReturnPressed)
         self.cursorPositionChanged.connect(self._onCursorPositionChanged)
         self.textChanged.connect(self._updateCursorWidth)
 
+    @property
+    def modified(self):
+        return self._modified or self.isModified()
+
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Left and self.cursorPosition() == 0:
+            # when cursor at very end and left key is pressed, try to go to previous index
             self.nextRequested.emit(self._index.previous, True)
-        elif event.key() == Qt.Key_Right and self.cursorPosition() + 1 == len(self.text()):
-            self.nextRequested.emit(self._index.next, True)
+            return
+        elif event.key() == Qt.Key_Right:
+            # when cursor at very end and right key is pressed, try to go to next index. When
+            # we are in overwrite mode, we cannot position cursor after last character
+            if self.cursorPosition() == self._lastValidCursorPosition():
+                self.nextRequested.emit(self._index.next, True)
+                return
         elif event.key() == Qt.Key_Escape:
-            self.rejectRequested.emit()
-        else:
-            QLineEdit.keyPressEvent(self, event)
+            # close editor on escape
+            self.closeRequested.emit()
+        elif self.overwriteMode and len(event.text()) == 1 and ord(event.text()[0]) >= ord('!'):
+            # this is input char - overwrite current character
+            cur_pos = self.cursorPosition()
+            text = self.text()[:cur_pos] + event.text() + self.text()[cur_pos+1:]
+            if self.validator() is None or self.validator().validate(text, cur_pos)[0] != QValidator.Invalid:
+                self.setText(text)
+                self._modified = True
+                if cur_pos == self._lastValidCursorPosition():
+                    self.nextRequested.emit(self._index.next, True)
+                else:
+                    self.setCursorPosition(cur_pos + 1)
+            return
+        QLineEdit.keyPressEvent(self, event)
 
     def _updateCursorWidth(self):
-        fm = QFontMetricsF(self.font())
-        cursor_pos = self.cursorPosition()
-        if cursor_pos < len(self.text()):
-            cursor_width = fm.width(self.text()[cursor_pos])
-        else:
-            cursor_width = -1
+        cursor_width = -1
+        if self.blockCursor and self.overwriteMode:
+            cursor_pos = self.cursorPosition()
+            if cursor_pos < len(self.text()):
+                cursor_width = QFontMetricsF(self.font()).width(self.text()[cursor_pos])
         self.style().cursorWidth = round(cursor_width)
 
     def _onCursorPositionChanged(self, old, new):
-        if new >= len(self.text()) and self.text():
+        if self.overwriteMode and new > self._lastValidCursorPosition() and self.text():
             self.setCursorPosition(len(self.text()) - 1)
         self._updateCursorWidth()
 
+    def _onReturnPressed(self):
+        self.commit()
+        self.closeRequested.emit()
+
+    def _lastValidCursorPosition(self):
+        if self.overwriteMode and not self.allowCursorAfterText and self.text():
+            return len(self.text()) - 1
+        else:
+            return len(self.text())
+
+    def setIndex(self, new_index, reason=AbstractEditWidget.UnknownReason):
+        AbstractEditWidget.setIndex(self, new_index, reason)
+        self._modified = False
+        if reason in (self.MoveNextReason, self.UnknownReason, self.InitReason):
+            self.setCursorPosition(0)
+        elif reason == self.MovePreviousReason:
+            self.setCursorPosition(self._lastValidCursorPosition())
+
 
 class HexColumnEditWidget(StandardTextEditWidget):
-    def __init__(self, parent, index, style_options):
-        StandardTextEditWidget.__init__(self, parent, index, style_options)
+    def __init__(self, parent, index):
+        StandardTextEditWidget.__init__(self, parent, index)
         self.formatter = index.model.formatter
         self.codec = index.model.valuecodec
         self.setValidator(FormatterValidator(self.formatter, self.codec))
+        self.overwriteMode = True
+        self.allowCursorAfterText = False
 
-        self.setIndex(index, self.InitReason)
+    @property
+    def data(self):
+        return self.codec.encode(self.formatter.parse(self.text()))
 
-    def setIndex(self, new_index, change_reason=AbstractEditWidget.UnknownReason):
+    def setIndex(self, new_index, reason=AbstractEditWidget.UnknownReason):
         self.setText(new_index.data() if new_index else '')
-        if change_reason in (self.MoveNextReason, self.UnknownReason, self.InitReason):
-            self.setCursorPosition(0)
-        elif change_reason == self.MovePreviousReason:
-            self.setCursorPosition(len(self.text()) - 1)
-        self._index = new_index
-
-    def commit(self):
-        if self._index:
-            num = self.formatter.parse(self.text())
-            self._index.model.setIndexData(self._index, self.codec.encode(num), ColumnModel.EditorDataRole)
-        else:
-            raise ValueError('invalid index')
+        StandardTextEditWidget.setIndex(self, new_index, reason)
 
 
 class FormatterValidator(QValidator):
