@@ -1605,21 +1605,26 @@ class HexWidget(QWidget):
         self._updateScrollBars()
 
     def _updateScrollBars(self):
-        if self._shouldShowVScroll:
+        should_show = self._shouldShowVScroll
+        if should_show:
             lc = self._leadingColumn
             max_value = max(lc.sourceModel.realRowCount() - 1, lc.firstVisibleRow)
             self.vScrollBar.setRangeLarge(0, max_value)
             self.vScrollBar.setPageStepLarge(lc.visibleRows)
             # self.vScrollBar.setSingleStepLarge(1)
             self.vScrollBar.setValueLarge(lc.firstVisibleRow)
-        self.vScrollBar.setVisible(self._shouldShowVScroll)
+        self.vScrollBar.setVisible(should_show)
 
-        if self._shouldShowHScroll:
+        should_show = self._shouldShowHScroll
+        if should_show:
             self.hScrollBar.setRange(0, self._totalWidth - self.view.width())
             self.hScrollBar.setPageStep(self.view.width())
             self.hScrollBar.setSingleStep(10)
             self.hScrollBar.setValue(self._dx)
-        self.hScrollBar.setVisible(self._shouldShowHScroll)
+        self.hScrollBar.setVisible(should_show)
+
+        self.layout().invalidate() # as we change children size inside resizeEvent, layout cannot determine that
+                                   # scrollbar has been shown or hidden
 
     @property
     def _shouldShowVScroll(self):
