@@ -1,10 +1,23 @@
-from PyQt4.QtCore import QFile, QFileInfo, Qt
-from PyQt4.QtGui import QMainWindow, QMdiArea, QFileDialog, QKeySequence, QMdiSubWindow, QApplication, QProgressBar
+from PyQt4.QtCore import QFileInfo, Qt, QByteArray
+from PyQt4.QtGui import QMainWindow, QTabWidget, QFileDialog, QKeySequence, QMdiSubWindow, QApplication, QProgressBar, \
+                        QWidget, QVBoxLayout, QFileIconProvider, QApplication, QIcon
 from hex.hexwidget import HexWidget
 import hex.settings as settings
 import hex.appsettings as appsettings
 import hex.utils as utils
 import hex.files as files
+import hex.resources.qrc_main
+
+
+def forActiveWidget(fn):
+    def wrapped(self):
+        if self.activeSubWidget is not None:
+            return fn(self)
+    return wrapped
+
+
+globalSettings = settings.globalSettings()
+globalQuickSettings = settings.globalQuickSettings()
 
 
 class MainWindow(QMainWindow):
@@ -13,52 +26,68 @@ class MainWindow(QMainWindow):
         self._inited = False
 
         self.setWindowTitle(QApplication.applicationName())
+        self.setWindowIcon(QIcon(':/main/images/hex.png'))
 
-        self.mdiArea = QMdiArea()
-        self.mdiArea.setViewMode(QMdiArea.TabbedView)
-        self.mdiArea.setDocumentMode(True)
-        self.mdiArea.setTabsClosable(True)
-        self.mdiArea.setTabsMovable(True)
-        self.mdiArea.subWindowActivated.connect(self._onSubWindowActivated)
+        self.subWidgets = []
 
-        self.setCentralWidget(self.mdiArea)
-        self.setFocusProxy(self.mdiArea)
+        self.tabsWidget = QTabWidget(self)
+        self.tabsWidget.setDocumentMode(True)
+        self.tabsWidget.setTabsClosable(True)
+        self.tabsWidget.setFocusPolicy(Qt.StrongFocus)
+        self.tabsWidget.currentChanged.connect(self._onTabChanged)
+        self.tabsWidget.tabCloseRequested.connect(self.closeTab)
+
+        self.setCentralWidget(self.tabsWidget)
+        self.setFocusProxy(self.tabsWidget)
         self.setFocus()
+
+        QApplication.instance().focusChanged.connect(self._onGlobalFocusChanged)
 
         menubar = self.menuBar()
-        file_menu = menubar.addMenu(utils.tr('File'))
-        action = file_menu.addAction(utils.tr('Open file...'))
-        action.setShortcut(QKeySequence('Ctrl+O'))
-        action.triggered.connect(self.openFileDialog)
-        file_menu.addSeparator()
-        file_menu.addAction(utils.tr('Close')).triggered.connect(self.mdiArea.closeActiveSubWindow)
-        file_menu.addSeparator()
-        file_menu.addAction(utils.tr('Exit')).triggered.connect(self.close)
+        
+        self.fileMenu = menubar.addMenu(utils.tr('File'))
+        self.actionOpenFile = self.fileMenu.addAction(utils.tr('Open file...'))
+        self.actionOpenFile.setShortcut(QKeySequence('Ctrl+O'))
+        self.actionOpenFile.triggered.connect(self.openFileDialog)
+        self.fileMenu.addSeparator()
+        self.actionCloseTab = self.fileMenu.addAction(utils.tr('Close'))
+        self.actionCloseTab.setShortcut(QKeySequence('Ctrl+W'))
+        self.actionCloseTab.triggered.connect(self.closeActiveTab)
+        self.fileMenu.addSeparator()
+        self.actionExit = self.fileMenu.addAction(utils.tr('Exit'))
+        self.actionExit.triggered.connect(self.close)
 
-        edit_menu = menubar.addMenu(utils.tr('Edit'))
-        action = edit_menu.addAction(utils.tr('Undo'))
-        action.setShortcut(QKeySequence('Ctrl+Z'))
-        action.triggered.connect(self.undo)
-        action = edit_menu.addAction(utils.tr('Redo'))
-        action.setShortcut(QKeySequence('Ctrl+Y'))
-        action.triggered.connect(self.redo)
-        edit_menu.addSeparator()
+        self.editMenu = menubar.addMenu(utils.tr('Edit'))
+        self.actionUndo = self.editMenu.addAction(utils.tr('Undo'))
+        self.actionUndo.setShortcut(QKeySequence('Ctrl+Z'))
+        self.actionUndo.triggered.connect(self.undo)
+        self.actionRedo = self.editMenu.addAction(utils.tr('Redo'))
+        self.actionRedo.setShortcut(QKeySequence('Ctrl+Y'))
+        self.actionRedo.triggered.connect(self.redo)
+        self.editMenu.addSeparator()
 
-        action = edit_menu.addAction(utils.tr('Copy'))
-        action.setShortcut(QKeySequence('Ctrl+C'))
-        action.triggered.connect(self.copy)
-        action = edit_menu.addAction(utils.tr('Paste'))
-        action.setShortcut(QKeySequence('Ctrl+V'))
-        action.triggered.connect(self.paste)
-        edit_menu.addSeparator()
+        self.copyAction = self.editMenu.addAction(utils.tr('Copy'))
+        self.copyAction.setShortcut(QKeySequence('Ctrl+C'))
+        self.copyAction.triggered.connect(self.copy)
+        self.pasteAction = self.editMenu.addAction(utils.tr('Paste'))
+        self.pasteAction.setShortcut(QKeySequence('Ctrl+V'))
+        self.pasteAction.triggered.connect(self.paste)
+        self.editMenu.addSeparator()
 
-        action = edit_menu.addAction(utils.tr('Clear selection'))
-        action.triggered.connect(self.clearSelection)
-        action = edit_menu.addAction(utils.tr('Select all'))
-        action.setShortcut(QKeySequence('Ctrl+A'))
-        action.triggered.connect(self.selectAll)
+        self.actionClearSelection = self.editMenu.addAction(utils.tr('Clear selection'))
+        self.actionClearSelection.setShortcut(QKeySequence('Ctrl+D'))
+        self.actionClearSelection.triggered.connect(self.clearSelection)
+        self.actionSelectAll = self.editMenu.addAction(utils.tr('Select all'))
+        self.actionSelectAll.setShortcut(QKeySequence('Ctrl+A'))
+        self.actionSelectAll.triggered.connect(self.selectAll)
 
-        self.setFocus()
+        self.helpMenu = menubar.addMenu(utils.tr('?'))
+        self.actionAbout = self.helpMenu.addAction(utils.tr('About program...'))
+        self.actionAbout.triggered.connect(self.showAbout)
+
+        geom = globalQuickSettings['mainWindow_geometry']
+        if geom and isinstance(geom, str):
+            self.restoreGeometry(QByteArray.fromHex(geom))
 
     def showEvent(self, event):
         if not self._inited:
@@ -66,9 +95,21 @@ class MainWindow(QMainWindow):
             self._inited = True
 
     def closeEvent(self, event):
-        self.mdiArea.closeAllSubWindows()
-        if self.mdiArea.activeSubWindow() is not None:
-            event.ignore()
+        while self.tabsWidget.count():
+            if not self.closeTab(0):
+                event.ignore()
+                return
+
+        globalQuickSettings['mainWindow_geometry'] = str(self.saveGeometry().toHex(), encoding='ascii')
+
+    def closeActiveTab(self):
+        self.closeTab(self.tabsWidget.currentIndex())
+
+    def closeTab(self, tab_index):
+        subWidget = self.tabsWidget.widget(tab_index)
+        self.tabsWidget.removeTab(tab_index)
+        self.subWidgets = [w for w in self.subWidgets if w is not subWidget]
+        return True
 
     def openFileDialog(self):
         from hex.loadfiledialog import LoadFileDialog
@@ -82,59 +123,74 @@ class MainWindow(QMainWindow):
                 self.openFile(filename, load_dialog.loadOptions)
 
     def openFile(self, filename, load_options=None):
-        self.mdiArea.addSubWindow(HexSubWindow(self, filename, files.editorFromFile(filename, load_options))).showMaximized()
+        subWidget = HexSubWindow(self, filename, files.editorFromFile(filename, load_options))
+        icon_provider = QFileIconProvider()
+        self.tabsWidget.addTab(subWidget, icon_provider.icon(QFileInfo(filename)), QFileInfo(filename).fileName())
+        self.subWidgets.append(subWidget)
+        self.tabsWidget.setCurrentWidget(subWidget)
 
-    def _onSubWindowActivated(self, window):
-        if window is not None and hasattr(window, 'path'):
+    def _onTabChanged(self, tab_index):
+        subWidget = self.tabsWidget.widget(tab_index)
+        if subWidget is not None and hasattr(subWidget, 'path'):
             self.setWindowTitle('')
-            self.setWindowFilePath(window.path)
+            self.setWindowFilePath(subWidget.path)
         else:
             self.setWindowTitle(QApplication.applicationName())
+        if subWidget is not None:
+            subWidget.setFocus()
+
+    def _onGlobalFocusChanged(self, old, new):
+        # check if this widget is child of self.tabsWidget
+        if not isinstance(new, (HexSubWindow, HexWidget)):
+            widget = new
+            while widget is not None:
+                if widget is self.tabsWidget:
+                    if self.tabsWidget.currentWidget() is not None:
+                        self.tabsWidget.currentWidget().setFocus()
+                    break
+                widget = widget.parentWidget()
 
     @property
-    def activeHexWidget(self):
-        subwin = self.mdiArea.activeSubWindow()
-        if subwin is not None and hasattr(subwin, 'hexWidget'):
-            return subwin.hexWidget
-        return None
+    def activeSubWidget(self):
+        return self.tabsWidget.currentWidget()
 
+    @forActiveWidget
     def clearSelection(self):
-        hw = self.activeHexWidget
-        if hw is not None:
-            hw.clearSelection()
+        self.activeSubWidget.hexWidget.clearSelection()
 
+    @forActiveWidget
     def selectAll(self):
-        hw = self.activeHexWidget
-        if hw is not None:
-            hw.selectAll()
+        self.activeSubWidget.hexWidget.selectAll()
 
+    @forActiveWidget
     def copy(self):
-        hw = self.activeHexWidget
-        if hw is not None:
-            hw.copy()
+        self.activeSubWidget.hexWidget.copy()
 
+    @forActiveWidget
     def paste(self):
-        hw = self.activeHexWidget
-        if hw is not None:
-            hw.paste()
+        self.activeSubWidget.hexWidget.paste()
 
+    @forActiveWidget
     def undo(self):
-        hw = self.activeHexWidget
-        if hw is not None:
-            hw.undo()
+        self.activeSubWidget.hexWidget.undo()
 
+    @forActiveWidget
     def redo(self):
-        hw = self.activeHexWidget
-        if hw is not None:
-            hw.redo()
+        self.activeSubWidget.hexWidget.redo()
+
+    def showAbout(self):
+        from hex.aboutdialog import AboutDialog
+
+        dlg = AboutDialog(self)
+        dlg.exec_()
 
 
-class HexSubWindow(QMdiSubWindow):
+class HexSubWindow(QWidget):
     def __init__(self, parent, filename, editor):
-        QMdiSubWindow.__init__(self, parent)
-        self.setAttribute(Qt.WA_DeleteOnClose)
+        QWidget.__init__(self, parent)
         self.path = QFileInfo(filename).fileName()
         self.hexWidget = HexWidget(self, editor)
-        self.setWidget(self.hexWidget)
         self.setFocusProxy(self.hexWidget)
-        self.setWindowTitle(self.path)
+        self.setLayout(QVBoxLayout())
+        self.layout().setContentsMargins(0, 0, 0, 0)
+        self.layout().addWidget(self.hexWidget)
