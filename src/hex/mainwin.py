@@ -85,7 +85,7 @@ class MainWindow(QMainWindow):
         self.actionAbout = self.helpMenu.addAction(utils.tr('About program...'))
         self.actionAbout.triggered.connect(self.showAbout)
 
-        geom = globalQuickSettings['mainWindow_geometry']
+        geom = globalQuickSettings['mainWindow.geometry']
         if geom and isinstance(geom, str):
             self.restoreGeometry(QByteArray.fromHex(geom))
 
@@ -100,7 +100,7 @@ class MainWindow(QMainWindow):
                 event.ignore()
                 return
 
-        globalQuickSettings['mainWindow_geometry'] = str(self.saveGeometry().toHex(), encoding='ascii')
+        globalQuickSettings['mainWindow.geometry'] = str(self.saveGeometry().toHex(), encoding='ascii')
 
     def closeActiveTab(self):
         self.closeTab(self.tabsWidget.currentIndex())
