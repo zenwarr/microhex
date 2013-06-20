@@ -191,6 +191,14 @@ class ColumnModel(QObject):
     def indexData(self, index, role=Qt.DisplayRole):
         return None
 
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        # this is standard header data. It works only for regular columns and displays offset from start of the row.
+        if self.regular and orientation == Qt.Horizontal and role == Qt.DisplayRole:
+            if 0 <= section <= self.columnCount(0):
+                cell_text_size = len(self.index(0, 0).data())
+                cell_offset = self.index(0, section).data(self.EditorPositionRole)
+                return IntegerFormatter(base=16, padding=cell_text_size).format(cell_offset)
+
     def hasIndex(self, row, column):
         """Return True if there is index at row and column in this model"""
         if self.rowCount() < 0 or row < self.rowCount():
@@ -380,6 +388,10 @@ class HexColumnModel(ColumnModel):
     def preferSpaced(self):
         return True
 
+    @property
+    def regular(self):
+        return True
+
     def _updateRowCount(self):
         self._rowCount = len(self.editor) // self.bytesOnRow + bool(len(self.editor) % self.bytesOnRow)
 
@@ -490,6 +502,9 @@ class CharColumnModel(ColumnModel):
                 return '∎'
         return None
 
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        return None
+
     def indexFlags(self, index):
         flags = self.FlagEditable
         if index.row + 1 >= self.realRowCount() and index > self.lastRealIndex:
@@ -596,6 +611,9 @@ class AddressColumnModel(ColumnModel):
                 ))
         return None
 
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        return None
+
     def indexFromPosition(self, position):
         if self._linkedModel is not None:
             model_index = self._linkedModel.indexFromPosition(position)
@@ -694,6 +712,9 @@ class FrameProxyModel(ColumnModel):
     def setIndexData(self, index, value, role=Qt.EditRole):
         return self.sourceModel.setIndexData(self.toSourceIndex(index), value, role)
 
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        return self.sourceModel.headerData(section, orientation, role)
+
     def toSourceIndex(self, index):
         if not index or index.model is self.sourceModel:
             return index
@@ -741,6 +762,9 @@ SelectionBorderColor = QColor(20, 205, 195)
 # EditCaretBorderColor = EditCaretBackgroundColor
 EditCaretTextColor = QColor(Qt.white)
 ModifiedTextColor = QColor(Qt.red)
+HeaderBackgroundColor = BackgroundColor
+HeaderTextColor = TextColor
+HeaderInactiveTextColor = InactiveTextColor
 
 
 class RowData(object):
@@ -888,7 +912,7 @@ class PlainTextDocumentBackend(ColumnDocumentBackend):
             if block.isValid():
                 block_rect = self._document.documentLayout().blockBoundingRect(block)
                 line = block.layout().lineAt(0)
-                x = line.cursorToX(index_data.firstCharIndex)[0] + VisualSpace
+                x = line.cursorToX(index_data.firstCharIndex)[0]
                 y = block_rect.y() + line.position().y()
                 width = self._column._fontMetrics.width(index_data.text)
                 return QRectF(x, y, width, self._column._fontMetrics.height())
@@ -897,7 +921,6 @@ class PlainTextDocumentBackend(ColumnDocumentBackend):
     def cellForPoint(self, point):
         self.generateDocument()
 
-        point = QPointF(point.x() - VisualSpace, point.y())
         char_position = self._document.documentLayout().hitTest(point, Qt.ExactHit)
         block = self._document.findBlock(char_position)
         if block.isValid():
@@ -911,92 +934,89 @@ class PlainTextDocumentBackend(ColumnDocumentBackend):
         return -1, -1
 
 
-class TableDocumentBackend(ColumnDocumentBackend):
-    def __init__(self, column):
-        ColumnDocumentBackend.__init__(self, column)
-
-    def generateDocument(self):
-        if self._document is None:
-            self._document = self._column.createDocumentTemplate()
-
-            cursor = QTextCursor(self._document)
-
-            cursor.beginEditBlock()
-            try:
-                self._table = cursor.insertTable(len(self._column._cache), self._column.model.columnCount(0))
-                self._table.setFormat(self._tableFormat)
-                for row_index in range(len(self._column._cache)):
-                    for column_index in range(self._table.columns()):
-                        cell = self._table.cellAt(row_index, column_index)
-                        cursor = cell.firstCursorPosition()
-                        try:
-                            cursor.insertHtml(self._column._cache[row_index].items[column_index].html)
-                        except IndexError:
-                            pass
-            finally:
-                cursor.endEditBlock()
-
-            self.documentUpdated.emit()
-
-    @property
-    def _tableFormat(self):
-        fmt = QTextTableFormat()
-        fmt.setBorderStyle(QTextTableFormat.BorderStyle_None)
-        fmt.setBorder(0)
-        fmt.setCellPadding(0)
-        fmt.setCellSpacing(0)
-        return fmt
-
-    def updateRow(self, row_index, row_data):
-        if self._document is not None:
-            cursor = self._table.cellAt(row_index, 0).firstCursorPosition()
-            cursor.movePosition(QTextCursor.NextRow)
-            cursor.removeSelectedText()
-            cursor.beginEditBlock()  # we do not use undo/redo, but this thing increases perfomance, blocking updating
-                                     # layout until endEditBlock is called.
-            try:
-                for column_index in range(self._table.columns()):
-                    cursor = self._table.cellAt(row_index, column_index).firstCursorPosition()
-                    cursor.insertHtml(row_data.items[column_index].html)
-            finally:
-                cursor.endEditBlock()
-
-            self.documentUpdated.emit()
-
-    def removeRows(self, row_index, number_of_rows):
-        if self._document is not None:
-            self._table.removeRows(row_index, number_of_rows)
-            self.documentUpdated.emit()
-
-    def insertRows(self, row_index, number_of_rows):
-        if self._document is not None:
-            if row_index < 0:
-                self._table.appendRows(number_of_rows)
-            else:
-                self._table.insertRows(row_index, number_of_rows)
-
-            self.documentUpdated.emit()
-
-    def rectForCell(self, row_index, cell_index):
-        self.generateDocument()
-
-        cursor = self._table.cellAt(row_index, cell_index).firstCursorPosition()
-        if not cursor.isNull():
-            r = self._document.documentLayout().blockBoundingRect(cursor.block())
-            r.translate(VisualSpace, 0)
-            return r
-
-        return QRectF()
-
-    def cellForPoint(self, point):
-        self.generateDocument()
-
-        for row_index in range(len(self._column._cache)):
-            for column_index in range(self._table.columns()):
-                if self.rectForCell(row_index, column_index).contains(point):
-                    return row_index, column_index
-        return -1, -1
-
+# class TableDocumentBackend(ColumnDocumentBackend):
+#     def __init__(self, column):
+#         ColumnDocumentBackend.__init__(self, column)
+#
+#     def generateDocument(self):
+#         if self._document is None:
+#             self._document = self._column.createDocumentTemplate()
+#
+#             cursor = QTextCursor(self._document)
+#
+#             cursor.beginEditBlock()
+#             try:
+#                 self._table = cursor.insertTable(len(self._column._cache), self._column.model.columnCount(0))
+#                 self._table.setFormat(self._tableFormat)
+#                 for row_index in range(len(self._column._cache)):
+#                     for column_index in range(self._table.columns()):
+#                         cell = self._table.cellAt(row_index, column_index)
+#                         cursor = cell.firstCursorPosition()
+#                         try:
+#                             cursor.insertHtml(self._column._cache[row_index].items[column_index].html)
+#                         except IndexError:
+#                             pass
+#             finally:
+#                 cursor.endEditBlock()
+#
+#             self.documentUpdated.emit()
+#
+#     @property
+#     def _tableFormat(self):
+#         fmt = QTextTableFormat()
+#         fmt.setBorderStyle(QTextTableFormat.BorderStyle_None)
+#         fmt.setBorder(0)
+#         fmt.setCellPadding(0)
+#         fmt.setCellSpacing(0)
+#         return fmt
+#
+#     def updateRow(self, row_index, row_data):
+#         if self._document is not None:
+#             cursor = self._table.cellAt(row_index, 0).firstCursorPosition()
+#             cursor.movePosition(QTextCursor.NextRow)
+#             cursor.removeSelectedText()
+#             cursor.beginEditBlock()  # we do not use undo/redo, but this thing increases perfomance, blocking updating
+#                                      # layout until endEditBlock is called.
+#             try:
+#                 for column_index in range(self._table.columns()):
+#                     cursor = self._table.cellAt(row_index, column_index).firstCursorPosition()
+#                     cursor.insertHtml(row_data.items[column_index].html)
+#             finally:
+#                 cursor.endEditBlock()
+#
+#             self.documentUpdated.emit()
+#
+#     def removeRows(self, row_index, number_of_rows):
+#         if self._document is not None:
+#             self._table.removeRows(row_index, number_of_rows)
+#             self.documentUpdated.emit()
+#
+#     def insertRows(self, row_index, number_of_rows):
+#         if self._document is not None:
+#             if row_index < 0:
+#                 self._table.appendRows(number_of_rows)
+#             else:
+#                 self._table.insertRows(row_index, number_of_rows)
+#
+#             self.documentUpdated.emit()
+#
+#     def rectForCell(self, row_index, cell_index):
+#         self.generateDocument()
+#
+#         cursor = self._table.cellAt(row_index, cell_index).firstCursorPosition()
+#         if not cursor.isNull():
+#             return self._document.documentLayout().blockBoundingRect(cursor.block())
+#
+#         return QRectF()
+#
+#     def cellForPoint(self, point):
+#         self.generateDocument()
+#
+#         for row_index in range(len(self._column._cache)):
+#             for column_index in range(self._table.columns()):
+#                 if self.rectForCell(row_index, column_index).contains(point):
+#                     return row_index, column_index
+#         return -1, -1
 
 
 class Column(QObject):
@@ -1019,6 +1039,8 @@ class Column(QObject):
         self._fullVisibleRows = 0
         self._visibleRows = 0
         self._firstVisibleRow = 0
+
+        self._showHorizontalHeader = True
 
         self._spaced = self.sourceModel.preferSpaced
         self._cache = []
@@ -1118,16 +1140,8 @@ class Column(QObject):
 
     def getRectForIndex(self, index):
         index = self.model.fromSourceIndex(index)
-        return self._documentBackend.rectForCell(index.row, index.column)
-
-    # def getRectForRow(self, visible_row_index):
-    #     if 0 <= visible_row_index < self._visibleRows:
-    #         block = self._document.findBlockByLineNumber(visible_row_index)
-    #         if block.isValid():
-    #             rect = block.layout().lineAt(0).rect()
-    #             rect.translate(VisualSpace, 0)
-    #             return rect
-    #     return QRectF()
+        rect = self._documentBackend.rectForCell(index.row, index.column)
+        return rect.translated(self.documentOrigin)
 
     def getPolygonsForRange(self, first_index, last_index):
         first_index = self.model.toSourceIndex(first_index)
@@ -1175,6 +1189,7 @@ class Column(QObject):
                 return range_polygon,
 
     def indexFromPoint(self, point):
+        point = QPoint(point.x() - self.documentOrigin.x(), point.y() - self.documentOrigin.y())
         row, column = self._documentBackend.cellForPoint(point)
         return self.model.toSourceIndex(self.model.index(row, column))
 
@@ -1183,7 +1198,7 @@ class Column(QObject):
         painter.save()
 
         painter.setPen(TextColor if is_leading else InactiveTextColor)
-        painter.translate(VisualSpace, 0)
+        painter.translate(self.documentOrigin)
 
         # little trick to quickly change default text color for document without re-generating it
         paint_context = QAbstractTextDocumentLayout.PaintContext()
@@ -1192,6 +1207,8 @@ class Column(QObject):
         self._documentBackend.document.documentLayout().draw(painter, paint_context)
 
         painter.restore()
+
+        self.paintHorizontalHeader(paint_data, is_leading)
 
     def paintCaret(self, paint_data, is_leading, caret_position):
         painter = paint_data.painter
@@ -1212,9 +1229,73 @@ class Column(QObject):
                 painter.setPen(QPen(QBrush(SelectionBorderColor), 2.0))
                 painter.drawPolygon(sel_polygon)
 
+    def paintHorizontalHeader(self, paint_data, is_leading):
+        # header can be painted only for regular columns
+        if not self.hasHorizontalHeader:
+            return
+
+        painter = paint_data.painter
+
+        painter.setPen(BorderColor)
+
+        header_rect = self.getHorizontalHeaderRect()
+        pen_width = painter.pen().widthF() or 1
+        if header_rect.height() > pen_width * 2 and header_rect.width() > pen_width:
+            header_rect = QRectF(QPointF(header_rect.left() + pen_width, header_rect.top() + pen_width),
+                                 QSizeF(header_rect.width() - pen_width * 2, header_rect.height() - pen_width * 2))
+            painter.fillRect(header_rect, HeaderBackgroundColor)
+
+        line_position = self.getHorizontalHeaderRect().bottom()
+        painter.drawLine(0, line_position, self.geometry.width(), line_position)
+
+        # and draw header items
+        cell_text_size = len(self.model.index(0, 0).data()) # regular column cell text size
+        header_text = ''
+        for column_index in range(self.model.columnCount(0)):
+            cell_data = self.model.headerData(column_index, Qt.Horizontal, Qt.DisplayRole)
+            if not isinstance(cell_data, str):
+                header_text += ' ' * cell_text_size
+            else:
+                if len(cell_data) > cell_text_size:
+                    cell_data = cell_data[:cell_text_size]
+                else:
+                    cell_data = ' ' * (cell_text_size - len(cell_data)) + cell_data
+                header_text += cell_data
+
+            if self.spaced and column_index + 1 != self.model.columnCount(0):
+                header_text += ' '
+
+        painter.setPen(HeaderTextColor if is_leading else HeaderInactiveTextColor)
+
+        text_rect = self.getHorizontalHeaderRect()
+        text_rect.setHeight(text_rect.height() - VisualSpace / 2)
+        text_rect.moveLeft(text_rect.left() + VisualSpace)
+        painter.drawText(text_rect, Qt.AlignVCenter, header_text)
+
+    def getHorizontalHeaderRect(self):
+        if self.hasHorizontalHeader:
+            return QRectF(0, 0, self.geometry.width(), self._fontMetrics.height() + VisualSpace / 2)
+        else:
+            return QRectF()
+
+    @property
+    def hasHorizontalHeader(self):
+        return self._showHorizontalHeader
+
+    @property
+    def documentOrigin(self):
+        return QPointF(VisualSpace, self.getHorizontalHeaderRect().height() + VisualSpace / 2)
+
+    @hasHorizontalHeader.setter
+    def hasHorizontalHeader(self, has_header):
+        if self._showHorizontalHeader != has_header:
+            self._showHorizontalHeader = has_header
+            self._updateGeometry()
+
     def _updateGeometry(self):
-        self._fullVisibleRows = int(self._geom.height() // self._fontMetrics.height())
-        self._visibleRows = self._fullVisibleRows + bool(int(self._geom.height()) % int(self._fontMetrics.height()))
+        real_height = max(self._geom.height() - self.documentOrigin.y(), 0)
+        self._fullVisibleRows = int(real_height // self._fontMetrics.height())
+        self._visibleRows = self._fullVisibleRows + bool(int(real_height) % int(self._fontMetrics.height()))
         self.model.resizeFrame(self._visibleRows)
 
     def _updateCache(self):
