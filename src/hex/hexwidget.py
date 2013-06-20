@@ -492,7 +492,7 @@ class CharColumnModel(ColumnModel):
 
     def indexFlags(self, index):
         flags = self.FlagEditable
-        if index.row >= self._rowCount and index > self.lastRealIndex:
+        if index.row + 1 >= self.realRowCount() and index > self.lastRealIndex:
             flags |= self.FlagVirtual
         elif self.editor.isRangeModified(index.data(self.EditorPositionRole), index.data(self.DataSizeRole)):
             flags |= self.FlagModified
@@ -1247,8 +1247,6 @@ class Column(QObject):
                 cell_classes = []
                 if index.flags & ColumnModel.FlagModified:
                     cell_classes.append('cell-mod')
-                if index.flags & ColumnModel.FlagVirtual:
-                    cell_classes.append('highlight')
 
                 prepared_text = html.escape(index_text)
                 prepared_text = prepared_text.replace(' ', '&nbsp;')
