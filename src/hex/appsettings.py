@@ -11,7 +11,8 @@ def doRegister():
         _settings_to_register = (
             ('integeredit.uppercase', False, bool),
             ('integeredit.default_style', 'c', str),
-            ('files.max_memoryload_size', 1024 * 1024 * 10, int)
+            ('files.max_memoryload_size', 1024 * 1024 * 10, int),
+            ('hexwidget.show_header', True, bool)
         )
 
         s = settings.globalSettings()

@@ -203,6 +203,7 @@ class HexSubWindow(QWidget):
         QWidget.__init__(self, parent)
         self.path = QFileInfo(filename).fileName()
         self.hexWidget = HexWidget(self, editor)
+        self.hexWidget.loadSettings(globalSettings)
         self.setFocusProxy(self.hexWidget)
         self.setLayout(QVBoxLayout())
         self.layout().setContentsMargins(0, 0, 0, 0)

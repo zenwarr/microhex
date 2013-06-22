@@ -1519,6 +1519,12 @@ class HexWidget(QWidget):
         self.appendColumn(CharColumnModel(self.editor, encodings.getCodec('UTF-16le'), self.font()))
         self.leadingColumn = self._columns[1]
 
+    def loadSettings(self, settings):
+        self.showHeader = settings['hexwidget.show_header']
+
+    def saveSettings(self, settings):
+        settings['hexwidget.show_header'] = self.showHeader
+
     @property
     def editor(self):
         return self._editor
