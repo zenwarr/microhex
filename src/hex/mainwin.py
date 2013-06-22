@@ -81,6 +81,11 @@ class MainWindow(QMainWindow):
         self.actionSelectAll.setShortcut(QKeySequence('Ctrl+A'))
         self.actionSelectAll.triggered.connect(self.selectAll)
 
+        self.viewMenu = menubar.addMenu(utils.tr('View'))
+        self.actionShowHeader = self.viewMenu.addAction(utils.tr('Show header'))
+        self.actionShowHeader.triggered.connect(self.showHeader)
+        self.actionShowHeader.setCheckable(True)
+
         self.helpMenu = menubar.addMenu(utils.tr('?'))
         self.actionAbout = self.helpMenu.addAction(utils.tr('About program...'))
         self.actionAbout.triggered.connect(self.showAbout)
@@ -139,6 +144,9 @@ class MainWindow(QMainWindow):
         if subWidget is not None:
             subWidget.setFocus()
 
+        self.actionShowHeader.setEnabled(subWidget is not None)
+        self.actionShowHeader.setChecked(subWidget is not None and subWidget.hexWidget.showHeader)
+
     def _onGlobalFocusChanged(self, old, new):
         # check if this widget is child of self.tabsWidget
         if not isinstance(new, (HexSubWindow, HexWidget)):
@@ -183,6 +191,11 @@ class MainWindow(QMainWindow):
 
         dlg = AboutDialog(self)
         dlg.exec_()
+
+    def showHeader(self, show):
+        if self.activeSubWidget:
+            self.activeSubWidget.hexWidget.showHeader = show
+            self.actionShowHeader.setChecked(show)
 
 
 class HexSubWindow(QWidget):

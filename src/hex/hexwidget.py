@@ -191,13 +191,12 @@ class ColumnModel(QObject):
     def indexData(self, index, role=Qt.DisplayRole):
         return None
 
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
+    def headerData(self, section, role=Qt.DisplayRole):
         # this is standard header data. It works only for regular columns and displays offset from start of the row.
-        if self.regular and orientation == Qt.Horizontal and role == Qt.DisplayRole:
+        if self.regular and role == Qt.DisplayRole:
             if 0 <= section <= self.columnCount(0):
-                cell_text_size = len(self.index(0, 0).data())
                 cell_offset = self.index(0, section).data(self.EditorPositionRole)
-                return IntegerFormatter(base=16, padding=cell_text_size).format(cell_offset)
+                return IntegerFormatter(base=16).format(cell_offset)
 
     def hasIndex(self, row, column):
         """Return True if there is index at row and column in this model"""
@@ -502,7 +501,7 @@ class CharColumnModel(ColumnModel):
                 return '∎'
         return None
 
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
+    def headerData(self, section, role=Qt.DisplayRole):
         return None
 
     def indexFlags(self, index):
@@ -611,7 +610,7 @@ class AddressColumnModel(ColumnModel):
                 ))
         return None
 
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
+    def headerData(self, section, role=Qt.DisplayRole):
         return None
 
     def indexFromPosition(self, position):
@@ -712,8 +711,8 @@ class FrameProxyModel(ColumnModel):
     def setIndexData(self, index, value, role=Qt.EditRole):
         return self.sourceModel.setIndexData(self.toSourceIndex(index), value, role)
 
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
-        return self.sourceModel.headerData(section, orientation, role)
+    def headerData(self, section, role=Qt.DisplayRole):
+        return self.sourceModel.headerData(section, role)
 
     def toSourceIndex(self, index):
         if not index or index.model is self.sourceModel:
@@ -1022,6 +1021,7 @@ class PlainTextDocumentBackend(ColumnDocumentBackend):
 class Column(QObject):
     updateRequested = pyqtSignal()
     resizeRequested = pyqtSignal(QSizeF)
+    headerResizeRequested = pyqtSignal()
 
     def __init__(self, model):
         QObject.__init__(self)
@@ -1040,7 +1040,9 @@ class Column(QObject):
         self._visibleRows = 0
         self._firstVisibleRow = 0
 
-        self._showHorizontalHeader = True
+        self._showHeader = False
+        self._headerHeight = False
+        self._headerData = []
 
         self._spaced = self.sourceModel.preferSpaced
         self._cache = []
@@ -1059,6 +1061,40 @@ class Column(QObject):
         self._geom = rect
         self._updateGeometry()
         self.updateRequested.emit()  # even if frame not changed, we should redraw widget
+
+    @property
+    def showHeader(self):
+        return self._showHeader
+
+    @showHeader.setter
+    def showHeader(self, show):
+        self._showHeader = show
+        self._updateGeometry()
+        self._updateCache()
+        self.updateRequested.emit()
+
+    def idealHeaderHeight(self):
+        return self._fontMetrics.height() + VisualSpace / 2
+
+    @property
+    def headerHeight(self):
+        return self.headerRect.height()
+
+    @headerHeight.setter
+    def headerHeight(self, height):
+        self._headerHeight = height
+        self.updateRequested.emit()
+
+    @property
+    def headerRect(self):
+        if self.showHeader:
+            return QRectF(QPointF(0, 0), QSizeF(self.geometry.width(), self._headerHeight))
+        else:
+            return QRectF()
+    
+    def getRectForHeaderItem(self, section_index):
+        cell_rect = self.getRectForIndex(self.model.index(0, section_index))
+        return QRectF(QPointF(cell_rect.x(), 0), QSizeF(cell_rect.width(), self.headerRect.height()))
 
     @property
     def firstVisibleRow(self):
@@ -1112,6 +1148,7 @@ class Column(QObject):
         if hasattr(self.sourceModel, 'renderFont'):  # well, this is hack until i invent better solution...
             self.sourceModel.renderFont = new_font
         self._documentBackend.clear()
+        self.headerResizeRequested.emit()
         self._updateGeometry()
 
     @property
@@ -1208,7 +1245,7 @@ class Column(QObject):
 
         painter.restore()
 
-        self.paintHorizontalHeader(paint_data, is_leading)
+        self.paintHeader(paint_data, is_leading)
 
     def paintCaret(self, paint_data, is_leading, caret_position):
         painter = paint_data.painter
@@ -1229,68 +1266,41 @@ class Column(QObject):
                 painter.setPen(QPen(QBrush(SelectionBorderColor), 2.0))
                 painter.drawPolygon(sel_polygon)
 
-    def paintHorizontalHeader(self, paint_data, is_leading):
+    class HeaderItemData(object):
+        def __init__(self):
+            self.text = ''
+
+    def _updateHeaderData(self):
+        self._headerData = []
+
+        if not self.showHeader or not self.model.regular:
+            return
+
+        for column_index in range(self.model.columnCount(0)):
+            cell_data = self.model.headerData(column_index, Qt.DisplayRole)
+            if not isinstance(cell_data, str):
+                cell_data = ''
+            header_item_data = self.HeaderItemData()
+            header_item_data.text = cell_data
+            self._headerData.append(header_item_data)
+
+    def paintHeader(self, paint_data, is_leading):
         # header can be painted only for regular columns
-        if not self.hasHorizontalHeader:
+        if not self.showHeader:
             return
 
         painter = paint_data.painter
-
-        painter.setPen(BorderColor)
-
-        header_rect = self.getHorizontalHeaderRect()
-        pen_width = painter.pen().widthF() or 1
-        if header_rect.height() > pen_width * 2 and header_rect.width() > pen_width:
-            header_rect = QRectF(QPointF(header_rect.left() + pen_width, header_rect.top() + pen_width),
-                                 QSizeF(header_rect.width() - pen_width * 2, header_rect.height() - pen_width * 2))
-            painter.fillRect(header_rect, HeaderBackgroundColor)
-
-        line_position = self.getHorizontalHeaderRect().bottom()
-        painter.drawLine(0, line_position, self.geometry.width(), line_position)
-
-        # and draw header items
-        cell_text_size = len(self.model.index(0, 0).data()) # regular column cell text size
-        header_text = ''
-        for column_index in range(self.model.columnCount(0)):
-            cell_data = self.model.headerData(column_index, Qt.Horizontal, Qt.DisplayRole)
-            if not isinstance(cell_data, str):
-                header_text += ' ' * cell_text_size
-            else:
-                if len(cell_data) > cell_text_size:
-                    cell_data = cell_data[:cell_text_size]
-                else:
-                    cell_data = ' ' * (cell_text_size - len(cell_data)) + cell_data
-                header_text += cell_data
-
-            if self.spaced and column_index + 1 != self.model.columnCount(0):
-                header_text += ' '
-
         painter.setPen(HeaderTextColor if is_leading else HeaderInactiveTextColor)
 
-        text_rect = self.getHorizontalHeaderRect()
-        text_rect.setHeight(text_rect.height() - VisualSpace / 2)
-        text_rect.moveLeft(text_rect.left() + VisualSpace)
-        painter.drawText(text_rect, Qt.AlignVCenter, header_text)
+        painter.fillRect(self.headerRect, HeaderBackgroundColor)
 
-    def getHorizontalHeaderRect(self):
-        if self.hasHorizontalHeader:
-            return QRectF(0, 0, self.geometry.width(), self._fontMetrics.height() + VisualSpace / 2)
-        else:
-            return QRectF()
-
-    @property
-    def hasHorizontalHeader(self):
-        return self._showHorizontalHeader
+        for section_index in range(len(self._headerData)):
+            rect = self.getRectForHeaderItem(section_index)
+            painter.drawText(rect, Qt.AlignHCenter|Qt.TextSingleLine, self._headerData[section_index].text)
 
     @property
     def documentOrigin(self):
-        return QPointF(VisualSpace, self.getHorizontalHeaderRect().height() + VisualSpace / 2)
-
-    @hasHorizontalHeader.setter
-    def hasHorizontalHeader(self, has_header):
-        if self._showHorizontalHeader != has_header:
-            self._showHorizontalHeader = has_header
-            self._updateGeometry()
+        return QPointF(VisualSpace, self.headerRect.height() + VisualSpace / 2)
 
     def _updateGeometry(self):
         real_height = max(self._geom.height() - self.documentOrigin.y(), 0)
@@ -1304,6 +1314,8 @@ class Column(QObject):
 
         for row in range(self._visibleRows):
             self._updateCachedRow(row)
+
+        self._updateHeaderData()
 
         self.updateRequested.emit()
 
@@ -1489,6 +1501,8 @@ class HexWidget(QWidget):
         self._editMode = False
         self._activeEditWidget = None
 
+        self._showHeader = True
+
         self.setFont(DefaultFont)
         self._dx = 0
 
@@ -1547,11 +1561,15 @@ class HexWidget(QWidget):
 
             column_dx = self._columns[-1].geometry.right() if self._columns else 0
             column.geometry = QRectF(column_dx, 0, 200, self.view.height())
+            column.showHeader = self.showHeader
 
             self._columns.append(column)
 
+            self._adjustHeaderHeights()
+
             column.updateRequested.connect(self._onColumnUpdateRequested)
             column.resizeRequested.connect(self._onColumnResizeRequested)
+            column.headerResizeRequested.connect(self._adjustHeaderHeights)
 
             if self._leadingColumn is None:
                 self._leadingColumn = column
@@ -1594,6 +1612,8 @@ class HexWidget(QWidget):
         for column in self._columns:
             self._paintColumn(pd, column)
 
+        self._paintBorders(pd)
+
     def _paintColumn(self, pd, column):
         painter = pd.painter
 
@@ -1612,9 +1632,20 @@ class HexWidget(QWidget):
         painter.setClipRect(QRectF(), Qt.NoClip)
         painter.resetTransform()
 
+    def _paintBorders(self, pd):
+        painter = pd.painter
+
         painter.setPen(BorderColor)
-        painter.drawLine(self._absoluteToWidget(QLineF(column.geometry.right(), 0, column.geometry.right(),
+
+        # borders between columns
+        for column in self._columns:
+            painter.drawLine(self._absoluteToWidget(QLineF(column.geometry.right(), 0, column.geometry.right(),
                                                        self.view.height())))
+
+        # header border
+        if self.showHeader:
+            painter.drawLine(QLineF(0, self.headerHeight, self.view.width(), self.headerHeight))
+
 
     def _wheel(self, event):
         if event.orientation() == Qt.Vertical:
@@ -2089,6 +2120,26 @@ class HexWidget(QWidget):
                     self._editor.remove(selection.start, selection.length)
             finally:
                 self._editor.endComplexAction()
+
+    @property
+    def showHeader(self):
+        return self._showHeader
+
+    @showHeader.setter
+    def showHeader(self, show):
+        if self._showHeader != show:
+            self._showHeader = show
+            for column in self._columns:
+                column.showHeader = show
+
+    def _adjustHeaderHeights(self):
+        header_height = max(column.idealHeaderHeight() for column in self._columns)
+        for column in self._columns:
+            column.headerHeight = header_height
+
+    @property
+    def headerHeight(self):
+        return self._columns[0].headerHeight if self._columns else 0
 
 
 class Selection(object):
