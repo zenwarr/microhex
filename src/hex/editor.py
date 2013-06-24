@@ -251,7 +251,7 @@ class Editor(QObject):
             result = bytes()
             for span_index in range(len(spans)):
                 pos = left_offset if span_index == 0 else 0
-                size = (right_offset - left_offset) + 1 if span_index == len(spans) - 1 else len(spans[span_index])
+                size = (right_offset - pos) + 1 if span_index == len(spans) - 1 else len(spans[span_index]) - pos
                 result += spans[span_index].read(pos, size)
             return result
 
@@ -317,7 +317,7 @@ class Editor(QObject):
         """
 
         with self.lock:
-            if position < 0 or length < 0 or position + length >= len(self):
+            if position < 0 or length < 0 or position + length > len(self):
                 raise OutOfBoundsError()
 
             if not self._spans or length == 0:
@@ -367,8 +367,8 @@ class Editor(QObject):
             elif position == self._totalLength:
                 span_index = len(self._spans)
             else:
-                fill_span = FillSpan(self, copy.deepcopy(fill_pattern), position - self._totalLength)
-                self._spans.append(fill_span)
+                spans = [FillSpan(self, copy.deepcopy(fill_pattern), position - self._totalLength)] + spans
+                position = self._totalLength
                 span_index = len(self._spans)
 
             for span in spans:
@@ -418,7 +418,7 @@ class Editor(QObject):
             raise FreezeSizeError()
 
         try:
-            self.beginComplexAction(utils.tr('writing {0} bytes at position {1}'.format(write_length, position)))
+            self.beginComplexAction(utils.tr('writing {0} bytes at position {1}').format(write_length, position))
             if position < self._totalLength:
                 self._remove(position, write_length)
             self._insertSpans(position, spans, fill_pattern)

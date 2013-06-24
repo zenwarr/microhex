@@ -21,8 +21,10 @@ class AboutDialog(QDialog):
 
         self.tabWidget = QTabWidget(self)
         self.copyingText = QTextBrowser(self)
+        self.copyingText.setOpenLinks(False)
         self.tabWidget.addTab(self.copyingText, utils.tr('License'))
         self.creditsText = QTextBrowser(self)
+        self.creditsText.setOpenLinks(False)
         self.tabWidget.addTab(self.creditsText, utils.tr('Credits'))
 
         l_file = QFile(':/main/data/COPYING.html')

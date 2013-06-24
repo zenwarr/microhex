@@ -60,11 +60,19 @@ class AbstractCodec(object):
         """
         raise NotImplementedError()
 
+    def canEncode(self, text):
+        """Returns True if text can be converted to given encoding, False otherwise
+        """
+        raise NotImplementedError()
+
 
 class QtProxyCodec(AbstractCodec):
     def __init__(self, qcodec):
         AbstractCodec.__init__(self, qcodec.name())
         self._qcodec = qcodec
+
+    def canEncode(self, text):
+        return self._qcodec.canEncode(text)
 
 
 class SingleByteEncodingCodec(QtProxyCodec):
@@ -149,7 +157,12 @@ class Utf16Codec(QtProxyCodec):
         return decoded
 
     def encodeString(self, text):
-        return self._qcodec.fromUnicode(text)
+        # looks like QTextCodec adds BOM before converted string. It is not what we want.
+        converted = self._qcodec.fromUnicode(text)
+        if len(converted) >= 4 and converted[:2] in (b'\xff\xfe', b'\xfe\xff'):
+            return converted[2:]
+        else:
+            return converted
 
 
 class Utf32Codec(QtProxyCodec):
@@ -182,7 +195,11 @@ class Utf32Codec(QtProxyCodec):
         return self._qcodec.toUnicode(data)
 
     def encodeString(self, text):
-        return self._qcodec.fromUnicode(text)
+        converted = self._qcodec.fromUnicode(text)
+        if len(converted) >= 8 and converted[:4] in (b'\xff\xfe\x00\x00', b'\x00\x00\xfe\xff'):
+            return converted[4:]
+        else:
+            return converted
 
 
 class Utf8Codec(QtProxyCodec):

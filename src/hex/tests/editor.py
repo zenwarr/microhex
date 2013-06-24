@@ -59,8 +59,18 @@ class TestEditor(unittest.TestCase):
 
         self.undoTest()
 
+    def test2(self):
+        editor = Editor(BufferDevice(QByteArray(b'Hello'), read_only=False))
+
+        editor.remove(0, 1)
+
+        self.assertEqual(len(editor), 4)
+        self.assertEqual(editor.readAll(), b'ello')
+        self.assertTrue(editor.isModified)
+        self.assertFalse(editor.isRangeModified(0, 4))
+
     def undoTest(self):
-        editor = Editor(BufferDevice(QByteArray(b'Hello, World!'), read_only=True))
+        editor = Editor(BufferDevice(QByteArray(b'Hello, World!'), read_only=False))
 
         editor.insertSpan(3, DataSpan(editor, b'000'))
         self.assertEqual(editor.readAll(), b'Hel000lo, World!')
