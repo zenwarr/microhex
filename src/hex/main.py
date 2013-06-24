@@ -5,6 +5,7 @@ from PyQt4.QtGui import QApplication
 import hex.settings as settings
 import hex.appsettings as appsettings
 import hex.utils as utils
+import hex.translate as translate
 
 
 class Application(QApplication):
@@ -25,6 +26,8 @@ class Application(QApplication):
             except settings.SettingsError as err:
                 print(utils.tr('failed to load settings: {0}').format(err))
 
+        translate.initApplicationTranslation()
+
     def startUp(self):
         if '--test' in self.arguments():
             from hex.test import runTests
@@ -43,13 +46,6 @@ class Application(QApplication):
 
 
 def main():
-    build_module_filename = os.path.join(os.path.dirname(__file__), 'build.py')
-    if os.path.exists(build_module_filename):
-        import imp
-        build_module = imp.load_source('builder', build_module_filename)
-        builder = build_module.Builder(os.path.dirname(__file__))
-        builder.build()
-
     locale.setlocale(locale.LC_ALL, '')
     os.chdir(os.path.expanduser('~'))
 

@@ -12,7 +12,8 @@ def doRegister():
             ('integeredit.uppercase', False, bool),
             ('integeredit.default_style', 'c', str),
             ('files.max_memoryload_size', 1024 * 1024 * 10, int),
-            ('hexwidget.show_header', True, bool)
+            ('hexwidget.show_header', True, bool),
+            ('app.translation', '', str)
         )
 
         s = settings.globalSettings()

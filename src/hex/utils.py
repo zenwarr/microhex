@@ -2,6 +2,9 @@ from PyQt4.QtCore import QCoreApplication
 import os
 
 
+applicationPath = ''
+
+
 def first(iterable, default=None):
     try:
         return next(iter(iterable))
@@ -9,7 +12,7 @@ def first(iterable, default=None):
         return default
 
 
-def tr(text, context='', disambiguation=None):
+def tr(text, context='utils', disambiguation=None):
     return QCoreApplication.translate(context, text, disambiguation, QCoreApplication.UnicodeUTF8)
 
 
