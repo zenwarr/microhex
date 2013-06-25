@@ -1,6 +1,6 @@
 from PyQt4.QtCore import QFileInfo, Qt, QByteArray
 from PyQt4.QtGui import QMainWindow, QTabWidget, QFileDialog, QKeySequence, QMdiSubWindow, QApplication, QProgressBar, \
-                        QWidget, QVBoxLayout, QFileIconProvider, QApplication, QIcon
+                        QWidget, QVBoxLayout, QFileIconProvider, QApplication, QIcon, QDialog
 from hex.hexwidget import HexWidget
 import hex.settings as settings
 import hex.appsettings as appsettings
@@ -100,6 +100,14 @@ class MainWindow(QMainWindow):
         self.actionShowHeader = self.viewMenu.addAction(utils.tr('Show header'))
         self.actionShowHeader.triggered.connect(self.showHeader)
         self.actionShowHeader.setCheckable(True)
+
+        self.viewMenu.addSeparator()
+        self.actionSetupColumn = self.viewMenu.addAction(utils.tr('Setup column...'))
+        self.actionSetupColumn.triggered.connect(self.setupActiveColumn)
+        self.actionAddColumn = self.viewMenu.addAction(utils.tr('Add column...'))
+        self.actionAddColumn.triggered.connect(self.addColumn)
+        self.actionRemoveColumn = self.viewMenu.addAction(utils.tr('Remove column...'))
+        self.actionRemoveColumn.triggered.connect(self.removeColumn)
 
         self.toolsMenu = menubar.addMenu(utils.tr('Tools'))
         self.actionShowSettings = self.toolsMenu.addAction(utils.tr('Settings...'))
@@ -247,6 +255,25 @@ class MainWindow(QMainWindow):
     @forActiveWidget
     def fillZeros(self):
         self.activeSubWidget.hexWidget.fillSelected(b'\x00')
+
+    @forActiveWidget
+    def setupActiveColumn(self):
+        import hex.columnproviders as columnproviders
+        active_column = self.activeSubWidget.hexWidget.leadingColumn
+        if active_column is not None:
+            dlg = columnproviders.ConfigureColumnDialog(self, self.activeSubWidget.hexWidget, active_column.sourceModel)
+            dlg.exec_()
+
+    @forActiveWidget
+    def addColumn(self):
+        import hex.columnproviders as columnproviders
+        dlg = columnproviders.CreateColumnDialog(self, self.activeSubWidget.hexWidget)
+        if dlg.exec_() == QDialog.Accepted:
+            self.activeSubWidget.hexWidget.appendColumn(dlg.createColumnModel())
+
+    @forActiveWidget
+    def removeColumn(self):
+        self.activeSubWidget.hexWidget.removeActiveColumn()
 
 
 class HexSubWindow(QWidget):

@@ -1,5 +1,5 @@
-from PyQt4.QtCore import QObject, pyqtSignal
 import struct
+import hex.utils as utils
 
 
 LittleEndian = '<'
@@ -7,9 +7,6 @@ BigEndian = '>'
 
 
 class GenericCodec(object):
-    def __init__(self, format_string):
-        self.formatString = format_string
-
     def decode(self, data):
         unpacked = struct.unpack(self.formatString, data)
         return unpacked[0] if unpacked else None
@@ -25,18 +22,17 @@ class IntegerCodec(GenericCodec):
     Format64Bit = 'q'
 
     _t = {
-        Format8Bit: 1,
-        Format16Bit: 2,
-        Format32Bit: 4,
-        Format64Bit: 8
+        Format8Bit: (1, utils.tr('Byte')),
+        Format16Bit: (2, utils.tr('Word')),
+        Format32Bit: (4, utils.tr('Double word')),
+        Format64Bit: (8, utils.tr('Quad word'))
     }
 
-    def __init__(self, binary_format, signed=True, endianess=LittleEndian):
-        GenericCodec.__init__(self, endianess + (binary_format if signed else binary_format.upper()))
+    def __init__(self, binary_format=Format8Bit, signed=True, endianess=LittleEndian):
+        GenericCodec.__init__(self)
         self.binaryFormat = binary_format
         self.signed = signed
         self.endianess = endianess
-        self.dataSize = self._t.get(self.binaryFormat)
 
     @property
     def maximal(self):
@@ -45,6 +41,18 @@ class IntegerCodec(GenericCodec):
     @property
     def minimal(self):
         return -self.maximal if self.signed else 0
+
+    @staticmethod
+    def formatName(fmt):
+        return IntegerCodec._t[fmt][1]
+
+    @property
+    def formatString(self):
+        return self.endianess + (self.binaryFormat if self.signed else self.binaryFormat.upper())
+
+    @property
+    def dataSize(self):
+        return self._t.get(self.binaryFormat)[0]
 
 
 class FloatCodec(GenericCodec):
@@ -57,7 +65,11 @@ class FloatCodec(GenericCodec):
     }
 
     def __init__(self, binary_format, endianess=LittleEndian):
-        GenericCodec.__init__(self, endianess + binary_format)
+        GenericCodec.__init__(self)
         self.binaryFormat = binary_format
         self.endianess = endianess
         self.dataSize = self._t.get(binary_format)
+
+    @property
+    def formatString(self):
+        return self.endianess + self.binaryFormat
