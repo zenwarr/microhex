@@ -88,6 +88,14 @@ class MainWindow(QMainWindow):
         self.actionInsertMode.setShortcut(QKeySequence('Ins'))
         self.actionInsertMode.triggered.connect(self.setInsertMode)
 
+        self.editMenu.addSeparator()
+        self.actionRemoveSelected = self.editMenu.addAction(utils.tr('Remove selected'))
+        self.actionRemoveSelected.setShortcut(QKeySequence('Del'))
+        self.actionRemoveSelected.triggered.connect(self.removeSelected)
+
+        self.actionFillZeros = self.editMenu.addAction(utils.tr('Fill selected with zeros'))
+        self.actionFillZeros.triggered.connect(self.fillZeros)
+
         self.viewMenu = menubar.addMenu(utils.tr('View'))
         self.actionShowHeader = self.viewMenu.addAction(utils.tr('Show header'))
         self.actionShowHeader.triggered.connect(self.showHeader)
@@ -231,6 +239,14 @@ class MainWindow(QMainWindow):
 
     def _onInsertModeChanged(self, mode):
         self.actionInsertMode.setChecked(mode)
+
+    @forActiveWidget
+    def removeSelected(self):
+        self.activeSubWidget.hexWidget.removeSelected()
+
+    @forActiveWidget
+    def fillZeros(self):
+        self.activeSubWidget.hexWidget.fillSelected(b'\x00')
 
 
 class HexSubWindow(QWidget):

@@ -2437,6 +2437,17 @@ class HexWidget(QWidget):
             self._insertMode = mode
             self.insertModeChanged.emit(mode)
 
+    def removeSelected(self):
+        for selection in self._selections:
+            self.editor.remove(selection.start, selection.length)
+        self._selections = []
+        self.view.update()
+
+    def fillSelected(self, pattern):
+        for selection in self._selections:
+            self.editor.writeSpan(selection.start, FillSpan(self.editor, pattern, selection.length))
+        self.view.update()
+
 
 class Selection(object):
     def __init__(self, start=0, length=0):
