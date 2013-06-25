@@ -14,7 +14,17 @@ class TranslationModule(object):
 
     @property
     def language(self):
-        return BuiltinLanguage if not self.filename else QFileInfo(self.filename).fileName()
+        return BuiltinLanguage if not self.filename else QFileInfo(self.filename).baseName()
+
+    def __eq__(self, other):
+        if not isinstance(other, TranslationModule):
+            return NotImplemented
+        return self.language.casefold() == other.language.casefold()
+
+    def __ne__(self, other):
+        if not isinstance(other, TranslationModule):
+            return NotImplemented
+        return not self.__eq__(other)
 
 
 _activeModule = None
@@ -31,7 +41,8 @@ def availableModules():
     if not _availModules:
         _availModules = [TranslationModule()]
         for fileEntry in QDir(os.path.join(utils.applicationPath, 'translations')).entryInfoList(QDir.Files|QDir.NoDotAndDotDot):
-            _availModules.append(TranslationModule(fileEntry.absoluteFilePath()))
+            if fileEntry.suffix() == 'qm':
+                _availModules.append(TranslationModule(fileEntry.absoluteFilePath()))
 
     return _availModules
 
@@ -49,6 +60,8 @@ def initApplicationTranslation():
             _activeModule.translator = translator
         else:
             print('failed to load translation from {0} file'.format(filename))
+    else:
+        _activeModule = TranslationModule()
 
 
 def moduleFromLanguage(language):

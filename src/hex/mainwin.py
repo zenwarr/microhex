@@ -86,6 +86,10 @@ class MainWindow(QMainWindow):
         self.actionShowHeader.triggered.connect(self.showHeader)
         self.actionShowHeader.setCheckable(True)
 
+        self.toolsMenu = menubar.addMenu(utils.tr('Tools'))
+        self.actionShowSettings = self.toolsMenu.addAction(utils.tr('Settings...'))
+        self.actionShowSettings.triggered.connect(self.showSettings)
+
         self.helpMenu = menubar.addMenu(utils.tr('?'))
         self.actionAbout = self.helpMenu.addAction(utils.tr('About program...'))
         self.actionAbout.triggered.connect(self.showAbout)
@@ -196,6 +200,12 @@ class MainWindow(QMainWindow):
         if self.activeSubWidget:
             self.activeSubWidget.hexWidget.showHeader = show
             self.actionShowHeader.setChecked(show)
+
+    def showSettings(self):
+        from hex.settingsdialog import SettingsDialog
+
+        dlg = SettingsDialog(self)
+        dlg.exec_()
 
 
 class HexSubWindow(QWidget):
