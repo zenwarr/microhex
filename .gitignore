@@ -47,4 +47,6 @@ docs/
 .idea/
 qrc_*
 ui_*
-*.qm
+*.ts
+
+lupdate.sh
