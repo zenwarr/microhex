@@ -1550,6 +1550,8 @@ def _translate(x, dx, dy=0):
 
 
 class HexWidget(QWidget):
+    insertModeChanged = pyqtSignal(bool)
+
     def __init__(self, parent, editor):
         from hex.floatscrollbar import LargeScrollBar
 
@@ -1935,6 +1937,9 @@ class HexWidget(QWidget):
                 self.endEditMode()
         elif self._editMode and (event.text() or event.key() in self._edit_keys):
             self._inputEvent(event)
+        elif event.key() == Qt.Key_Insert:
+            self._insertMode = not self._insertMode
+            self.insertModeChanged.emit(self._insertMode)
 
     def _inputEvent(self, event):
         # input text into active cell
@@ -2408,6 +2413,16 @@ class HexWidget(QWidget):
         if self._cursorTimer is not None:
             self._cursorTimer.start(QApplication.cursorFlashTime())
         self.view.update()
+
+    @property
+    def insertMode(self):
+        return self._insertMode
+
+    @insertMode.setter
+    def insertMode(self, mode):
+        if self._insertMode != mode:
+            self._insertMode = mode
+            self.insertModeChanged.emit(mode)
 
 
 

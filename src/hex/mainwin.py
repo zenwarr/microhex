@@ -29,6 +29,7 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon(':/main/images/hex.png'))
 
         self.subWidgets = []
+        self._activeSubWidget = None
 
         self.tabsWidget = QTabWidget(self)
         self.tabsWidget.setDocumentMode(True)
@@ -80,6 +81,12 @@ class MainWindow(QMainWindow):
         self.actionSelectAll = self.editMenu.addAction(utils.tr('Select all'))
         self.actionSelectAll.setShortcut(QKeySequence('Ctrl+A'))
         self.actionSelectAll.triggered.connect(self.selectAll)
+
+        self.editMenu.addSeparator()
+        self.actionInsertMode = self.editMenu.addAction(utils.tr('Insert mode'))
+        self.actionInsertMode.setCheckable(True)
+        self.actionInsertMode.setShortcut(QKeySequence('Ins'))
+        self.actionInsertMode.triggered.connect(self.setInsertMode)
 
         self.viewMenu = menubar.addMenu(utils.tr('View'))
         self.actionShowHeader = self.viewMenu.addAction(utils.tr('Show header'))
@@ -139,6 +146,8 @@ class MainWindow(QMainWindow):
         self.tabsWidget.setCurrentWidget(subWidget)
 
     def _onTabChanged(self, tab_index):
+        oldSubWidget = self._activeSubWidget
+
         subWidget = self.tabsWidget.widget(tab_index)
         if subWidget is not None and hasattr(subWidget, 'path'):
             self.setWindowTitle('')
@@ -148,8 +157,17 @@ class MainWindow(QMainWindow):
         if subWidget is not None:
             subWidget.setFocus()
 
+        self._activeSubWidget = subWidget
+
         self.actionShowHeader.setEnabled(subWidget is not None)
         self.actionShowHeader.setChecked(subWidget is not None and subWidget.hexWidget.showHeader)
+
+        self.actionInsertMode.setEnabled(subWidget is not None)
+        self.actionInsertMode.setChecked(subWidget is not None and subWidget.hexWidget.insertMode)
+        if oldSubWidget is not None:
+            oldSubWidget.hexWidget.insertModeChanged.disconnect(self._onInsertModeChanged)
+        if subWidget is not None:
+            subWidget.hexWidget.insertModeChanged.connect(self._onInsertModeChanged)
 
     def _onGlobalFocusChanged(self, old, new):
         # check if this widget is child of self.tabsWidget
@@ -206,6 +224,13 @@ class MainWindow(QMainWindow):
 
         dlg = SettingsDialog(self)
         dlg.exec_()
+
+    def setInsertMode(self, mode):
+        if self.activeSubWidget:
+            self.activeSubWidget.hexWidget.insertMode = mode
+
+    def _onInsertModeChanged(self, mode):
+        self.actionInsertMode.setChecked(mode)
 
 
 class HexSubWindow(QWidget):
