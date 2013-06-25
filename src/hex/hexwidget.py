@@ -145,6 +145,7 @@ class ColumnModel(QObject):
     FlagModified = 4
 
     dataChanged = pyqtSignal(ModelIndex, ModelIndex)
+    dataResized = pyqtSignal(ModelIndex)  # argument is new last real index
     modelReset = pyqtSignal()
 
     def __init__(self, editor=None):
@@ -388,9 +389,8 @@ class HexColumnModel(ColumnModel):
         self.dataChanged.emit(self.indexFromPosition(start), self.indexFromPosition(start + length - 1))
 
     def onEditorDataResized(self, new_size):
-        old_last_index = self.lastRealIndex
         self._updateRowCount()
-        self.dataChanged.emit(old_last_index, self.lastRealIndex)
+        self.dataResized.emit(self.lastRealIndex)
 
     @property
     def preferSpaced(self):
@@ -467,8 +467,11 @@ class CharColumnModel(ColumnModel):
         if position >= len(self.editor):
             return 0
         elif row + 1 == self._rowCount:
-            bytes_left = position % self._bytesOnRow + 1
-            return bytes_left // self._codec.unitSize + bool(bytes_left % self._codec.unitSize)
+            bytes_left = len(self.editor) % self._bytesOnRow
+            if not bytes_left:
+                return self._bytesOnRow // self._codec.unitSize
+            else:
+                return bytes_left // self._codec.unitSize + bool(bytes_left % self._codec.unitSize)
         else:
             return self._bytesOnRow // self._codec.unitSize
 
@@ -519,7 +522,7 @@ class CharColumnModel(ColumnModel):
 
     def indexFlags(self, index):
         flags = self.FlagEditable
-        if index.row + 1 >= self.realRowCount() and index > self.lastRealIndex:
+        if not self.lastRealIndex or (index.row + 1 >= self.realRowCount() and index > self.lastRealIndex):
             flags |= self.FlagVirtual
         elif self.editor.isRangeModified(index.data(self.EditorPositionRole), index.data(self.DataSizeRole)):
             flags |= self.FlagModified
@@ -568,9 +571,8 @@ class CharColumnModel(ColumnModel):
         self.dataChanged.emit(self.indexFromPosition(start), self.indexFromPosition(start + length - 1))
 
     def onEditorDataResized(self, new_size):
-        old_last_index = self.lastRealIndex
         self._updateRowCount()
-        self.dataChanged.emit(old_last_index, self.lastRealIndex)
+        self.dataResized.emit(self.lastRealIndex)
 
     def insertDefaultIndex(self, before_index):
         pos = before_index.data(self.EditorPositionRole)
@@ -687,6 +689,7 @@ class FrameProxyModel(ColumnModel):
         self.__rowCount = 0
         self.sourceModel = source_model or EmptyColumnModel()
         self.sourceModel.dataChanged.connect(self.__onDataChanged)
+        self.sourceModel.dataResized.connect(self.__onDataResized)
         self.sourceModel.modelReset.connect(self.modelReset)
 
     def setFrame(self, first_row, row_count):
@@ -770,6 +773,9 @@ class FrameProxyModel(ColumnModel):
         last = self.fromSourceIndex(last) or self.lastIndex
 
         self.dataChanged.emit(first, last)
+
+    def __onDataResized(self, new_last_index):
+        self.modelReset.emit()
 
     @property
     def regular(self):
@@ -1953,13 +1959,10 @@ class HexWidget(QWidget):
                 if self._cursorOffset == 0:
                     # remove index from the left
                     index_to_remove = index.previous
-                    if index_to_remove:
+                    if index_to_remove and not index_to_remove.virtual:
                         self._leadingColumn.removeIndex(index_to_remove)
                 else:
                     changed_text = original_text[:cursor_offset-1] + original_text[cursor_offset:]
-            # elif event.key() == Qt.Key_Delete:
-            #     # well, we cannot delete next index with Delete key
-            #     index_text = index_text[:cursor_offset] + index_text[cursor_offset+1:]
             elif event.text():
                 if self._cursorOffset == 0 and self._insertMode:
                     # when in insert mode, pressing character key when cursor is at beginning of cell, inserts new cell
@@ -1990,7 +1993,7 @@ class HexWidget(QWidget):
 
     (NavMethod_NextCell, NavMethod_PrevCell, NavMethod_RowStart, NavMethod_RowEnd, NavMethod_ScreenUp,
         NavMethod_ScreenDown, NavMethod_RowUp, NavMethod_RowDown, NavMethod_EditorStart, NavMethod_EditorEnd,
-        NavMethod_NextCharacter, NavMethod_PrevCharacter) = range(12)
+        NavMethod_NextCharacter, NavMethod_PrevCharacter, NavMethod_CellEnd, NavMethod_CellStart) = range(14)
 
     def _goNextCell(self):
         self._goCaretIndex(self.caretIndex(self._leadingColumn).next)
@@ -2091,6 +2094,14 @@ class HexWidget(QWidget):
 
         self._goCaretIndex(new_caret_index)
 
+    def _goCellStart(self):
+        self.cursorOffset = 0
+
+    def _goCellEnd(self):
+        index_text = self.caretIndex(self._leadingColumn).data()
+        if index_text:
+            self.cursorOffset = len(index_text) - 1
+
     navigate_callbacks = {
         NavMethod_NextCell: _goNextCell,
         NavMethod_PrevCell: _goPrevCell,
@@ -2103,7 +2114,9 @@ class HexWidget(QWidget):
         NavMethod_EditorStart: _goEditorStart,
         NavMethod_EditorEnd: _goEditorEnd,
         NavMethod_NextCharacter: _goNextCharacter,
-        NavMethod_PrevCharacter: _goPrevCharacter
+        NavMethod_PrevCharacter: _goPrevCharacter,
+        NavMethod_CellEnd: _goCellEnd,
+        NavMethod_CellStart: _goCellStart
     }
 
     def _navigate(self, method, make_selection=False):
@@ -2423,7 +2436,6 @@ class HexWidget(QWidget):
         if self._insertMode != mode:
             self._insertMode = mode
             self.insertModeChanged.emit(mode)
-
 
 
 class Selection(object):
