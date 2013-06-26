@@ -1,4 +1,4 @@
-from PyQt4.QtGui import QWidget, QFormLayout, QDialog, QVBoxLayout, QDialogButtonBox, QLineEdit, QSizePolicy, QComboBox
+from PyQt4.QtGui import QWidget, QFormLayout, QVBoxLayout, QDialogButtonBox, QLineEdit, QSizePolicy, QComboBox
 from PyQt4.QtCore import Qt
 import hex.utils as utils
 import hex.valuecodecs as valuecodecs
@@ -44,9 +44,9 @@ def providerForColumnModel(column_model):
     return None
 
 
-class CreateColumnDialog(QDialog):
+class CreateColumnDialog(utils.Dialog):
     def __init__(self, parent, hex_widget):
-        QDialog.__init__(self, parent)
+        utils.Dialog.__init__(self, parent, name='create_column_dialog')
         self.hexWidget = hex_widget
         self.configWidget = None
 
@@ -91,9 +91,9 @@ class CreateColumnDialog(QDialog):
         return model
 
 
-class ConfigureColumnDialog(QDialog):
+class ConfigureColumnDialog(utils.Dialog):
     def __init__(self, parent, hex_widget, column_model):
-        QDialog.__init__(self, parent)
+        utils.Dialog.__init__(self, parent, name='configure_column_dialog')
         self.hexWidget = hex_widget
         self.columnModel = column_model
 
@@ -123,4 +123,4 @@ class ConfigureColumnDialog(QDialog):
         if self.configWidget is not None:
             self.configWidget.saveToColumn(self.columnModel)
             self.columnModel.name = self.txtColumnName.text()
-        QDialog.accept(self)
+        utils.Dialog.accept(self)

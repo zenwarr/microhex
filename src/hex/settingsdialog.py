@@ -1,4 +1,4 @@
-from PyQt4.QtGui import QDialog, QDialogButtonBox, QListWidgetItem, QMessageBox
+from PyQt4.QtGui import QDialogButtonBox, QListWidgetItem, QMessageBox
 from hex.forms.ui_settingsdialog import Ui_SettingsDialog
 import hex.utils as utils
 import hex.settings as settings
@@ -8,7 +8,7 @@ import hex.translate as translate
 globalSettings = settings.globalSettings()
 
 
-class SettingsDialog(QDialog):
+class SettingsDialog(utils.Dialog):
     class _PageData(object):
         def __init__(self):
             self.title = ''
@@ -17,10 +17,11 @@ class SettingsDialog(QDialog):
             self.inited = False
 
     def __init__(self, parent):
-        QDialog.__init__(self, parent)
+        utils.Dialog.__init__(self, parent, name='settings_dialog')
 
         self.ui = Ui_SettingsDialog()
         self.ui.setupUi(self)
+        self.loadGeometry()
 
         self._pages = []
 
@@ -86,7 +87,7 @@ class SettingsDialog(QDialog):
 
     def accept(self):
         self._save()
-        QDialog.accept(self)
+        utils.Dialog.accept(self)
 
     def _save(self):
         for page_data in self._pages:

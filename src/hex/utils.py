@@ -1,4 +1,5 @@
-from PyQt4.QtCore import QCoreApplication
+from PyQt4.QtCore import QCoreApplication, QByteArray
+from PyQt4.QtGui import QDialog
 import os
 
 
@@ -54,3 +55,34 @@ def formatSize(size):
     if num.endswith('.0'):
         num = num[:-2]
     return num + ' ' + postfix
+
+
+class Dialog(QDialog):
+    """Dialog that remembers position and size"""
+
+    def __init__(self, parent=None, name=''):
+        QDialog.__init__(self, parent)
+        self.name = name
+        self.loadGeometry()
+
+    def loadGeometry(self):
+        import hex.settings as settings
+
+        if self.name:
+            saved_geom = settings.globalQuickSettings()[self.name + '.geometry']
+            if saved_geom and isinstance(saved_geom, str):
+                self.restoreGeometry(QByteArray.fromHex(saved_geom))
+
+    def accept(self):
+        self.__save()
+        QDialog.accept(self)
+
+    def reject(self):
+        self.__save()
+        QDialog.reject(self)
+
+    def __save(self):
+        import hex.settings as settings
+        
+        if self.name:
+            settings.globalQuickSettings()[self.name + '.geometry'] = str(self.saveGeometry().toHex(), encoding='ascii')

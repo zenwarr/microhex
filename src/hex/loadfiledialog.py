@@ -1,5 +1,4 @@
 from PyQt4.QtCore import QFileInfo
-from PyQt4.QtGui import QDialog
 from hex.forms.ui_loadfiledialog import Ui_LoadFileDialog
 import hex.utils as utils
 import hex.formatters as formatters
@@ -9,11 +8,13 @@ import hex.settings as settings
 globalSettings = settings.globalSettings()
 
 
-class LoadFileDialog(QDialog):
+class LoadFileDialog(utils.Dialog):
     def __init__(self, parent, filename):
-        QDialog.__init__(self, parent)
+        utils.Dialog.__init__(self, parent, name='load_file_dialog')
         self.ui = Ui_LoadFileDialog()
         self.ui.setupUi(self)
+        self.loadGeometry()
+
         self.filename = filename
         self.fileSize = QFileInfo(filename).size()
         self._userFreezeSize = self.ui.chkFreezeSize.isChecked()
