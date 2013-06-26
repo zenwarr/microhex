@@ -170,7 +170,7 @@ class HexColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConfig
 
         self.setLayout(QFormLayout())
         self.cmbBinaryFormat = QComboBox(self)
-        self.layout().addRow(utils.tr('Binary format'), self.cmbBinaryFormat)
+        self.layout().addRow(utils.tr('Binary format:'), self.cmbBinaryFormat)
 
         icodec = valuecodecs.IntegerCodec
         for fmt in (icodec.Format8Bit, icodec.Format16Bit, icodec.Format32Bit, icodec.Format64Bit):
@@ -180,13 +180,13 @@ class HexColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConfig
         if column is None:
             self.cmbBinaryFormat.setCurrentIndex(0)
 
-        self.chkSigned = QCheckBox(utils.tr('Signed values'))
-        self.layout().addRow(self.chkSigned)
+        self.chkSigned = QCheckBox()
+        self.layout().addRow(utils.tr('Signed values:'), self.chkSigned)
         if column is not None:
             self.chkSigned.setChecked(column.valuecodec.signed)
 
         self.cmbEndianess = QComboBox(self)
-        self.layout().addRow(utils.tr('Endianess'), self.cmbEndianess)
+        self.layout().addRow(utils.tr('Endianess:'), self.cmbEndianess)
         self.cmbEndianess.addItem(utils.tr('Little endian'), valuecodecs.LittleEndian)
         self.cmbEndianess.addItem(utils.tr('Big endian'), valuecodecs.BigEndian)
         if column is not None:
@@ -195,7 +195,7 @@ class HexColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConfig
             self.cmbEndianess.setCurrentIndex(0)
 
         self.cmbBase = QComboBox(self)
-        self.layout().addRow(utils.tr('Base'), self.cmbBase)
+        self.layout().addRow(utils.tr('Base:'), self.cmbBase)
         for base in ((utils.tr('Hex'), 16), (utils.tr('Dec'), 10), (utils.tr('Oct'), 8), (utils.tr('Bin'), 2)):
             self.cmbBase.addItem(base[0], base[1])
         if column is not None:
@@ -204,7 +204,7 @@ class HexColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConfig
         self.spnColumnsOnRow = QSpinBox(self)
         self.spnColumnsOnRow.setMinimum(1)
         self.spnColumnsOnRow.setMaximum(32)
-        self.layout().addRow(utils.tr('Columns on row'), self.spnColumnsOnRow)
+        self.layout().addRow(utils.tr('Columns on row:'), self.spnColumnsOnRow)
         if column is not None:
             self.spnColumnsOnRow.setValue(column.columnsOnRow)
         else:

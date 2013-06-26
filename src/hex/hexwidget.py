@@ -1596,21 +1596,9 @@ class HexWidget(QWidget):
 
     def _onColumnResizeRequested(self, new_size):
         column_to_resize = self.sender()
-
-        dx = 0
-        resized = False
-        for column in self._columns:
-            column.geometry.setLeft(dx)
-            if column is column_to_resize:
-                if column.geometry.width() != new_size.width():
-                    column.geometry = QRectF(column.geometry.topLeft(), QSizeF(new_size.width(), column.geometry.height()))
-                    resized = True
-                else:
-                    break
-            dx += column.geometry.width()
-
-        if resized:
-            self.view.update()
+        if column_to_resize.geometry.width() != new_size.width():
+            column_to_resize.geometry.setWidth(new_size.width())
+            self._updateColumnsGeometry()
 
     def _updateColumnsGeometry(self):
         dx = 0
