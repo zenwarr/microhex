@@ -12,6 +12,7 @@ from hex.editor import DataSpan, FillSpan
 from hex.proxystyle import ProxyStyle
 import hex.encodings as encodings
 import hex.utils as utils
+import hex.settings as settings
 
 
 # Why we need to make different model/view classes? Why not to use existing ones?
@@ -415,24 +416,58 @@ class FrameProxyModel(ColumnModel):
         return self.sourceModel.regular
 
 
-DefaultFont = QFont('Ubuntu Mono', 13)
-VisualSpace = 10
+class Theme(object):
+    def __init__(self):
+        self.font = QFont('Ubuntu Mono', 13)
+        self.backgroundColor = QColor(250, 250, 245)
+        self.textColor = QColor(Qt.black)
+        self.borderColor = QColor(Qt.black)
+        self.inactiveTextColor = QColor(Qt.darkGray)
+        self.caretBackgroundColor = QColor(150, 250, 160, 100)
+        self.caretBorderColor = QColor(0, 0, 0, 255)
+        self.selectionBackgroundColor = QColor(220, 250, 245, 100)
+        self.selectionBorderColor = QColor(20, 205, 195)
+        self.cursorBackgroundColor = QColor(100, 60, 60, 100)
+        self.cursorBorderColor = QColor(Qt.black)
+        self.modifiedTextColor = QColor(Qt.red)
+        self.headerBackgroundColor = self.backgroundColor
+        self.headerTextColor = self.textColor
+        self.headerInactiveTextColor = self.inactiveTextColor
 
-# default color theme
-BackgroundColor = QColor(250, 250, 245)
-TextColor = QColor(Qt.black)
-BorderColor = QColor(Qt.black)
-InactiveTextColor = QColor(Qt.darkGray)
-CaretBackgroundColor = QColor(150, 250, 160, 100)
-CaretBorderColor = QColor(0, 0, 0, 255)
-SelectionBackgroundColor = QColor(220, 250, 245, 100)
-SelectionBorderColor = QColor(20, 205, 195)
-CursorBackgroundColor = QColor(100, 60, 60, 100)
-CursorBorderColor = QColor(Qt.black)
-ModifiedTextColor = QColor(Qt.red)
-HeaderBackgroundColor = BackgroundColor
-HeaderTextColor = TextColor
-HeaderInactiveTextColor = InactiveTextColor
+    def load(self, settings, name):
+        theme_obj = settings[name]
+        font_name, font_size = None, None
+        for key in theme_obj.keys():
+            attr = utils.underscoreToCamelCase(key)
+            if key == 'font_name':
+                font_name = getattr(theme_obj, key)
+            elif key == 'font_size':
+                font_size = getattr(theme_obj, key)
+            elif not hasattr(self, attr) or not callable(getattr(self, attr)):
+                stored_value = theme_obj[key]
+                if isinstance(stored_value, str):
+                    color = QColor()
+                    color.setNamedColor(theme_obj[key])
+                    if color.isValid():
+                        setattr(self, attr, color)
+
+        if isinstance(font_name, str):
+            self.font.setFamily(font_name)
+        if isinstance(font_size, int):
+            self.font.setPointSize(font_size)
+
+    def save(self, settings, name):
+        theme_obj = dict()
+        for attr_name in dir(self):
+            if not attr_name.startswith('_') and isinstance(getattr(self, attr_name), QColor):
+                theme_obj[utils.camelCaseToUnderscore(attr_name)] = getattr(self, attr_name).name()
+        theme_obj.font_name = self.font.family()
+        theme_obj.font_size = self.font.pointSize()
+        settings[name] = theme_obj
+
+
+VisualSpace = 10
+DefaultTheme = None
 
 
 class RowData(object):
@@ -732,8 +767,9 @@ class Column(QObject):
         self.model.frameResized.connect(self._onFrameResized)
 
         self._geom = QRectF()
-        self._font = DefaultFont
+        self._font = QFont()
         self._fontMetrics = QFontMetricsF(self._font)
+        self._theme = DefaultTheme
 
         self._fullVisibleRows = 0
         self._visibleRows = 0
@@ -947,12 +983,12 @@ class Column(QObject):
         painter = paint_data.painter
         painter.save()
 
-        painter.setPen(TextColor if is_leading else InactiveTextColor)
+        painter.setPen(self._theme.textColor if is_leading else self._theme.inactiveTextColor)
         painter.translate(self.documentOrigin)
 
         # little trick to quickly change default text color for document without re-generating it
         paint_context = QAbstractTextDocumentLayout.PaintContext()
-        paint_context.palette.setColor(QPalette.Text, TextColor if is_leading else InactiveTextColor)
+        paint_context.palette.setColor(QPalette.Text, self._theme.textColor if is_leading else self._theme.inactiveTextColor)
         # standard QTextDocument.draw also sets clip rect here, but we already have one
         self._documentBackend.document.documentLayout().draw(painter, paint_context)
 
@@ -966,8 +1002,8 @@ class Column(QObject):
             caret_index = self.model.fromSourceIndex(self.sourceModel.indexFromPosition(caret_position))
             if caret_index and self.isIndexVisible(caret_index, False):
                 caret_rect = self.getRectForIndex(caret_index)
-                painter.setBrush(QBrush(CaretBackgroundColor))
-                painter.setPen(CaretBorderColor)
+                painter.setBrush(QBrush(self._theme.caretBackgroundColor))
+                painter.setPen(self._theme.caretBorderColor)
                 painter.drawRect(caret_rect)
 
     def paintSelection(self, paint_data, is_leading, selection):
@@ -975,8 +1011,8 @@ class Column(QObject):
             painter = paint_data.painter
             for sel_polygon in self.getPolygonsForRange(self.sourceModel.indexFromPosition(selection.start),
                                         self.sourceModel.indexFromPosition(selection.start + len(selection) -1)):
-                painter.setBrush(SelectionBackgroundColor)
-                painter.setPen(QPen(QBrush(SelectionBorderColor), 2.0))
+                painter.setBrush(self._theme.selectionBackgroundColor)
+                painter.setPen(QPen(QBrush(self._theme.selectionBorderColor), 2.0))
                 painter.drawPolygon(sel_polygon)
 
     class HeaderItemData(object):
@@ -1003,9 +1039,9 @@ class Column(QObject):
             return
 
         painter = paint_data.painter
-        painter.setPen(HeaderTextColor if is_leading else HeaderInactiveTextColor)
+        painter.setPen(self._theme.headerTextColor if is_leading else self._theme.headerInactiveTextColor)
 
-        painter.fillRect(self.headerRect, HeaderBackgroundColor)
+        painter.fillRect(self.headerRect, self._theme.headerBackgroundColor)
 
         for section_index in range(len(self._headerData)):
             rect = self.getRectForHeaderItem(section_index)
@@ -1159,7 +1195,7 @@ class Column(QObject):
                 color: green;
             }}
 
-        """.format(mod_color=ModifiedTextColor.name()))
+        """.format(mod_color=self._theme.modifiedTextColor.name()))
 
         return document
 
@@ -1195,6 +1231,11 @@ class HexWidget(QWidget):
 
         QWidget.__init__(self, parent)
 
+        global DefaultTheme
+        if DefaultTheme is None:
+            DefaultTheme = Theme()
+            DefaultTheme.load(settings.globalSettings(), 'hexwidget.default_theme')
+
         self.view = QWidget(self)
         self.view.installEventFilter(self)
         self.setFocusProxy(self.view)
@@ -1214,6 +1255,7 @@ class HexWidget(QWidget):
         self.m_layout.addWidget(self.vScrollBar)
         self.m_layout.setContentsMargins(0, 0, 0, 0)
 
+        self._theme = DefaultTheme
         self._editor = editor
         self._columns = list()
         self._leadingColumn = None
@@ -1235,11 +1277,11 @@ class HexWidget(QWidget):
         self._dx = 0
 
         palette = QPalette(self.view.palette())
-        palette.setColor(QPalette.Background, BackgroundColor)
+        palette.setColor(QPalette.Background, self._theme.backgroundColor)
         self.view.setPalette(palette)
         self.view.setAutoFillBackground(True)
 
-        self.setFont(DefaultFont)
+        self.setFont(self._theme.font)
 
         from hex.hexcolumn import HexColumnModel
         from hex.charcolumn import CharColumnModel
@@ -1383,7 +1425,7 @@ class HexWidget(QWidget):
     def _paintBorders(self, pd):
         painter = pd.painter
 
-        painter.setPen(BorderColor)
+        painter.setPen(self._theme.borderColor)
 
         # borders between columns
         for column in self._columns:
@@ -2033,11 +2075,11 @@ class HexWidget(QWidget):
                 except IndexError:
                     return
                 cursor_width = font_metrics.width(char_under_cursor)
-                pd.painter.setBrush(CursorBackgroundColor)
-                pd.painter.setPen(CursorBorderColor)
+                pd.painter.setBrush(self._theme.cursorBackgroundColor)
+                pd.painter.setPen(self._theme.cursorBorderColor)
                 pd.painter.drawRect(QRectF(cursor_pos, QSizeF(cursor_width, line_height)))
             else:
-                pd.painter.setPen(QPen(CursorBorderColor, 1.0))
+                pd.painter.setPen(QPen(self._theme.cursorBorderColor, 1.0))
                 pd.painter.drawLine(cursor_pos, QPointF(cursor_pos.x(), cursor_pos.y() + line_height))
 
     def _cursorPosition(self):

@@ -86,3 +86,19 @@ class Dialog(QDialog):
         
         if self.name:
             settings.globalQuickSettings()[self.name + '.geometry'] = str(self.saveGeometry().toHex(), encoding='ascii')
+
+
+def camelCaseToUnderscore(camel_case):
+    return ''.join(('_' + c.lower() if c.isupper() else c) for c in camel_case)
+
+
+def underscoreToCamelCase(underscore):
+    result = list()
+    word_start = False
+    for ch in underscore:
+        if ch == '_':
+            word_start = True
+        else:
+            result.append(ch.upper() if word_start else ch)
+            word_start = False
+    return ''.join(result)
