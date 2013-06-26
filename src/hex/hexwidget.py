@@ -1232,13 +1232,14 @@ class HexWidget(QWidget):
 
         self._showHeader = True
 
-        self.setFont(DefaultFont)
         self._dx = 0
 
         palette = QPalette(self.view.palette())
         palette.setColor(QPalette.Background, BackgroundColor)
         self.view.setPalette(palette)
         self.view.setAutoFillBackground(True)
+
+        self.setFont(DefaultFont)
 
         from hex.hexcolumn import HexColumnModel
         from hex.charcolumn import CharColumnModel
@@ -1266,6 +1267,7 @@ class HexWidget(QWidget):
         QWidget.setFont(self, new_font)
         for column in self._columns:
             column.font = self.font()
+        self._updateScrollBars()
 
     @property
     def leadingColumn(self):
