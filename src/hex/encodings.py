@@ -283,12 +283,12 @@ singlebyte_encodings = {
     'Windows-1256',
     'Windows-1257',
     'Windows-1258',
-    'IBM-850'
+    'IBM-850',
     'IBM-866',
-    'IBM-874'
+    'IBM-874',
     'AppleRoman',
-    'KOI8-R'
-    'KOI8-U'
+    'KOI8-R',
+    'KOI8-U',
     'roman8'
 }
 
@@ -301,8 +301,6 @@ encodings = {
 }
 
 for encoding in singlebyte_encodings:
-    global encodings
-
     qcodec = QTextCodec.codecForName(encoding)
     if qcodec is not None:
         encodings[encoding] = SingleByteEncodingCodec(qcodec)
