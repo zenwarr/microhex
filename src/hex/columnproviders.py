@@ -8,7 +8,7 @@ import hex.encodings as encodings
 
 class AbstractColumnProvider(object):
     def __init__(self):
-        pass
+        self.creatable = True
 
     def createConfigurationWidget(self, parent, hex_widget, column=None):
         pass
@@ -19,7 +19,10 @@ class AbstractColumnConfigurationWidget(object):
         pass
 
     def createColumnModel(self, hex_widget):
-        pass
+        raise NotImplementedError()
+
+    def saveToColunm(self, column):
+        raise NotImplementedError()
 
 
 _providers = None
@@ -57,7 +60,8 @@ class CreateColumnDialog(utils.Dialog):
         self.cmbColumnProvider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.layout().addWidget(self.cmbColumnProvider)
         for provider in availableProviders():
-            self.cmbColumnProvider.addItem(provider.name, provider)
+            if provider.creatable:
+                self.cmbColumnProvider.addItem(provider.name, provider)
 
         self.txtColumnName = QLineEdit(self)
         forml = QFormLayout()

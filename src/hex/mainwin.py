@@ -108,6 +108,8 @@ class MainWindow(QMainWindow):
         self.actionAddColumn.triggered.connect(self.addColumn)
         self.actionRemoveColumn = self.viewMenu.addAction(utils.tr('Remove column'))
         self.actionRemoveColumn.triggered.connect(self.removeColumn)
+        self.actionAddAddress = self.viewMenu.addAction(utils.tr('Add address bar to column...'))
+        self.actionAddAddress.triggered.connect(self.addAddressColumn)
 
         self.toolsMenu = menubar.addMenu(utils.tr('Tools'))
         self.actionShowSettings = self.toolsMenu.addAction(utils.tr('Settings...'))
@@ -274,6 +276,18 @@ class MainWindow(QMainWindow):
     @forActiveWidget
     def removeColumn(self):
         self.activeSubWidget.hexWidget.removeActiveColumn()
+
+    @forActiveWidget
+    def addAddressColumn(self):
+        import hex.addresscolumn as addresscolumn
+
+        hex_widget = self.activeSubWidget.hexWidget
+        if hex_widget.leadingColumn is None:
+            return
+
+        dlg = addresscolumn.AddAddressColumnDialog(self, hex_widget, hex_widget.leadingColumn)
+        if dlg.exec_() == QDialog.Accepted:
+            dlg.addColumn()
 
 
 class HexSubWindow(QWidget):

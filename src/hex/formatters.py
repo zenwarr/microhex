@@ -6,9 +6,31 @@ class IntegerFormatter(object):
 
     def __init__(self, base=10, style=StyleNone, padding=0, uppercase=False):
         self.base = base
+        self._style = self.StyleNone
         self.style = style
         self.padding = padding
         self.uppercase = uppercase
+
+    @property
+    def style(self):
+        return self._style
+
+    @style.setter
+    def style(self, new_style):
+        if new_style != self._style:
+            if isinstance(new_style, str):
+                self._style = self.styleFromName(new_style)
+            else:
+                self._style = new_style
+
+    @property
+    def styleName(self):
+        if self.style == self.StyleNone:
+            return 'none'
+        elif self.style == self.StyleC:
+            return 'c'
+        elif self.style == self.StyleAsm:
+            return 'asm'
 
     def format(self, value):
         result = ''
@@ -113,6 +135,15 @@ class IntegerFormatter(object):
         except ValueError:
             return QValidator.Invalid
 
+    @staticmethod
+    def styleFromName(name):
+        name = name.lower()
+        if name == 'c':
+            return IntegerFormatter.StyleC
+        elif name in ('asm', 'assembler'):
+            return IntegerFormatter.StyleAsm
+        return IntegerFormatter.StyleNone
+
 
 def parseInteger(text):
     guessed = IntegerFormatter.guessFormat(text)
@@ -120,15 +151,6 @@ def parseInteger(text):
         return IntegerFormatter().parse(text)
     else:
         return IntegerFormatter(guessed[1], guessed[0]).parse(text)
-
-
-def styleFromName(name):
-    name = name.lower()
-    if name == 'c':
-        return IntegerFormatter.StyleC
-    elif name in ('asm', 'assembler'):
-        return IntegerFormatter.StyleAsm
-    return IntegerFormatter.StyleNone
 
 
 class FloatFormatter(object):

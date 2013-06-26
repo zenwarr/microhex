@@ -151,18 +151,27 @@ class ColumnModel(QObject):
     def __init__(self, editor=None):
         QObject.__init__(self)
         self.name = ''
-
-        if editor is not None:
-            with editor.lock:
-                self.__editor = editor
-                self.__editor.dataChanged.connect(self.onEditorDataChanged)
-                self.__editor.resized.connect(self.onEditorDataResized)
-        else:
-            self.__editor = None
+        self.__editor = None
+        self.editor = editor
 
     @property
     def editor(self):
         return self.__editor
+
+    @editor.setter
+    def editor(self, new_editor):
+        if self.__editor is not new_editor:
+            if self.__editor is not None:
+                with self.__editor.lock:
+                    self.__editor.dataChanged.disconnect(self.onEditorDataChanged)
+                    self.__editor.resized.disconnect(self.onEditorDataResized)
+                self.__editor = None
+
+            self.__editor = new_editor
+            if new_editor is not None:
+                with new_editor.lock:
+                    new_editor.dataChanged.connect(self.onEditorDataChanged)
+                    new_editor.resized.connect(self.onEditorDataResized)
 
     def reset(self):
         self.modelReset.emit()
@@ -298,99 +307,6 @@ class EmptyColumnModel(ColumnModel):
 
     def indexFromPosition(self, position):
         return ModelIndex()
-
-
-class AddressColumnModel(ColumnModel):
-    def __init__(self, linked_model, formatter=None):
-        ColumnModel.__init__(self, linked_model.editor)
-        self._linkedModel = linked_model
-        self._formatter = formatter or IntegerFormatter()
-        self._baseAddress = 0
-        self._updatePadding()
-
-    @property
-    def linkedModel(self):
-        return self._linkedModel
-
-    @linkedModel.setter
-    def linkedModel(self, model):
-        if self._linkedModel is not model:
-            self._linkedModel = model
-            self.modelReset.emit()
-
-    @property
-    def baseAddress(self):
-        return self._baseAddress
-
-    @baseAddress.setter
-    def baseAddress(self, new_base):
-        if self._baseAddress != new_base:
-            self._baseAddress = new_base
-            self.modelReset.emit()
-
-    def rowCount(self):
-        if self._linkedModel is not None:
-            return self._linkedModel.rowCount()
-        return 0
-
-    def columnCount(self, row):
-        return 1 if self._linkedModel is not None and self._linkedModel.hasRow(row) else 0
-
-    def realRowCount(self):
-        if self._linkedModel is not None:
-            return self._linkedModel.realRowCount()
-        return 0
-
-    def realColumnCount(self, row):
-        if self._linkedModel is not None:
-            return int(bool(self._linkedModel.realColumnCount(row)))
-        return 0
-
-    def indexData(self, index, role=Qt.DisplayRole):
-        if self._linkedModel is not None:
-            model_index = self._linkedModel.index(index.row, 0)
-            if role == Qt.DisplayRole and model_index:
-                raw = model_index.data(self.EditorPositionRole) - self._baseAddress
-                return self._formatter.format(raw) if self._formatter is not None else raw
-            elif role == self.EditorPositionRole:
-                return model_index.data(self.EditorPositionRole)
-            elif role == self.DataSizeRole:
-                return sum(index.data(self.DataSizeRole) for index in index_range(
-                    model_index, self._linkedModel.lastRowIndex(index.row), include_last=True
-                ))
-        return None
-
-    def headerData(self, section, role=Qt.DisplayRole):
-        return None
-
-    def indexFromPosition(self, position):
-        if self._linkedModel is not None:
-            model_index = self._linkedModel.indexFromPosition(position)
-            return self.index(model_index.row, 0) if model_index else ModelIndex()
-        return self._linkedModelone
-
-    def indexFlags(self, index):
-        if self._linkedModel is not None:
-            model_index = self._linkedModel.index(index.row, 0)
-            if model_index and model_index.flags & ColumnModel.FlagVirtual:
-                return ColumnModel.FlagVirtual
-        return 0
-
-    def _maxLengthForSize(self, size):
-        """Calculate maximal length of address text for given editor size"""
-        sign1 = self._baseAddress > 0
-        sign2 = self._baseAddress < len(self._linkedModel.editor)
-        max_raw = max(abs(0 - self._baseAddress) + sign1,
-                      abs(len(self._linkedModel.editor) - self._baseAddress) + sign2)
-        return len(self._formatter.format(max_raw))
-
-    def _updatePadding(self):
-        if self._formatter is None:
-            self._formatter = IntegerFormatter()
-        self._formatter.padding = self._maxLengthForSize(len(self.editor))
-
-    def onEditorDataResized(self, new_size):
-        self._updatePadding()
 
 
 class FrameProxyModel(ColumnModel):
@@ -1327,6 +1243,7 @@ class HexWidget(QWidget):
 
         from hex.hexcolumn import HexColumnModel
         from hex.charcolumn import CharColumnModel
+        from hex.addresscolumn import AddressColumnModel
 
         hex_column = HexColumnModel(self.editor, IntegerCodec(IntegerCodec.Format8Bit, False),
                                          IntegerFormatter(16, padding=2))
@@ -1384,18 +1301,17 @@ class HexWidget(QWidget):
     def caretIndex(self, column):
         return column.sourceModel.indexFromPosition(self.caretPosition) if column is not None else ModelIndex()
 
-    def appendColumn(self, model):
+    def insertColumn(self, model, at_index=-1):
         if model is not None:
             column = Column(model)
             column.font = self.font()
 
-            column_dx = self._columns[-1].geometry.right() if self._columns else 0
-            column.geometry = QRectF(column_dx, 0, 200, self.view.height())
+            column.geometry = QRectF(QPointF(0, 0), QSizeF(200, self.view.height()))
             column.showHeader = self.showHeader
-
-            self._columns.append(column)
+            self._columns.insert(at_index if at_index >= 0 else len(self._columns), column)
 
             self._adjustHeaderHeights()
+            self._updateColumnsGeometry()
 
             column.updateRequested.connect(self._onColumnUpdateRequested)
             column.resizeRequested.connect(self._onColumnResizeRequested)
@@ -1407,6 +1323,9 @@ class HexWidget(QWidget):
                 column.scrollToFirstRow(self._leadingColumn.firstVisibleRow)
 
             self.view.update()
+
+    def appendColumn(self, model):
+        self.insertColumn(model)
 
     def columnFromIndex(self, index):
         return utils.first(cd for cd in self._columns if cd.sourceModel is index.model or cd.model is index.model)
@@ -2169,6 +2088,19 @@ class HexWidget(QWidget):
             self._columns = [c for c in self._columns if c is not self._leadingColumn]
             self.leadingColumn = self._columns[0] if self._columns else None
             self._updateColumnsGeometry()
+
+    def addAddressColumn(self, address_column_model, relative_position=Qt.AlignLeft):
+        """Adds address column to leading one. relative_position can be Qt.AlignLeft or Qt.AlignRight
+        and determines where address column will be located.
+        """
+        if self._leadingColumn is not None:
+            leading_column_index = self.columnIndex(self._leadingColumn)
+            if relative_position == Qt.AlignLeft:
+                column_index = leading_column_index
+            else:
+                column_index = leading_column_index + 1
+            address_column_model.linkedModel = self._leadingColumn.sourceModel
+            self.insertColumn(address_column_model, column_index)
 
 
 class Selection(object):

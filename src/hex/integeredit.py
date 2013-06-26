@@ -29,7 +29,7 @@ class IntegerEdit(QAbstractSpinBox):
         self._baseButton.setPopupMode(QToolButton.InstantPopup)
         self._baseButton.setText(str(base))
 
-        style = formatters.styleFromName(globalSettings['integeredit.default_style'])
+        style = globalSettings['integeredit.default_style']
         self._formatter = formatters.IntegerFormatter(base, style, uppercase=globalSettings['integeredit.uppercase'])
 
         for standard_base in (('Hex', 16), ('Dec', 10), ('Oct', 8), ('Bin', 2)):
