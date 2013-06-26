@@ -1831,6 +1831,7 @@ class HexWidget(QWidget):
                         if not activated_index.virtual:
                             self._selectStartIndex = activated_index
                             self._selectStartColumn = column
+                            self._mousePressPoint = mouse_pos
 
     def _mouseRelease(self, event):
         self._selectStartIndex = None
@@ -1848,7 +1849,17 @@ class HexWidget(QWidget):
                     hover_index = column.sourceModel.lastRealIndex
 
                 if hover_index:
-                    selections = [self.selectionBetweenIndexes(self._selectStartIndex, hover_index)]
+                    selections = None
+                    if hover_index == self.caretIndex(column):
+                        index_rect = self._columnToAbsolute(column, column.getRectForIndex(hover_index))
+                        hit_rect = QRectF(QPointF(), QSizeF(index_rect.width() // 2, index_rect.height() // 2))
+                        hit_rect.moveCenter(self._mousePressPoint)
+                        if hit_rect.contains(mouse_pos):
+                            selections = []
+
+                    if selections is None:
+                        selections = [self.selectionBetweenIndexes(self._selectStartIndex, hover_index)]
+
                     if selections != self._selections:
                         self._selections = selections
                         self.view.update()
@@ -2119,3 +2130,10 @@ class Selection(object):
         if not isinstance(other, Selection):
             return NotImplemented
         return not self.__eq__(other)
+
+
+def _check_square_hit(square_center, square_size, point):
+    square_size = square_size / 2
+    if abs(square_center.x() - point.x()) <= square_size and abs(square_center.y() - point.y()) <= square_size:
+        return True
+    return False
