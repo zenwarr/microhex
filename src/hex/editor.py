@@ -190,7 +190,7 @@ class FillSpan(Span):
 
 
 class Editor(QObject):
-    dataChanged = pyqtSignal(int, int)
+    dataChanged = pyqtSignal(int, int)  # first argument is start position, second one - length
     resized = pyqtSignal(int)
 
     def __init__(self, device=None):
@@ -429,7 +429,7 @@ class Editor(QObject):
             self.resized.emit(self._totalLength)
             self.dataChanged.emit(min(position, old_length), -1)
         else:
-            self.dataChanged.emit(position, position + write_length - 1)
+            self.dataChanged.emit(position, write_length)
 
     def _remove(self, position, length):
         if position < 0:

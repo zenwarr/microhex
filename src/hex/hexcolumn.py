@@ -1,5 +1,5 @@
 from PyQt4.QtCore import Qt
-from PyQt4.QtGui import QValidator, QWidget, QFormLayout, QComboBox, QCheckBox, QSpinBox
+from PyQt4.QtGui import QValidator, QWidget, QFormLayout, QComboBox, QCheckBox, QSpinBox, QSizePolicy
 import hex.hexwidget as hexwidget
 import hex.editor as editor
 import hex.columnproviders as columnproviders
@@ -169,8 +169,27 @@ class HexColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConfig
         self.column = column
 
         self.setLayout(QFormLayout())
+        self.layout().setContentsMargins(0, 0, 0, 0)
+
         self.cmbBinaryFormat = QComboBox(self)
+        self.cmbBinaryFormat.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.layout().addRow(utils.tr('Binary format:'), self.cmbBinaryFormat)
+        self.cmbBinaryFormat.currentIndexChanged[int].connect(self._onBinaryFormatChanged)
+
+        self.chkSigned = QCheckBox()
+        self.layout().addRow(utils.tr('Signed values:'), self.chkSigned)
+        if column is not None:
+            self.chkSigned.setChecked(column.valuecodec.signed)
+
+        self.cmbEndianess = QComboBox(self)
+        self.cmbEndianess.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.layout().addRow(utils.tr('Endianess:'), self.cmbEndianess)
+        self.cmbEndianess.addItem(utils.tr('Little endian'), valuecodecs.LittleEndian)
+        self.cmbEndianess.addItem(utils.tr('Big endian'), valuecodecs.BigEndian)
+        if column is not None:
+            self.cmbEndianess.setCurrentIndex(self.cmbEndianess.findData(column.valuecodec.endianess))
+        else:
+            self.cmbEndianess.setCurrentIndex(0)
 
         icodec = valuecodecs.IntegerCodec
         for fmt in (icodec.Format8Bit, icodec.Format16Bit, icodec.Format32Bit, icodec.Format64Bit):
@@ -180,21 +199,8 @@ class HexColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConfig
         if column is None:
             self.cmbBinaryFormat.setCurrentIndex(0)
 
-        self.chkSigned = QCheckBox()
-        self.layout().addRow(utils.tr('Signed values:'), self.chkSigned)
-        if column is not None:
-            self.chkSigned.setChecked(column.valuecodec.signed)
-
-        self.cmbEndianess = QComboBox(self)
-        self.layout().addRow(utils.tr('Endianess:'), self.cmbEndianess)
-        self.cmbEndianess.addItem(utils.tr('Little endian'), valuecodecs.LittleEndian)
-        self.cmbEndianess.addItem(utils.tr('Big endian'), valuecodecs.BigEndian)
-        if column is not None:
-            self.cmbEndianess.setCurrentIndex(self.cmbEndianess.findData(column.valuecodec.endianess))
-        else:
-            self.cmbEndianess.setCurrentIndex(0)
-
         self.cmbBase = QComboBox(self)
+        self.cmbBase.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.layout().addRow(utils.tr('Base:'), self.cmbBase)
         for base in ((utils.tr('Hex'), 16), (utils.tr('Dec'), 10), (utils.tr('Oct'), 8), (utils.tr('Bin'), 2)):
             self.cmbBase.addItem(base[0], base[1])
@@ -202,6 +208,7 @@ class HexColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConfig
             self.cmbBase.setCurrentIndex(self.cmbBase.findData(column.formatter.base))
 
         self.spnColumnsOnRow = QSpinBox(self)
+        self.spnColumnsOnRow.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.spnColumnsOnRow.setMinimum(1)
         self.spnColumnsOnRow.setMaximum(32)
         self.layout().addRow(utils.tr('Columns on row:'), self.spnColumnsOnRow)
@@ -209,6 +216,9 @@ class HexColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConfig
             self.spnColumnsOnRow.setValue(column.columnsOnRow)
         else:
             self.spnColumnsOnRow.setValue(16)
+
+    def _onBinaryFormatChanged(self, index):
+        self.cmbEndianess.setEnabled(self.cmbBinaryFormat.itemData(index) != valuecodecs.IntegerCodec.Format8Bit)
 
     @property
     def _valueCodec(self):

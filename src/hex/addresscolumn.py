@@ -1,5 +1,5 @@
 from PyQt4.QtCore import Qt
-from PyQt4.QtGui import QWidget, QFormLayout, QComboBox, QVBoxLayout, QDialogButtonBox, QLineEdit
+from PyQt4.QtGui import QWidget, QFormLayout, QComboBox, QVBoxLayout, QDialogButtonBox, QLineEdit, QSizePolicy
 import hex.hexwidget as hexwidget
 import hex.formatters as formatters
 import hex.columnproviders as columnproviders
@@ -128,6 +128,7 @@ class AddressColumnConfigurationWidget(columnproviders.AbstractColumnConfigurati
         self.setLayout(QFormLayout())
 
         self.cmbBase = QComboBox(self)
+        self.cmbBase.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.layout().addRow(utils.tr('Base:'), self.cmbBase)
         for base in ((utils.tr('Hex'), 16), (utils.tr('Dec'), 10), (utils.tr('Oct'), 8), (utils.tr('Bin'), 2)):
             self.cmbBase.addItem(base[0], base[1])
@@ -135,6 +136,7 @@ class AddressColumnConfigurationWidget(columnproviders.AbstractColumnConfigurati
             self.cmbBase.setCurrentIndex(self.cmbBase.findData(column.formatter.base))
 
         self.cmbStyle = QComboBox(self)
+        self.cmbStyle.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.layout().addRow(utils.tr('Style:'), self.cmbStyle)
         for style_data in ((utils.tr('No style'), 'none'), (utils.tr('C'), 'c'), (utils.tr('Assembler'), 'asm')):
             self.cmbStyle.addItem(style_data[0], style_data[1])
@@ -142,6 +144,7 @@ class AddressColumnConfigurationWidget(columnproviders.AbstractColumnConfigurati
             self.cmbStyle.setCurrentIndex(self.cmbStyle.findData(column.formatter.styleName))
 
         self.intBaseAddress = integeredit.IntegerEdit(self)
+        self.intBaseAddress.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.layout().addRow(utils.tr('Base address:'), self.intBaseAddress)
         self.intBaseAddress.minimum = -10000000000000
 
@@ -166,22 +169,21 @@ class AddAddressColumnDialog(utils.Dialog):
         utils.Dialog.__init__(self, parent, name='add_address_column_dialog')
         self.hexWidget = hex_widget
         self.column = column
+        self.setWindowTitle(utils.tr('Add address bar'))
 
         self.setLayout(QVBoxLayout())
 
-        forml = QFormLayout()
-        self.txtName = QLineEdit(self)
-        forml.addRow(utils.tr('Name:'), self.txtName)
-
-        self.cmbAlignment = QComboBox(self)
-        self.cmbAlignment.addItem(utils.tr('To the left'), Qt.AlignLeft)
-        self.cmbAlignment.addItem(utils.tr('To the right'), Qt.AlignRight)
-        forml.addRow(utils.tr('Position:'), self.cmbAlignment)
-
-        self.layout().addLayout(forml)
-
         self.configWidget = AddressColumnConfigurationWidget(self, hex_widget, None)
         self.layout().addWidget(self.configWidget)
+
+        self.txtName = QLineEdit(self)
+        self.configWidget.layout().insertRow(0, utils.tr('Name:'), self.txtName)
+
+        self.cmbAlignment = QComboBox(self)
+        self.cmbAlignment.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.cmbAlignment.addItem(utils.tr('To the left'), Qt.AlignLeft)
+        self.cmbAlignment.addItem(utils.tr('To the right'), Qt.AlignRight)
+        self.configWidget.layout().insertRow(1, utils.tr('Position:'), self.cmbAlignment)
 
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok|QDialogButtonBox.Cancel, Qt.Horizontal, self)
         self.buttonBox.accepted.connect(self.accept)

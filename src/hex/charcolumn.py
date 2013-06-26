@@ -1,4 +1,4 @@
-from PyQt4.QtGui import QRawFont, QFont, QValidator, QWidget, QComboBox, QFormLayout, QSpinBox
+from PyQt4.QtGui import QRawFont, QFont, QValidator, QWidget, QComboBox, QFormLayout, QSpinBox, QSizePolicy
 from PyQt4.QtCore import Qt
 import hex.hexwidget as hexwidget
 import hex.encodings as encodings
@@ -203,8 +203,10 @@ class CharColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConfi
         self.columnModel = column
 
         self.setLayout(QFormLayout())
+        self.layout().setContentsMargins(0, 0, 0, 0)
 
         self.cmbEncoding = QComboBox(self)
+        self.cmbEncoding.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.layout().addRow(utils.tr('Encoding:'), self.cmbEncoding)
         for encoding in sorted(encodings.encodings.keys()):
             self.cmbEncoding.addItem(encoding)
@@ -214,6 +216,7 @@ class CharColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConfi
             self.cmbEncoding.setCurrentIndex(self.cmbEncoding.findText('Windows-1251'))
 
         self.spnBytesOnRow = QSpinBox(self)
+        self.spnBytesOnRow.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.spnBytesOnRow.setMinimum(1)
         self.spnBytesOnRow.setMaximum(32)
         self.layout().addRow(utils.tr('Bytes on row:'), self.spnBytesOnRow)

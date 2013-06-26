@@ -170,8 +170,8 @@ class ColumnModel(QObject):
             self.__editor = new_editor
             if new_editor is not None:
                 with new_editor.lock:
-                    new_editor.dataChanged.connect(self.onEditorDataChanged)
-                    new_editor.resized.connect(self.onEditorDataResized)
+                    new_editor.dataChanged.connect(self.onEditorDataChanged, Qt.QueuedConnection)
+                    new_editor.resized.connect(self.onEditorDataResized, Qt.QueuedConnection)
 
     def reset(self):
         self.modelReset.emit()
@@ -630,7 +630,6 @@ class PlainTextDocumentBackend(ColumnDocumentBackend):
 
     def cursorPositionFromPoint(self, point):
         return self._positionForPoint(point)[1]
-
 
 
 # class TableDocumentBackend(ColumnDocumentBackend):
