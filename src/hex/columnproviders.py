@@ -97,13 +97,14 @@ class ConfigureColumnDialog(utils.Dialog):
         self.hexWidget = hex_widget
         self.columnModel = column_model
 
-        self.setWindowTitle(utils.tr('Setup column'))
+        self.setWindowTitle(utils.tr('Setup column {0}').format(column_model.name))
         self.setLayout(QVBoxLayout())
 
         self.txtColumnName = QLineEdit(self)
         forml = QFormLayout()
         forml.addRow(utils.tr('Name:'), self.txtColumnName)
         self.layout().addLayout(forml)
+        self.txtColumnName.setText(column_model.name)
 
         self.provider = providerForColumnModel(column_model)
         if self.provider is not None:

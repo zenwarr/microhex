@@ -106,7 +106,7 @@ class MainWindow(QMainWindow):
         self.actionSetupColumn.triggered.connect(self.setupActiveColumn)
         self.actionAddColumn = self.viewMenu.addAction(utils.tr('Add column...'))
         self.actionAddColumn.triggered.connect(self.addColumn)
-        self.actionRemoveColumn = self.viewMenu.addAction(utils.tr('Remove column...'))
+        self.actionRemoveColumn = self.viewMenu.addAction(utils.tr('Remove column'))
         self.actionRemoveColumn.triggered.connect(self.removeColumn)
 
         self.toolsMenu = menubar.addMenu(utils.tr('Tools'))
