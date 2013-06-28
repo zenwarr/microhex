@@ -1,6 +1,6 @@
 from PyQt4.QtCore import QFileInfo, Qt, QByteArray, QObject, pyqtSignal
 from PyQt4.QtGui import QMainWindow, QTabWidget, QFileDialog, QKeySequence, QMdiSubWindow, QApplication, QProgressBar, \
-                        QWidget, QVBoxLayout, QFileIconProvider, QApplication, QIcon, QDialog, QAction, QIcon
+                        QWidget, QVBoxLayout, QFileIconProvider, QApplication, QIcon, QDialog, QAction, QIcon, QLabel
 from hex.hexwidget import HexWidget
 import hex.settings as settings
 import hex.appsettings as appsettings
@@ -48,6 +48,7 @@ class MainWindow(QMainWindow):
 
         self.createActions()
         self.buildMenus()
+        self.buildStatusbar()
 
         geom = globalQuickSettings['mainWindow.geometry']
         if geom and isinstance(geom, str):
@@ -176,6 +177,33 @@ class MainWindow(QMainWindow):
         self.helpMenu = menubar.addMenu(utils.tr('?'))
         self.helpMenu.addAction(self.actionAbout)
 
+    def buildStatusbar(self):
+        self.lblReadOnly = QLabel()
+
+        def readonly_to_text(readonly):
+            if readonly is not None:
+                return utils.tr('Read-only') if readonly else utils.tr('Read-write')
+            else:
+                return ''
+
+        self.readOnlyObserver = PropertyObserver(self, 'activeSubWidget.hexWidget.readOnly', readonly_to_text)
+        self.readOnlyObserver.valueChanged.connect(self.lblReadOnly.setText)
+
+        self.lblInsertMode = QLabel()
+
+        def insertmode_to_text(insert_mode):
+            if insert_mode is not None:
+                return utils.tr('Insert') if insert_mode else utils.tr('Overwrite')
+            else:
+                return ''
+
+        self.insertModeObserver = PropertyObserver(self, 'activeSubWidget.hexWidget.insertMode', insertmode_to_text)
+        self.insertModeObserver.valueChanged.connect(self.lblInsertMode.setText)
+
+        statusbar = self.statusBar()
+        statusbar.addPermanentWidget(self.lblReadOnly)
+        statusbar.addPermanentWidget(self.lblInsertMode)
+
     def showEvent(self, event):
         if not self._inited:
             self.openFile('/home/victor/Документы/utf-16.txt')
@@ -212,17 +240,16 @@ class MainWindow(QMainWindow):
     def openFile(self, filename, load_options=None):
         subWidget = HexSubWindow(self, filename, files.editorFromFile(filename, load_options))
         icon_provider = QFileIconProvider()
-        self.tabsWidget.addTab(subWidget, icon_provider.icon(QFileInfo(filename)), QFileInfo(filename).fileName())
+        self.tabsWidget.addTab(subWidget, icon_provider.icon(QFileInfo(filename)), subWidget.title)
         self.subWidgets.append(subWidget)
         self.tabsWidget.setCurrentWidget(subWidget)
+        subWidget.titleChanged.connect(self._updateTabTitle)
+        subWidget.isModifiedChanged.connect(self._onIsModifiedChanged)
 
     def _onTabChanged(self, tab_index):
+        self._updateTitle()
+
         subWidget = self.tabsWidget.widget(tab_index)
-        if subWidget is not None and hasattr(subWidget, 'path'):
-            self.setWindowTitle('')
-            self.setWindowFilePath(subWidget.path)
-        else:
-            self.setWindowTitle(QApplication.applicationName())
         if subWidget is not None:
             subWidget.setFocus()
 
@@ -239,6 +266,25 @@ class MainWindow(QMainWindow):
                         self.tabsWidget.currentWidget().setFocus()
                     break
                 widget = widget.parentWidget()
+
+    def _onIsModifiedChanged(self):
+        if self.sender() is self.tabsWidget.currentWidget():
+            self._updateTitle()
+
+    def _updateTabTitle(self, new_title):
+        tab_index = self.tabsWidget.indexOf(self.sender())
+        self.tabsWidget.setTabText(tab_index, new_title)
+        if tab_index != -1 and tab_index == self.tabsWidget.currentIndex():
+            self._updateTitle()
+
+    def _updateTitle(self):
+        subWidget = self.tabsWidget.currentWidget()
+        if subWidget is not None and hasattr(subWidget, 'path'):
+            self.setWindowTitle('')
+            self.setWindowFilePath(subWidget.path)
+            self.setWindowModified(subWidget.isModified)
+        else:
+            self.setWindowTitle(QApplication.applicationName())
 
     @property
     def activeSubWidget(self):
@@ -331,12 +377,14 @@ class MainWindow(QMainWindow):
 class PropertyObserver(QObject):
     valueChanged = pyqtSignal(object)
 
-    def __init__(self, parent, props):
+    def __init__(self, parent, props, transform_function=None):
         QObject.__init__(self)
         self.parent = parent
         self.props = props.split('.') if isinstance(props, str) else props
         self.value = None
         self._connectedSignals = []
+        self._realValue = None
+        self._transformFunction = transform_function
         self._update()
 
     def _update(self):
@@ -346,6 +394,7 @@ class PropertyObserver(QObject):
         for signal in self._connectedSignals:
             signal.disconnect(self._update)
         self._connectedSignals = []
+        self._realValue = False
 
         parent = self.parent
         for prop_name in self.props:
@@ -364,10 +413,21 @@ class PropertyObserver(QObject):
                     self._connectedSignals.append(signal)
 
             parent = prop_value
+        else:
+            self._realValue = True
 
-        self.value = new_value
+        if not self._realValue:
+            new_value = None
+
+        self.value = new_value if self._transformFunction is None else self._transformFunction(new_value)
         if old_value != self.value:
             self.valueChanged.emit(self.value)
+
+    @property
+    def isRealValue(self):
+        """True if self.value is real value of most nested property. When isRealValue is True, value is always None
+        """
+        return self._realValue
 
 
 class ObservingAction(QAction):
@@ -385,6 +445,9 @@ class ObservingAction(QAction):
 
 
 class HexSubWindow(QWidget):
+    titleChanged = pyqtSignal(str)
+    isModifiedChanged = pyqtSignal(bool)
+
     def __init__(self, parent, filename, editor):
         QWidget.__init__(self, parent)
         self.path = QFileInfo(filename).fileName()
@@ -394,3 +457,16 @@ class HexSubWindow(QWidget):
         self.setLayout(QVBoxLayout())
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().addWidget(self.hexWidget)
+        self.hexWidget.isModifiedChanged.connect(self._onModifiedChanged)
+
+    @property
+    def title(self):
+        return self.path + ('* ' * self.hexWidget.isModified)
+
+    @property
+    def isModified(self):
+        return self.hexWidget.isModified
+
+    def _onModifiedChanged(self, is_modified):
+        self.isModifiedChanged.emit(is_modified)
+        self.titleChanged.emit(self.title)

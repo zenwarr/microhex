@@ -2184,6 +2184,14 @@ class HexWidget(QWidget):
     def hasSelection(self):
         return bool(self._selections)
 
+    @property
+    def readOnly(self):
+        return self.editor.readOnly if self.editor is not None else True
+
+    @property
+    def isModified(self):
+        return self.editor.isModified if self.editor is not None else False
+
 
 class Selection(object):
     def __init__(self, start=0, length=0):
