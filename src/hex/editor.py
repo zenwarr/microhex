@@ -192,6 +192,9 @@ class FillSpan(Span):
 class Editor(QObject):
     dataChanged = pyqtSignal(int, int)  # first argument is start position, second one - length
     resized = pyqtSignal(int)
+    canUndoChanged = pyqtSignal(bool)
+    canRedoChanged = pyqtSignal(bool)
+    isModifiedChanged = pyqtSignal(bool)
 
     def __init__(self, device=None):
         QObject.__init__(self)
@@ -377,9 +380,8 @@ class Editor(QObject):
                 span_index += 1
                 self._totalLength += len(cloned_span)  # wow, exception safety...
 
-            self._modified = True
-
             self.addAction(InsertAction(self, position, spans, was_modified=self._modified))
+            self.isModified = True
 
     def appendSpan(self, span):
         """Shorthand method for Editor.insertSpan
@@ -445,9 +447,9 @@ class Editor(QObject):
         del self._spans[first_span_index:last_span_index]
 
         self._totalLength -= length
-        self._modified = True
 
         self.addAction(RemoveAction(self, position, removed_spans, was_modified=self._modified))
+        self.isModified = True
 
     def remove(self, position, length):
         """Remove :length: bytes starting from byte with index :position:. If length < 0, removes all bytes from
@@ -491,6 +493,12 @@ class Editor(QObject):
     @property
     def isModified(self):
         return self._modified
+
+    @isModified.setter
+    def isModified(self, new_modified):
+        if self._modified != new_modified:
+            self._modified = new_modified
+            self.isModifiedChanged.emit(new_modified)
 
     def isRangeModified(self, position, length=1):
         if not self._modified:
@@ -553,7 +561,10 @@ class Editor(QObject):
 
     def addAction(self, action):
         if not self._disableUndo:
+            old_can_undo = self.canUndo()
             self._currentUndoAction.addAction(action)
+            if old_can_undo != self.canUndo():
+                self.canUndoChanged.emit(self.canUndo())
 
     def beginComplexAction(self, title=''):
         if not self._disableUndo:
@@ -568,20 +579,28 @@ class Editor(QObject):
             self._currentUndoAction = self._currentUndoAction.parent
 
     def undo(self):
+        old_can_undo = self.canUndo()
         try:
             self._disableUndo = True
             self._currentUndoAction.undoStep()
-            self._modified = self._currentUndoAction.wasModified
+            new_modified = self._currentUndoAction.wasModified
         finally:
             self._disableUndo = False
+        self.isModified = new_modified
+        if old_can_undo != self.canUndo():
+            self.canUndoChanged.emit(self.canUndo())
 
     def redo(self, branch=None):
+        old_can_redo = self.canRedo()
         try:
             self._disableUndo = True
             self._currentUndoAction.redoStep(branch)
-            self._modified = self._currentUndoAction.wasModified
+            new_modified = self._currentUndoAction.wasModified
         finally:
             self._disableUndo = False
+        self.isModified = new_modified
+        if old_can_redo != self.canRedo():
+            self.canRedoChanged.emit(self.canRedo())
 
     def canUndo(self):
         return self._currentUndoAction.canUndo()

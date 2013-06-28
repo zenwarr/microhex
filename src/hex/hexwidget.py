@@ -1225,6 +1225,12 @@ def _translate(x, dx, dy=0):
 
 class HexWidget(QWidget):
     insertModeChanged = pyqtSignal(bool)
+    canUndoChanged = pyqtSignal(bool)
+    canRedoChanged = pyqtSignal(bool)
+    isModifiedChanged = pyqtSignal(bool)
+    hasSelectionChanged = pyqtSignal(bool)
+    leadingColumnChanged = pyqtSignal(object)
+    showHeaderChanged = pyqtSignal(bool)
 
     def __init__(self, parent, editor):
         from hex.floatscrollbar import LargeScrollBar
@@ -1295,6 +1301,10 @@ class HexWidget(QWidget):
         self.appendColumn(CharColumnModel(self.editor, encodings.getCodec('UTF-16le'), self.font()))
         self.leadingColumn = self._columns[1]
 
+        self.editor.canUndoChanged.connect(self.canUndoChanged, Qt.QueuedConnection)
+        self.editor.canRedoChanged.connect(self.canRedoChanged, Qt.QueuedConnection)
+        self.editor.isModifiedChanged.connect(self.isModifiedChanged, Qt.QueuedConnection)
+
     def loadSettings(self, settings):
         self.showHeader = settings['hexwidget.show_header']
 
@@ -1319,6 +1329,7 @@ class HexWidget(QWidget):
     def leadingColumn(self, new_column):
         if new_column is not self._leadingColumn:
             self._leadingColumn = new_column
+            self.leadingColumnChanged.emit(self._leadingColumn)
             self.view.update()
 
     @property
@@ -1970,6 +1981,15 @@ class HexWidget(QWidget):
     def selections(self):
         return self._selections
 
+    @selections.setter
+    def selections(self, new_selections):
+        if self._selections != new_selections:
+            old_has_selection = self.hasSelection
+            self._selections = new_selections
+            if old_has_selection != self.hasSelection:
+                self.hasSelectionChanged.emit(self.hasSelection)
+            self.view.update()
+
     @property
     def editMode(self):
         return self._editMode
@@ -1996,13 +2016,11 @@ class HexWidget(QWidget):
             self.view.update()
 
     def clearSelection(self):
-        self._selections = []
-        self.view.update()
+        self.selections = []
 
     def selectAll(self):
         if self.editor is not None:
-            self._selections = [Selection(0, len(self._editor))]
-            self.view.update()
+            self.selections = [Selection(0, len(self._editor))]
 
     def copy(self):
         if len(self._selections) == 1:
@@ -2027,6 +2045,12 @@ class HexWidget(QWidget):
             self.editor.undo()
         except IOError:
             pass
+
+    def canUndo(self):
+        return self.editor.canUndo()
+
+    def canRedo(self):
+        return self.editor.canRedo()
 
     def redo(self, branch=None):
         try:
@@ -2054,6 +2078,7 @@ class HexWidget(QWidget):
             self._showHeader = show
             for column in self._columns:
                 column.showHeader = show
+            self.showHeaderChanged.emit(show)
 
     def _adjustHeaderHeights(self):
         header_height = max(column.idealHeaderHeight() for column in self._columns)
@@ -2129,8 +2154,7 @@ class HexWidget(QWidget):
     def removeSelected(self):
         for selection in self._selections:
             self.editor.remove(selection.start, selection.length)
-        self._selections = []
-        self.view.update()
+        self.selections = []
 
     def fillSelected(self, pattern):
         for selection in self._selections:
@@ -2155,6 +2179,10 @@ class HexWidget(QWidget):
                 column_index = leading_column_index + 1
             address_column_model.linkedModel = self._leadingColumn.sourceModel
             self.insertColumn(address_column_model, column_index)
+
+    @property
+    def hasSelection(self):
+        return bool(self._selections)
 
 
 class Selection(object):
