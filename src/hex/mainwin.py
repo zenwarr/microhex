@@ -6,6 +6,7 @@ import hex.settings as settings
 import hex.appsettings as appsettings
 import hex.utils as utils
 import hex.files as files
+import hex.data as data
 import hex.resources.qrc_main
 
 
@@ -55,6 +56,10 @@ class MainWindow(QMainWindow):
             self.restoreGeometry(QByteArray.fromHex(geom))
 
     def createActions(self):
+        self.actionCreateDocument = QAction(QIcon.fromTheme('document-new'), utils.tr('Create...'), None)
+        self.actionCreateDocument.setShortcut(QKeySequence('Ctrl+N'))
+        self.actionCreateDocument.triggered.connect(self.newDocument)
+
         self.actionOpenFile = QAction(QIcon.fromTheme('document-open'), utils.tr('Open file...'), None)
         self.actionOpenFile.setShortcut(QKeySequence('Ctrl+O'))
         self.actionOpenFile.triggered.connect(self.openFileDialog)
@@ -142,6 +147,7 @@ class MainWindow(QMainWindow):
     def buildMenus(self):
         menubar = self.menuBar()
         self.fileMenu = menubar.addMenu(utils.tr('File'))
+        self.fileMenu.addAction(self.actionCreateDocument)
         self.fileMenu.addAction(self.actionOpenFile)
         self.fileMenu.addSeparator()
         self.fileMenu.addAction(self.actionCloseTab)
@@ -239,8 +245,13 @@ class MainWindow(QMainWindow):
 
     def openFile(self, filename, load_options=None):
         subWidget = HexSubWindow(self, filename, files.editorFromFile(filename, load_options))
-        icon_provider = QFileIconProvider()
-        self.tabsWidget.addTab(subWidget, icon_provider.icon(QFileInfo(filename)), subWidget.title)
+        self._addTab(subWidget)
+
+    def newDocument(self):
+        self._addTab(HexSubWindow(self, '', data.editorFromByteArray(QByteArray()), utils.tr('New document')))
+
+    def _addTab(self, subWidget):
+        self.tabsWidget.addTab(subWidget, subWidget.icon, subWidget.title)
         self.subWidgets.append(subWidget)
         self.tabsWidget.setCurrentWidget(subWidget)
         subWidget.titleChanged.connect(self._updateTabTitle)
@@ -281,8 +292,7 @@ class MainWindow(QMainWindow):
         subWidget = self.tabsWidget.currentWidget()
         if subWidget is not None and hasattr(subWidget, 'path'):
             self.setWindowTitle('')
-            self.setWindowFilePath(subWidget.path)
-            self.setWindowModified(subWidget.isModified)
+            self.setWindowFilePath(subWidget.title)
         else:
             self.setWindowTitle(QApplication.applicationName())
 
@@ -448,9 +458,12 @@ class HexSubWindow(QWidget):
     titleChanged = pyqtSignal(str)
     isModifiedChanged = pyqtSignal(bool)
 
-    def __init__(self, parent, filename, editor):
+    def __init__(self, parent, filename, editor, name=''):
         QWidget.__init__(self, parent)
-        self.path = QFileInfo(filename).fileName()
+        file_info = QFileInfo(filename)
+        self.path = file_info.fileName()
+        self.name = name
+        self.icon = QFileIconProvider().icon(file_info) if filename else QIcon()
         self.hexWidget = HexWidget(self, editor)
         self.hexWidget.loadSettings(globalSettings)
         self.setFocusProxy(self.hexWidget)
@@ -461,7 +474,10 @@ class HexSubWindow(QWidget):
 
     @property
     def title(self):
-        return self.path + ('* ' * self.hexWidget.isModified)
+        if self.path:
+            return self.path + ('* ' * self.hexWidget.isModified)
+        else:
+            return self.name
 
     @property
     def isModified(self):
