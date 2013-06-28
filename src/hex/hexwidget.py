@@ -1823,7 +1823,7 @@ class HexWidget(QWidget):
 
                     # and create selection between stored position and current caret position
                     sel = self.selectionBetweenIndexes(new_index, self._selectStartIndex)
-                    self._selections = [sel]
+                    self.selections = [sel]
             else:
                 self._selectStartIndex = None
                 self._selectStartColumn = None
@@ -1916,7 +1916,7 @@ class HexWidget(QWidget):
                         selections = [self.selectionBetweenIndexes(self._selectStartIndex, hover_index)]
 
                     if selections != self._selections:
-                        self._selections = selections
+                        self.selections = selections
                         self.view.update()
 
             self._stopScrollTimer()

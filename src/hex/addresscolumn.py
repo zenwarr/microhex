@@ -113,6 +113,7 @@ class AddressColumnProvider(columnproviders.AbstractColumnProvider):
     def __init__(self):
         columnproviders.AbstractColumnProvider.__init__(self)
         self.creatable = False
+        self.columnModelType = AddressColumnModel
 
     def createConfigurationWidget(self, parent, hex_widget, column=None):
         return AddressColumnConfigurationWidget(parent, hex_widget, column)
@@ -147,6 +148,8 @@ class AddressColumnConfigurationWidget(columnproviders.AbstractColumnConfigurati
         self.intBaseAddress.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.layout().addRow(utils.tr('Base address:'), self.intBaseAddress)
         self.intBaseAddress.minimum = -10000000000000
+        if column is not None:
+            self.intBaseAddress.number = column.baseAddress
 
     @property
     def _formatter(self):

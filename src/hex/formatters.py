@@ -52,7 +52,7 @@ class IntegerFormatter(object):
             result = '0'
 
         if self.padding > 0 and self.padding - self._decorationLength() - len(result) > 0:
-            result = result.zfill(self.padding)
+            result = result.zfill(self.padding - self._decorationLength())
 
         result = self._decorate(result)
 

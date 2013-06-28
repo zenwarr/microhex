@@ -16,7 +16,7 @@ class IntegerEdit(QAbstractSpinBox):
         self._min = minimum
         self._max = maximum
         self.step = 1
-        self._number = minimum
+        self._number = 0
 
         self._baseButton = QToolButton(self)
         # self._baseButton.setAutoRaise(True)
@@ -114,7 +114,7 @@ class IntegerEdit(QAbstractSpinBox):
 
     @number.setter
     def number(self, new_number):
-        if self._number != new_number or self.validate(self.text(), 0) != QValidator.Acceptable:
+        if self.number != new_number or self.validate(self.text(), 0) != QValidator.Acceptable:
             self.lineEdit().setText(self._formatter.format(new_number))
 
     def validate(self, text, pos):
@@ -152,13 +152,13 @@ class IntegerEdit(QAbstractSpinBox):
             self._min = min(n_min, self._max)
         else:
             self._min = n_min
-        if self._number < n_min:
+        if self.number < n_min:
             self.number = n_min
 
     @maximum.setter
     def maximum(self, n_max):
         self._max = max(n_max, self._min)
-        if self._max >= 0 and self._number > self._max:
+        if self._max >= 0 and self.number > self._max:
             self.number = self._max
 
     def stepBy(self, steps):
@@ -174,10 +174,9 @@ class IntegerEdit(QAbstractSpinBox):
                         (self.StepDownEnabled if self.number > self._min else 0))
 
     def _onTextChanged(self, new_text):
-        num = self._formatter.parse(new_text)
-        if num != self._number:
-            self._number = num
-            self.numberChanged.emit(num)
+        if self._number != self.number:
+            self.number = self.number
+            self.numberChanged.emit(self.number)
 
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.ControlModifier:
