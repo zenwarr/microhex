@@ -219,7 +219,6 @@ class MainWindow(QMainWindow):
 
     def showEvent(self, event):
         if not self._inited:
-            self.openFile('/home/victor/Документы/utf-16.txt')
             self._inited = True
 
     def closeEvent(self, event):
