@@ -2,7 +2,7 @@ import threading
 import random
 import weakref
 import os
-from PyQt4.QtCore import QIODevice, QFile, QFileInfo, QBuffer, QUrl, QByteArray
+from PyQt4.QtCore import QIODevice, QFile, QFileInfo, QBuffer, QUrl, QByteArray, QObject, pyqtSignal
 import hex.settings as settings
 import hex.utils as utils
 
@@ -19,8 +19,11 @@ class OutOfBoundsError(IOError):
     pass
 
 
-class AbstractDevice(object):
+class AbstractDevice(QObject):
+    urlChanged = pyqtSignal(object)
+
     def __init__(self, url=None, options=None):
+        QObject.__init__(self)
         self.lock = threading.RLock()
         self._url = url or QUrl()
         self._cache = bytes()
@@ -45,7 +48,7 @@ class AbstractDevice(object):
         with self.lock:
             if length < 0:
                 raise OutOfBoundsError()
-            elif length == 0:
+            elif length == 0 or position >= len(self):
                 return bytes()
 
             if self._cacheStart <= position < self._cacheStart + len(self._cache):
@@ -82,7 +85,11 @@ class AbstractDevice(object):
     def write(self, position, data):
         """Writes data at :position:, overwriting existing data. Returns number of bytes actually written.
         """
-        return self._write(position, data)
+        bytes_written = self._write(position, data)
+        # if data is written into cache frame, drop cache
+        if check_ranges_intersect(position, len(data), self._cacheStart, len(self._cache)):
+            self._cache = []
+        return bytes_written
 
     def createSaver(self, editor, write_device):
         """Create saver to save data from this device to :write_device:
@@ -116,7 +123,9 @@ class StandardSaver(object):
         while span_offset < len(span):
             read_length = min(len(span) - span_offset, MaximalWriteBlock)
             span_data = span.read(span_offset, read_length)
-            self.writeDevice.write(self.position, span_data)
+            if self.writeDevice.write(self.position, span_data) != read_length:
+                raise IOError(utils.tr('failed to write {0}: not all data was written').format(
+                            utils.formatSize(self.writeDevice.url.toString())))
             self.position += read_length
             span_offset += read_length
 
@@ -133,7 +142,6 @@ class QtProxyDevice(AbstractDevice):
     def __init__(self, qdevice, url=None, options=None):
         AbstractDevice.__init__(self, url, options)
         self._qdevice = qdevice
-        self._pos = 0
 
     def _ensureOpened(self):
         if self._qdevice is not None and not self._qdevice.isOpen():
@@ -146,12 +154,8 @@ class QtProxyDevice(AbstractDevice):
 
     def _read(self, position, length):
         self._ensureOpened()
-        if self._pos != position:
-            if not self._qdevice.seek(position):
-                raise IOError(utils.tr('failed to seek to position {0}').format(position))
-            else:
-                self._pos = position
-
+        if not self._qdevice.seek(position):
+            raise IOError(utils.tr('failed to seek to position {0}').format(position))
         return self._qdevice.read(length)
 
     @property
@@ -211,6 +215,12 @@ class FileDevice(QtProxyDevice):
     def clear(self):
         self._qdevice.resize(0)
 
+    def resize(self, new_size):
+        self._ensureOpened()
+        if not self._qdevice.resize(new_size):
+            raise IOError(utils.tr('failed to resize file {0} to size {1}').format(self.url.toString(),
+                                                                                   utils.formatSize(new_size)))
+
     def createSaver(self, editor, write_device):
         if editor is not None and editor.canQuickSave and isinstance(write_device, FileDevice):
             return QuickFileSaver(editor, self, write_device)
@@ -248,9 +258,7 @@ class QuickFileSaver(StandardSaver):
 
     def begin(self):
         # no need to clear device before saving, but resize file to editor' size
-        if not self.writeDevice.qdevice.resize(len(self.editor)):
-            raise IOError(utils.tr('failed to resize file {0} to size {1}').format(self.writeDevice.name,
-                                                                                   utils.formatSize(len(self.editor))))
+        self.writeDevice.resize(len(self.editor))
 
     def putSpan(self, span):
         from hex.editor import Span, DeviceSpan
@@ -378,3 +386,16 @@ def deviceFromBytes(data, load_options=None):
     load_options = load_options or BufferLoadOptions()
     load_options.data = data if isinstance(data, QByteArray) else QByteArray(data)
     return deviceFromUrl(QUrl('data://'), load_options)
+
+
+def check_ranges_intersect(start1, length1, start2, length2):
+    if start2 < start1:
+        t = start2
+        start2 = start1
+        start1 = t
+
+        t = length2
+        length2 = length1
+        length1 = t
+
+    return not (start2 - start1 <= length1)

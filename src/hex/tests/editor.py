@@ -164,6 +164,12 @@ class TestEditor(unittest.TestCase):
         self.assertEqual(editor.readAll(), b'Hello, World!')
         self.assertFalse(editor.isModified)
 
+        array2 = QByteArray()
+        device2 = BufferDevice(array2)
+
+        editor.save(device2)
+        self.assertEqual(device2.read(0, len(device2)), b'Hello, World!')
+
     def testb1(self):
         editor = Editor(deviceFromBytes(QByteArray()))
 

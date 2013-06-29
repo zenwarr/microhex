@@ -194,8 +194,9 @@ class Editor(QObject):
     canUndoChanged = pyqtSignal(bool)
     canRedoChanged = pyqtSignal(bool)
     isModifiedChanged = pyqtSignal(bool)
+    urlChanged = pyqtSignal(object)
 
-    def __init__(self, device=None):
+    def __init__(self, device):
         QObject.__init__(self)
         self._device = device
         self._lock = threading.RLock()
@@ -204,21 +205,21 @@ class Editor(QObject):
         self._currentUndoAction = None
         self._disableUndo = False
         self._spans = []
-        self._freezeSize = device.fixedSize if device is not None else False
-        self._readOnly = device.readOnly if device is not None else False
+        self._freezeSize = device.fixedSize
+        self._readOnly = device.readOnly
         self._canQuickSave = True
         self._currentSavepointIndex = 0
 
-        if self._device is not None and len(self._device):
+        if len(self._device):
             # initialize editor with one span referencing all device data
             self._spans.append(DeviceSpan(self, self._device, 0, len(self._device)))
-            self._spans[0].savepointIndex = 0
+            self._spans[0].savepointIndex = -1
             self._totalLength = len(self._device)
 
         self._currentUndoAction = ComplexAction(self, utils.tr('initial state'))
+        self._device.urlChanged.connect(self.urlChanged)
 
-        if self._device is not None:
-            self._device.editor = self
+        self._device.editor = self
 
     @property
     def lock(self):
@@ -227,6 +228,10 @@ class Editor(QObject):
     @property
     def device(self):
         return self._device
+
+    @property
+    def url(self):
+        return self._device.url
 
     @property
     def length(self):
@@ -637,32 +642,39 @@ class Editor(QObject):
     def canQuickSave(self):
         return self._canQuickSave
 
-    def save(self, device=None):
-        """Completely writes all editor data into given device. Saving in general is complex process and can involve
-        not only writing byte chunks, but also other OS functions like copying and removing files, etc.
-        When saving process is started, new object of DeviceSaver class is created.
+    def save(self, device=None, switch_device=False):
+        """Completely writes all editor data into given device.
         """
-        if device is None:
-            device = self.device
+        with self.lock:
+            if device is None:
+                if not self.isModified:
+                    return
+                device = self.device
 
-        if device is None:
-            raise ValueError('device is None')
+            if device is None:
+                raise ValueError('device is None')
 
-        if not self.isModified:
-            return
+            saver = self.device.createSaver(self, device)
+            saver.begin()
+            try:
+                for span in self._spans:
+                    saver.putSpan(span)
+            except:
+                saver.fail()
+                raise
+            else:
+                saver.complete()
+                if device is self._device or switch_device:
+                    self._currentSavepointIndex += 1
+                self.isModified = False
 
-        saver = device.createSaver(self, self.device)
-        saver.begin()
-        try:
-            for span in self._spans:
-                saver.putSpan(span)
-        except:
-            saver.fail()
-            raise
-        else:
-            saver.complete()
-            self._currentSavepointIndex += 1
-            self.isModified = False
+                if switch_device:
+                    for span in self._spans:
+                        if isinstance(span, DeviceSpan) and span._device is self._device:
+                            span._device = device
+
+                    self._device = device
+                    self.urlChanged.emit(self.url)
 
 
 class AbstractUndoAction(object):

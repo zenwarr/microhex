@@ -1,4 +1,4 @@
-from PyQt4.QtCore import pyqtSignal, QObject, Qt, QPointF, QRectF, QPoint, QSizeF, QEvent, QTimer, QLineF
+from PyQt4.QtCore import pyqtSignal, QObject, Qt, QPointF, QRectF, QPoint, QSizeF, QEvent, QTimer, QLineF, QUrl
 from PyQt4.QtGui import QColor, QFont, QFontMetricsF, QPolygonF, QWidget, QScrollBar, QVBoxLayout, QHBoxLayout, \
                         QPainter, QBrush, QPalette, QPen, QApplication, QRegion, QLineEdit, QValidator, \
                         QTextEdit, QTextOption, QSizePolicy, QStyle, QStyleOptionFrameV2, QTextCursor, QTextDocument, \
@@ -1232,6 +1232,7 @@ class HexWidget(QWidget):
     hasSelectionChanged = pyqtSignal(bool)
     leadingColumnChanged = pyqtSignal(object)
     showHeaderChanged = pyqtSignal(bool)
+    urlChanged = pyqtSignal(object)
 
     def __init__(self, parent, editor):
         from hex.floatscrollbar import LargeScrollBar
@@ -2194,14 +2195,18 @@ class HexWidget(QWidget):
     def isModified(self):
         return self.editor.isModified if self.editor is not None else False
 
-    def save(self):
+    def save(self, device=None, switch_to_device=False):
         if self.editor is not None:
-            self.editor.save()
+            self.editor.save(device, switch_to_device)
             self.reset()
 
     def reset(self):
         for column in self._columns:
             column.sourceModel.reset()
+
+    @property
+    def url(self):
+        return self.editor.url if self.editor is not None else QUrl()
 
 
 class Selection(object):
