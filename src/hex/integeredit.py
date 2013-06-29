@@ -158,7 +158,7 @@ class IntegerEdit(QAbstractSpinBox):
     @maximum.setter
     def maximum(self, n_max):
         self._max = max(n_max, self._min)
-        if self._max >= 0 and self.number > self._max:
+        if self._max >= 0 and self._number > self._max:
             self.number = self._max
 
     def stepBy(self, steps):
@@ -175,7 +175,7 @@ class IntegerEdit(QAbstractSpinBox):
 
     def _onTextChanged(self, new_text):
         if self._number != self.number:
-            self.number = self.number
+            self._number = self.number
             self.numberChanged.emit(self.number)
 
     def keyPressEvent(self, event):

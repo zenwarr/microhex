@@ -12,7 +12,7 @@ class AddressColumnModel(hexwidget.ColumnModel):
         editor = linked_model.editor if linked_model is not None else linked_model
         hexwidget.ColumnModel.__init__(self, editor)
         self._linkedModel = None
-        self.formatter = formatter or formatters.IntegerFormatter()
+        self.formatter = formatter or formatters.IntegerFormatter(base=16, uppercase=True)
         self._baseAddress = base_address
         self.linkedModel = linked_model
 

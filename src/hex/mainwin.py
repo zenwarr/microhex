@@ -1,12 +1,13 @@
-from PyQt4.QtCore import QFileInfo, Qt, QByteArray, QObject, pyqtSignal
+from PyQt4.QtCore import QFileInfo, Qt, QByteArray, QObject, pyqtSignal, QUrl
 from PyQt4.QtGui import QMainWindow, QTabWidget, QFileDialog, QKeySequence, QMdiSubWindow, QApplication, QProgressBar, \
-                        QWidget, QVBoxLayout, QFileIconProvider, QApplication, QIcon, QDialog, QAction, QIcon, QLabel
+                        QWidget, QVBoxLayout, QFileIconProvider, QApplication, QIcon, QDialog, QAction, QIcon, QLabel, \
+                        QMessageBox
 from hex.hexwidget import HexWidget
 import hex.settings as settings
 import hex.appsettings as appsettings
 import hex.utils as utils
-import hex.files as files
-import hex.data as data
+import hex.devices as devices
+import hex.editor as editor
 import hex.resources.qrc_main
 
 
@@ -63,6 +64,10 @@ class MainWindow(QMainWindow):
         self.actionOpenFile = QAction(QIcon.fromTheme('document-open'), utils.tr('Open file...'), None)
         self.actionOpenFile.setShortcut(QKeySequence('Ctrl+O'))
         self.actionOpenFile.triggered.connect(self.openFileDialog)
+
+        self.actionSave = ObservingAction(QIcon.fromTheme('document-save'), utils.tr('Save'),
+                                          PropertyObserver(self, 'activeSubWidget.hexWidget.isModified'))
+        self.actionSave.triggered.connect(self.save)
 
         self.actionCloseTab = ObservingAction(QIcon(), utils.tr('Close'), PropertyObserver(self, 'activeSubWidget'))
         self.actionCloseTab.setShortcut(QKeySequence('Ctrl+W'))
@@ -150,6 +155,8 @@ class MainWindow(QMainWindow):
         self.fileMenu.addAction(self.actionCreateDocument)
         self.fileMenu.addAction(self.actionOpenFile)
         self.fileMenu.addSeparator()
+        self.fileMenu.addAction(self.actionSave)
+        self.fileMenu.addSeparator()
         self.fileMenu.addAction(self.actionCloseTab)
         self.fileMenu.addSeparator()
         self.fileMenu.addAction(self.actionExit)
@@ -228,6 +235,22 @@ class MainWindow(QMainWindow):
 
     def closeTab(self, tab_index):
         subWidget = self.tabsWidget.widget(tab_index)
+        if subWidget.hexWidget.isModified:
+            msgbox = QMessageBox(self)
+            msgbox.setWindowTitle(utils.tr('Close editor'))
+            msgbox.setIcon(QMessageBox.Question)
+            msgbox.setText(utils.tr('Document {0} has unsaved changed. Do you want to save it?')
+                                        .format(subWidget.title))
+            msgbox.addButton(utils.tr('Save'), QMessageBox.YesRole)
+            msgbox.addButton(utils.tr('Do not save'), QMessageBox.NoRole)
+            msgbox.addButton(QMessageBox.Cancel)
+            msgbox.setDefaultButton(QMessageBox.Cancel)
+            ans = msgbox.exec_()
+            if ans == QMessageBox.Cancel:
+                return
+            elif ans == QMessageBox.Yes:
+                subWidget.hexWidget.save()
+
         self.tabsWidget.removeTab(tab_index)
         self.subWidgets = [w for w in self.subWidgets if w is not subWidget]
         return True
@@ -244,11 +267,13 @@ class MainWindow(QMainWindow):
                 self.openFile(filename, load_dialog.loadOptions)
 
     def openFile(self, filename, load_options=None):
-        subWidget = HexSubWindow(self, filename, files.editorFromFile(filename, load_options))
+        e = editor.Editor(devices.deviceFromUrl(QUrl.fromLocalFile(filename), load_options))
+        subWidget = HexSubWindow(self, filename, e)
         self._addTab(subWidget)
 
     def newDocument(self):
-        self._addTab(HexSubWindow(self, '', data.editorFromByteArray(QByteArray()), utils.tr('New document')))
+        e = editor.Editor(devices.deviceFromBytes(QByteArray()))
+        self._addTab(HexSubWindow(self, '', e, utils.tr('New document')))
 
     def _addTab(self, subWidget):
         self.tabsWidget.addTab(subWidget, subWidget.icon, subWidget.title)
@@ -382,6 +407,10 @@ class MainWindow(QMainWindow):
         dlg = addresscolumn.AddAddressColumnDialog(self, hex_widget, hex_widget.leadingColumn)
         if dlg.exec_() == QDialog.Accepted:
             dlg.addColumn()
+
+    @forActiveWidget
+    def save(self):
+        self.activeSubWidget.hexWidget.save()
 
 
 class PropertyObserver(QObject):

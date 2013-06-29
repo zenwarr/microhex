@@ -3,6 +3,7 @@ from hex.forms.ui_loadfiledialog import Ui_LoadFileDialog
 import hex.utils as utils
 import hex.formatters as formatters
 import hex.settings as settings
+import hex.devices as devices
 
 
 globalSettings = settings.globalSettings()
@@ -59,9 +60,7 @@ class LoadFileDialog(utils.Dialog):
 
     @property
     def loadOptions(self):
-        from hex.files import FileLoadOptions
-
-        options = FileLoadOptions()
+        options = devices.FileLoadOptions()
         if self.ui.chkLoadRange.isChecked():
             options.range = self.ui.rangeStart.number, self.ui.rangeLength.number
         options.readOnly = self.ui.chkReadOnly.isChecked()

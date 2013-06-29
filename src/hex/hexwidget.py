@@ -1077,6 +1077,7 @@ class Column(QObject):
         assert(0 <= row_index < len(self._cache))
 
         row_data = RowData()
+        row_data.html = '<div class="row">'
         column_count = self.model.columnCount(row_index)
         for column_index in range(column_count):
             index = self.model.toSourceIndex(self.model.index(row_index, column_index))
@@ -1095,7 +1096,7 @@ class Column(QObject):
                 if cell_classes:
                     # unfortunately, HTML subset supported by Qt does not include multiclasses
                     for css_class in cell_classes:
-                        index_html = '<span class={0}>{1}</span>'.format(css_class, prepared_text)
+                        index_html = '<span class="{0}">{1}</span>'.format(css_class, prepared_text)
                 else:
                     index_html = '<span>{0}</span>'.format(prepared_text)
 
@@ -1109,6 +1110,7 @@ class Column(QObject):
 
             row_data.items.append(index_data)
 
+        row_data.html += '</div>'
         self._cache[row_index] = row_data
         self._documentBackend.updateRow(row_index, row_data)
 
@@ -1194,7 +1196,6 @@ class Column(QObject):
             .highlight {{
                 color: green;
             }}
-
         """.format(mod_color=self._theme.modifiedTextColor.name()))
 
         return document
@@ -1658,6 +1659,7 @@ class HexWidget(QWidget):
                     self._leadingColumn.insertDefaultCell(index)
                     # now caret position points to inserted index and caret index is invalid
                     index = self.caretIndex(self._leadingColumn)
+                    original_text = index.data(Qt.EditRole)
 
                 if self._leadingColumn.regular:
                     # replace character at cursor offset
@@ -2191,6 +2193,15 @@ class HexWidget(QWidget):
     @property
     def isModified(self):
         return self.editor.isModified if self.editor is not None else False
+
+    def save(self):
+        if self.editor is not None:
+            self.editor.save()
+            self.reset()
+
+    def reset(self):
+        for column in self._columns:
+            column.sourceModel.reset()
 
 
 class Selection(object):

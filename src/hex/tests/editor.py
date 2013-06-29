@@ -1,7 +1,7 @@
 import unittest
 from hex.editor import Editor, Span, DataSpan, FillSpan, OutOfBoundsError
-from hex.devices import BufferDevice
-from PyQt4.QtCore import QBuffer, QByteArray
+from hex.devices import BufferDevice, deviceFromBytes
+from PyQt4.QtCore import QByteArray
 
 
 class TestEditor(unittest.TestCase):
@@ -57,10 +57,8 @@ class TestEditor(unittest.TestCase):
 
         self.assertTrue(editor.isModified)
 
-        self.undoTest()
-
     def test2(self):
-        editor = Editor(BufferDevice(QByteArray(b'Hello'), read_only=False))
+        editor = Editor(deviceFromBytes(QByteArray(b'Hello')))
 
         editor.remove(0, 1)
 
@@ -69,12 +67,16 @@ class TestEditor(unittest.TestCase):
         self.assertTrue(editor.isModified)
         self.assertFalse(editor.isRangeModified(0, 4))
 
-    def undoTest(self):
-        editor = Editor(BufferDevice(QByteArray(b'Hello, World!'), read_only=False))
+    def testUndo(self):
+        editor = Editor(deviceFromBytes(QByteArray(b'Hello, World!')))
 
         editor.insertSpan(3, DataSpan(editor, b'000'))
         self.assertEqual(editor.readAll(), b'Hel000lo, World!')
         self.assertTrue(editor.isModified)
+        self.assertFalse(editor.isRangeModified(0, 2))
+        self.assertTrue(editor.isRangeModified(3, 1))
+        self.assertFalse(editor.isRangeModified(10, 2))
+        self.assertTrue(editor.isRangeModified(0, 5))
 
         self.assertTrue(editor.canUndo())
         self.assertFalse(editor.canRedo())
@@ -87,6 +89,14 @@ class TestEditor(unittest.TestCase):
         self.assertEqual(editor.readAll(), b'Hel000lo, World!')
 
         # and again...
+        editor.undo()
+        self.assertEqual(editor.readAll(), b'Hello, World!')
+        self.assertFalse(editor.isModified)
+
+        self.assertFalse(editor.canUndo())
+        self.assertTrue(editor.canRedo())
+
+        # and again!
         editor.undo()
         self.assertEqual(editor.readAll(), b'Hello, World!')
         self.assertFalse(editor.isModified)
@@ -124,3 +134,40 @@ class TestEditor(unittest.TestCase):
 
         editor.undo()
         self.assertEqual(editor.readAll(), b'Hello, World!')
+
+    def testSave(self):
+        array = QByteArray(b'Hello, World!')
+
+        editor = Editor(BufferDevice(array))
+
+        editor.insertSpan(3, DataSpan(editor, b'000'))
+        self.assertEqual(editor.readAll(), b'Hel000lo, World!')
+        self.assertTrue(editor.isModified)
+
+        editor.save()
+
+        self.assertEqual(editor.readAll(), b'Hel000lo, World!')
+        self.assertFalse(editor.isModified)
+
+        self.assertFalse(editor.isRangeModified(0, 5))
+        editor.insertSpan(10, DataSpan(editor, b'!!!'))
+        self.assertFalse(editor.isRangeModified(0, 5))
+        self.assertTrue(editor.isModified)
+
+        self.assertEqual(array, b'Hel000lo, World!')
+
+        editor.undo()
+        self.assertEqual(editor.readAll(), b'Hel000lo, World!')
+        self.assertFalse(editor.isModified)
+
+        editor.undo()
+        self.assertEqual(editor.readAll(), b'Hello, World!')
+        self.assertFalse(editor.isModified)
+
+    def testb1(self):
+        editor = Editor(deviceFromBytes(QByteArray()))
+
+        editor.insertSpan(40, DataSpan(editor, b'\x00'))
+        editor.writeSpan(10, FillSpan(editor, b'\x00', 5))
+
+        self.assertTrue(editor.isRangeModified(30, 1))

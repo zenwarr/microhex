@@ -29,13 +29,10 @@ DefaultFillPattern = b'\0'
 class Span(object):
     """Span controls piece of immutable data. Spans are immutable and thread-safe.
     """
-    NoFlag = 0
-    Native = 1
-
-    def __init__(self, parent=None, flags=NoFlag):
+    def __init__(self, parent=None):
         self.__parent = parent
-        self.__flags = flags
         self._lock = threading.RLock()
+        self.savepointIndex = -1
 
     @property
     def lock(self):
@@ -44,10 +41,6 @@ class Span(object):
     @property
     def parent(self):
         return self.__parent
-
-    @property
-    def flags(self):
-        return self.__flags
 
     @property
     def length(self):
@@ -60,7 +53,7 @@ class Span(object):
         with self.lock:
             if offset < 0 or offset >= len(self):
                 raise OutOfBoundsError()
-            return copy.deepcopy(self), copy.deepcopy(self)
+            return self.clone(self.parent), self.clone(self.parent)
 
     def clone(self, new_parent):
         with self.lock:
@@ -76,8 +69,8 @@ class Span(object):
 
 
 class DataSpan(Span):
-    def __init__(self, parent, data, flags=Span.NoFlag):
-        Span.__init__(self, parent, flags)
+    def __init__(self, parent, data):
+        Span.__init__(self, parent)
         self.__data = data  # should be bytes object
 
     @property
@@ -100,7 +93,9 @@ class DataSpan(Span):
 
     def __deepcopy__(self, memo):
         with self.lock:
-            return DataSpan(self.parent, self.__data, self.flags)
+            cloned = DataSpan(self.parent, self.__data)
+            cloned.savepointIndex = self.savepointIndex
+            return cloned
 
     def __eq__(self, other):
         if not isinstance(other, DataSpan):
@@ -109,8 +104,8 @@ class DataSpan(Span):
 
 
 class DeviceSpan(Span):
-    def __init__(self, parent, device, device_offset, device_len, flags=Span.NoFlag):
-        Span.__init__(self, parent, flags)
+    def __init__(self, parent, device, device_offset, device_len):
+        Span.__init__(self, parent)
         self._device = device
         self._deviceOffset = device_offset
         self._deviceLen = device_len if device_len >= 0 else -1
@@ -118,11 +113,7 @@ class DeviceSpan(Span):
     @property
     def length(self):
         with self.lock:
-            if self._deviceLen >= 0:
-                return self._deviceLen
-            else:
-                size = len(self._device) - self._deviceOffset
-                return size if size >= 0 else 0
+            return self._deviceLen
 
     def read(self, offset, size):
         with self.lock:
@@ -146,7 +137,9 @@ class DeviceSpan(Span):
 
     def __deepcopy__(self, memo):
         with self.lock:
-            return DeviceSpan(self.parent, self._device, self._deviceOffset, self._deviceLen, self.flags)
+            cloned = DeviceSpan(self.parent, self._device, self._deviceOffset, self._deviceLen)
+            cloned.savepointIndex = self.savepointIndex
+            return cloned
 
     def __eq__(self, other):
         if not isinstance(other, DeviceSpan):
@@ -154,10 +147,14 @@ class DeviceSpan(Span):
         return self._device is other._device and self._deviceOffset == other._deviceOffset and \
                     self._deviceLen == other._deviceLen
 
+    @property
+    def device(self):
+        return self._device
+
 
 class FillSpan(Span):
-    def __init__(self, parent, pattern, length, flags=Span.NoFlag):
-        Span.__init__(self, parent, flags)
+    def __init__(self, parent, pattern, length):
+        Span.__init__(self, parent)
         self.__pattern = pattern
         self.__length = length
 
@@ -177,11 +174,13 @@ class FillSpan(Span):
         s, f = Span.split(self, offset)
         f.__length = offset
         s.__length = self.__length - offset
-        return s, f
+        return f, s
 
     def __deepcopy__(self, memo):
         with self.lock:
-            return FillSpan(self.parent, self.__pattern, self.__length, self.flags)
+            cloned = FillSpan(self.parent, self.__pattern, self.__length)
+            cloned.savepointIndex = self.savepointIndex
+            return cloned
 
     def __eq__(self, other):
         if not isinstance(other, FillSpan):
@@ -202,16 +201,24 @@ class Editor(QObject):
         self._lock = threading.RLock()
         self._modified = False
         self._totalLength = 0
-        self._currentUndoAction = ComplexAction(self)
+        self._currentUndoAction = None
         self._disableUndo = False
         self._spans = []
         self._freezeSize = device.fixedSize if device is not None else False
         self._readOnly = device.readOnly if device is not None else False
+        self._canQuickSave = True
+        self._currentSavepointIndex = 0
+
+        if self._device is not None and len(self._device):
+            # initialize editor with one span referencing all device data
+            self._spans.append(DeviceSpan(self, self._device, 0, len(self._device)))
+            self._spans[0].savepointIndex = 0
+            self._totalLength = len(self._device)
+
+        self._currentUndoAction = ComplexAction(self, utils.tr('initial state'))
 
         if self._device is not None:
-            # initialize editor with one span referencing all device data
-            self._spans.append(DeviceSpan(self, self._device, 0, -1, Span.Native))
-            self._totalLength = len(self._device)
+            self._device.editor = self
 
     @property
     def lock(self):
@@ -352,6 +359,11 @@ class Editor(QObject):
 
         old_length = self._totalLength
         self._insertSpans(position, spans, fill_pattern)
+
+        if self._canQuickSave:
+            if position < old_length or any(isinstance(span, DeviceSpan) and span._device is self._device for span in spans):
+                self._canQuickSave = False
+
         if old_length != self._totalLength:
             self.resized.emit(self._totalLength)
             self.dataChanged.emit(min(old_length, position), -1)
@@ -376,11 +388,12 @@ class Editor(QObject):
 
             for span in spans:
                 cloned_span = span.clone(self)
+                cloned_span.savepointIndex = self._currentSavepointIndex
                 self._spans.insert(span_index, cloned_span)
                 span_index += 1
                 self._totalLength += len(cloned_span)  # wow, exception safety...
 
-            self.addAction(InsertAction(self, position, spans, was_modified=self._modified))
+            self.addAction(InsertAction(self, position, spans))
             self.isModified = True
 
     def appendSpan(self, span):
@@ -415,6 +428,7 @@ class Editor(QObject):
 
         old_length = self._totalLength
         write_length = self._calculateSpansLength(spans)
+        old_can_quick_save = self._canQuickSave
 
         if self._freezeSize and position + write_length > self._totalLength:
             raise FreezeSizeError()
@@ -426,6 +440,9 @@ class Editor(QObject):
             self._insertSpans(position, spans, fill_pattern)
         finally:
             self.endComplexAction()
+
+        if old_can_quick_save:
+            self._canQuickSave = not any(isinstance(span, DeviceSpan) and span._device is self._device for span in spans)
 
         if self._totalLength != old_length:
             self.resized.emit(self._totalLength)
@@ -448,7 +465,7 @@ class Editor(QObject):
 
         self._totalLength -= length
 
-        self.addAction(RemoveAction(self, position, removed_spans, was_modified=self._modified))
+        self.addAction(RemoveAction(self, position, removed_spans))
         self.isModified = True
 
     def remove(self, position, length):
@@ -462,7 +479,12 @@ class Editor(QObject):
         if self._freezeSize and length != 0:
             raise FreezeSizeError()
 
+        old_length = self._totalLength
+
         self._remove(position, length)
+
+        if self._canQuickSave and position + length < old_length:
+            self._canQuickSave = False
 
         self.resized.emit(len(self))
         self.dataChanged.emit(position, -1)
@@ -503,7 +525,7 @@ class Editor(QObject):
     def isRangeModified(self, position, length=1):
         if not self._modified:
             return False
-        return any(not (s.flags & Span.Native) for s in self.spansInRange(position, length)[0])
+        return any(s.savepointIndex >= self._currentSavepointIndex for s in self.spansInRange(position, length)[0])
 
     def __len__(self):
         with self.lock:
@@ -611,26 +633,62 @@ class Editor(QObject):
     def alternativeBranches(self):
         return self._currentUndoAction.alternativeBranches()
 
+    @property
+    def canQuickSave(self):
+        return self._canQuickSave
+
+    def save(self, device=None):
+        """Completely writes all editor data into given device. Saving in general is complex process and can involve
+        not only writing byte chunks, but also other OS functions like copying and removing files, etc.
+        When saving process is started, new object of DeviceSaver class is created.
+        """
+        if device is None:
+            device = self.device
+
+        if device is None:
+            raise ValueError('device is None')
+
+        if not self.isModified:
+            return
+
+        saver = device.createSaver(self, self.device)
+        saver.begin()
+        try:
+            for span in self._spans:
+                saver.putSpan(span)
+        except:
+            saver.fail()
+            raise
+        else:
+            saver.complete()
+            self._currentSavepointIndex += 1
+            self.isModified = False
+
 
 class AbstractUndoAction(object):
-    def __init__(self, editor, title='', was_modified=True):
+    def __init__(self, editor, title=''):
         self.title = title
         self.editor = editor
         self.parent = None
-        self._wasModified = was_modified
+        self._wasModified = editor.isModified
+        self._savepointIndex = editor._currentSavepointIndex
+
+    def _restore(self):
+        self.editor.isModified = self._wasModified
+        self.editor._currentSavepointIndex = self._savepointIndex
 
     def undo(self):
-        self.editor._modified = self._wasModified
+        self._restore()
 
     def redo(self):
-        self.editor._modified = self._wasModified
+        self._restore()
 
 
 class InsertAction(AbstractUndoAction):
-    def __init__(self, editor, position, spans, title='', was_modified=True):
+    def __init__(self, editor, position, spans, title=''):
         if not title:
             title = utils.tr('insert {0} bytes from position {1}'.format(editor._calculateSpansLength(spans), position))
-        AbstractUndoAction.__init__(self, editor, title, was_modified)
+        AbstractUndoAction.__init__(self, editor, title)
         self.spans = spans
         self.position = position
 
@@ -645,10 +703,10 @@ class InsertAction(AbstractUndoAction):
 
 
 class RemoveAction(AbstractUndoAction):
-    def __init__(self, editor, position, spans, title='', was_modified=True):
+    def __init__(self, editor, position, spans, title=''):
         if not title:
             title = utils.tr('remove {0} bytes from position {1}'.format(editor._calculateSpansLength(spans), position))
-        AbstractUndoAction.__init__(self, editor, title, was_modified=True)
+        AbstractUndoAction.__init__(self, editor, title)
         self.spans = spans
         self.position = position
 
