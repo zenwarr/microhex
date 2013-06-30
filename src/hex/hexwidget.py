@@ -3,7 +3,7 @@ from PyQt4.QtGui import QColor, QFont, QFontMetricsF, QPolygonF, QWidget, QScrol
                         QPainter, QBrush, QPalette, QPen, QApplication, QRegion, QLineEdit, QValidator, \
                         QTextEdit, QTextOption, QSizePolicy, QStyle, QStyleOptionFrameV2, QTextCursor, QTextDocument, \
                         QTextBlockFormat, QPlainTextDocumentLayout, QAbstractTextDocumentLayout, QTextCharFormat, \
-                        QTextTableFormat, QRawFont, QKeyEvent
+                        QTextTableFormat, QRawFont, QKeyEvent, QFontDatabase
 import math
 import html
 from hex.valuecodecs import IntegerCodec
@@ -461,11 +461,10 @@ class Theme(object):
         settings[name] = theme_obj
 
     @staticmethod
-    def isFontInstalled(font):
+    def isFontInstalled(font_family):
         """It seems that Qt has no standard way to determine if font is installed on system, but we have
          QRawFont.supportsCharacter method!"""
-        raw_font = QRawFont.fromFont(font)
-        return raw_font.supportsCharacter('a') or raw_font.supportsCharacter('A')
+        return font_family in QFontDatabase().families()
 
     @staticmethod
     def fontFromData(font_data):
@@ -476,7 +475,7 @@ class Theme(object):
                     font_size = font_choice[1] if isinstance(font_choice[1], int) else -1
                     if font_name and font_size > 0:
                         font = QFont(font_name, font_size)
-                        if Theme.isFontInstalled(font):
+                        if Theme.isFontInstalled(font_name):
                             return font
 
     @staticmethod
@@ -1001,12 +1000,12 @@ class Column(QObject):
                 return range_polygon,
 
     def indexFromPoint(self, point):
-        point = QPoint(point.x() - self.documentOrigin.x(), point.y() - self.documentOrigin.y())
+        point = QPointF(point.x() - self.documentOrigin.x(), point.y() - self.documentOrigin.y())
         row, column = self._documentBackend.cellFromPoint(point)
         return self.model.toSourceIndex(self.model.index(row, column))
 
     def cursorPositionFromPoint(self, point):
-        point = QPoint(point.x() - self.documentOrigin.x(), point.y() - self.documentOrigin.y())
+        point = QPointF(point.x() - self.documentOrigin.x(), point.y() - self.documentOrigin.y())
         return self._documentBackend.cursorPositionFromPoint(point)
 
     def paint(self, paint_data, is_leading):

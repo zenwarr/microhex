@@ -95,17 +95,17 @@
         <translation type="unfinished">ОК</translation>
     </message>
     <message>
-        <location filename="devices.py" line="151"/>
+        <location filename="devices.py" line="158"/>
         <source>failed to seek to position {0}</source>
         <translation type="unfinished">невозможно перейти к позиции {0}</translation>
     </message>
     <message>
-        <location filename="devices.py" line="192"/>
+        <location filename="devices.py" line="196"/>
         <source>file {0} does not exist</source>
         <translation type="unfinished">файл {0} не найден</translation>
     </message>
     <message>
-        <location filename="devices.py" line="194"/>
+        <location filename="devices.py" line="198"/>
         <source>cannot load file into memory that has size {0}</source>
         <translation type="unfinished">файл размера {0} невозможно загрузить в память</translation>
     </message>
@@ -120,17 +120,17 @@
         <translation type="unfinished">операция невозможна для редактора с зафиксированным размером</translation>
     </message>
     <message>
-        <location filename="editor.py" line="431"/>
+        <location filename="editor.py" line="448"/>
         <source>writing {0} bytes at position {1}</source>
         <translation type="unfinished">запись {0} байт по адресу {1}</translation>
     </message>
     <message>
-        <location filename="editor.py" line="684"/>
+        <location filename="editor.py" line="699"/>
         <source>insert {0} bytes from position {1}</source>
         <translation type="unfinished">вставка {0} байт по адресу {1}</translation>
     </message>
     <message>
-        <location filename="editor.py" line="702"/>
+        <location filename="editor.py" line="718"/>
         <source>remove {0} bytes from position {1}</source>
         <translation type="unfinished">удаление {0} байт по адресу {1}</translation>
     </message>
@@ -165,7 +165,7 @@
         <translation type="unfinished">не удалось сохранить настройки: {0}</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="154"/>
+        <location filename="mainwin.py" line="160"/>
         <source>File</source>
         <translation type="unfinished">Файл</translation>
     </message>
@@ -175,82 +175,82 @@
         <translation type="unfinished">Открыть файл...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="72"/>
+        <location filename="mainwin.py" line="78"/>
         <source>Close</source>
         <translation type="unfinished">Закрыть</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="76"/>
+        <location filename="mainwin.py" line="82"/>
         <source>Exit</source>
         <translation type="unfinished">Выход</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="164"/>
+        <location filename="mainwin.py" line="171"/>
         <source>Edit</source>
         <translation type="unfinished">Правка</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="79"/>
+        <location filename="mainwin.py" line="85"/>
         <source>Undo</source>
         <translation type="unfinished">Отменить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="84"/>
+        <location filename="mainwin.py" line="90"/>
         <source>Redo</source>
         <translation type="unfinished">Повторить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="89"/>
+        <location filename="mainwin.py" line="95"/>
         <source>Copy</source>
         <translation type="unfinished">Копировать</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="94"/>
+        <location filename="mainwin.py" line="100"/>
         <source>Paste</source>
         <translation type="unfinished">Вставить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="99"/>
+        <location filename="mainwin.py" line="105"/>
         <source>Clear selection</source>
         <translation type="unfinished">Убрать выделение</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="104"/>
+        <location filename="mainwin.py" line="110"/>
         <source>Select all</source>
         <translation type="unfinished">Выделить все</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="179"/>
+        <location filename="mainwin.py" line="186"/>
         <source>View</source>
         <translation type="unfinished">Вид</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="124"/>
+        <location filename="mainwin.py" line="130"/>
         <source>Show header</source>
         <translation type="unfinished">Показывать заголовок</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="190"/>
+        <location filename="mainwin.py" line="197"/>
         <source>?</source>
         <translation type="unfinished">?</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="149"/>
+        <location filename="mainwin.py" line="155"/>
         <source>About program...</source>
         <translation type="unfinished">О программе...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="260"/>
+        <location filename="mainwin.py" line="267"/>
         <source>Open file</source>
         <translation type="unfinished">Открыть файл</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="187"/>
+        <location filename="mainwin.py" line="194"/>
         <source>Tools</source>
         <translation type="unfinished">Инструменты</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="146"/>
+        <location filename="mainwin.py" line="152"/>
         <source>Settings...</source>
         <translation type="unfinished">Настройки...</translation>
     </message>
@@ -295,17 +295,17 @@
         <translation type="unfinished">Вы действительно хотите сбросить настройки приложения? Это действие не может быть отменено</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="109"/>
+        <location filename="mainwin.py" line="115"/>
         <source>Insert mode</source>
         <translation type="unfinished">Режим вставки</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="115"/>
+        <location filename="mainwin.py" line="121"/>
         <source>Remove selected</source>
         <translation type="unfinished">Удалить выделенное</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="120"/>
+        <location filename="mainwin.py" line="126"/>
         <source>Fill selected with zeros</source>
         <translation type="unfinished">Заполнить выделенное нулями</translation>
     </message>
@@ -400,12 +400,12 @@
         <translation type="obsolete">Колонок в строке</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="130"/>
+        <location filename="mainwin.py" line="136"/>
         <source>Setup column...</source>
         <translation type="unfinished">Настроить колонку...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="134"/>
+        <location filename="mainwin.py" line="140"/>
         <source>Add column...</source>
         <translation type="unfinished">Добавить колонку...</translation>
     </message>
@@ -465,7 +465,7 @@
         <translation type="unfinished">Настроить колонку {0}</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="138"/>
+        <location filename="mainwin.py" line="144"/>
         <source>Remove column</source>
         <translation type="unfinished">Удалить колонку</translation>
     </message>
@@ -495,7 +495,7 @@
         <translation type="unfinished">Положение:</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="142"/>
+        <location filename="mainwin.py" line="148"/>
         <source>Add address bar to column...</source>
         <translation type="unfinished">Добавить панель адреса для колонки...</translation>
     </message>
@@ -505,32 +505,32 @@
         <translation type="unfinished">Добавить колонку адреса</translation>
     </message>
     <message>
-        <location filename="devices.py" line="236"/>
+        <location filename="devices.py" line="246"/>
         <source>failed to remove {0}</source>
         <translation type="unfinished">не удалось удалить {0}</translation>
     </message>
     <message>
-        <location filename="devices.py" line="240"/>
+        <location filename="devices.py" line="250"/>
         <source>failed to move {0} into {1}</source>
         <translation type="unfinished">не удалось переместить {0} в {1}</translation>
     </message>
     <message>
-        <location filename="devices.py" line="252"/>
+        <location filename="devices.py" line="221"/>
         <source>failed to resize file {0} to size {1}</source>
         <translation type="unfinished">не удалось изменить размер файла с {0} на {1}</translation>
     </message>
     <message>
-        <location filename="devices.py" line="354"/>
+        <location filename="devices.py" line="362"/>
         <source>unknown scheme for device URL: {0}</source>
         <translation type="unfinished">Неизвестный протокол URL: {0}</translation>
     </message>
     <message>
-        <location filename="devices.py" line="358"/>
+        <location filename="devices.py" line="366"/>
         <source>failed to load {0} bytes into memory: limit is {1}</source>
         <translation type="unfinished">не удалось загрузить {0} в память: ограничение составляет {1}</translation>
     </message>
     <message>
-        <location filename="editor.py" line="212"/>
+        <location filename="editor.py" line="219"/>
         <source>initial state</source>
         <translation type="unfinished">начальное состояние</translation>
     </message>
@@ -540,49 +540,64 @@
         <translation type="unfinished">Создать...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="244"/>
+        <location filename="mainwin.py" line="250"/>
         <source>Save</source>
         <translation type="unfinished">Сохранить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="198"/>
+        <location filename="mainwin.py" line="205"/>
         <source>Read-only</source>
         <translation type="unfinished">Только чтение</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="198"/>
+        <location filename="mainwin.py" line="205"/>
         <source>Read-write</source>
         <translation type="unfinished">Чтение и запись</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="209"/>
+        <location filename="mainwin.py" line="216"/>
         <source>Insert</source>
         <translation type="unfinished">Вставка</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="209"/>
+        <location filename="mainwin.py" line="216"/>
         <source>Overwrite</source>
         <translation type="unfinished">Перезапись</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="240"/>
+        <location filename="mainwin.py" line="246"/>
         <source>Close editor</source>
         <translation type="unfinished">Закрыть редактор</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="242"/>
+        <location filename="mainwin.py" line="248"/>
         <source>Document {0} has unsaved changed. Do you want to save it?</source>
         <translation type="unfinished">В документе {0} есть несохраненные изменения. Сохранить их?</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="245"/>
+        <location filename="mainwin.py" line="251"/>
         <source>Do not save</source>
         <translation type="unfinished">Не сохранять</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="275"/>
+        <location filename="mainwin.py" line="293"/>
         <source>New document</source>
         <translation type="unfinished">Новый документ</translation>
+    </message>
+    <message>
+        <location filename="devices.py" line="127"/>
+        <source>failed to write {0}: not all data was written</source>
+        <translation type="unfinished">не удалось сохранить {0}: не все данные были записаны</translation>
+    </message>
+    <message>
+        <location filename="mainwin.py" line="73"/>
+        <source>Save as...</source>
+        <translation type="unfinished">Сохранить как...</translation>
+    </message>
+    <message>
+        <location filename="mainwin.py" line="284"/>
+        <source>Save file as</source>
+        <translation type="unfinished">Сохранить файл как</translation>
     </message>
 </context>
 </TS>
