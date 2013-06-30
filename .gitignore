@@ -43,7 +43,6 @@ __pycache__
 # Microhex specific
 *.orl
 TODO
-docs/
 .idea/
 qrc_*
 ui_*

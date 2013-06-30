@@ -418,7 +418,8 @@ class FrameProxyModel(ColumnModel):
 
 class Theme(object):
     def __init__(self):
-        self.font = QFont('Ubuntu Mono', 13)
+        self.fontData = (('Ubuntu Mono', 13), ('Consolas', 13), ('Courier New', 11))
+        self.font = self.fontFromData(self.fontData)
         self.backgroundColor = QColor(250, 250, 245)
         self.textColor = QColor(Qt.black)
         self.borderColor = QColor(Qt.black)
@@ -436,34 +437,63 @@ class Theme(object):
 
     def load(self, settings, name):
         theme_obj = settings[name]
-        font_name, font_size = None, None
         for key in theme_obj.keys():
             attr = utils.underscoreToCamelCase(key)
-            if key == 'font_name':
-                font_name = getattr(theme_obj, key)
-            elif key == 'font_size':
-                font_size = getattr(theme_obj, key)
+            if key == 'font':
+                self.font = self.fontFromData(theme_obj['font'])
             elif not hasattr(self, attr) or not callable(getattr(self, attr)):
                 stored_value = theme_obj[key]
                 if isinstance(stored_value, str):
-                    color = QColor()
-                    color.setNamedColor(theme_obj[key])
+                    color = self.colorFromName(theme_obj[key])
                     if color.isValid():
                         setattr(self, attr, color)
-
-        if isinstance(font_name, str):
-            self.font.setFamily(font_name)
-        if isinstance(font_size, int):
-            self.font.setPointSize(font_size)
 
     def save(self, settings, name):
         theme_obj = dict()
         for attr_name in dir(self):
             if not attr_name.startswith('_') and isinstance(getattr(self, attr_name), QColor):
-                theme_obj[utils.camelCaseToUnderscore(attr_name)] = getattr(self, attr_name).name()
-        theme_obj.font_name = self.font.family()
-        theme_obj.font_size = self.font.pointSize()
+                color = getattr(self, attr_name)
+                color_name = color.name()
+                if color.alpha() != 255:
+                    color_name += ':' + str(color.alpha())
+                theme_obj[utils.camelCaseToUnderscore(attr_name)] = color_name
+        theme_obj.font = self.fontData
         settings[name] = theme_obj
+
+    @staticmethod
+    def isFontInstalled(font):
+        """It seems that Qt has no standard way to determine if font is installed on system, but we have
+         QRawFont.supportsCharacter method!"""
+        raw_font = QRawFont.fromFont(font)
+        return raw_font.supportsCharacter('a') or raw_font.supportsCharacter('A')
+
+    @staticmethod
+    def fontFromData(font_data):
+        if isinstance(font_data, (list, tuple)):
+            for font_choice in font_data:
+                if isinstance(font_choice, (list, tuple)) and len(font_choice) >= 2:
+                    font_name = font_choice[0] if isinstance(font_choice[0], str) else ''
+                    font_size = font_choice[1] if isinstance(font_choice[1], int) else -1
+                    if font_name and font_size > 0:
+                        font = QFont(font_name, font_size)
+                        if Theme.isFontInstalled(font):
+                            return font
+
+    @staticmethod
+    def colorFromName(name):
+        alpha = 255
+        if ':' in name:
+            # extract alpha-channel value
+            colon_index = name.index(':')
+            try:
+                alpha = int(name[colon_index+1:])
+            except ValueError:
+                pass
+            name = name[:colon_index]
+        color = QColor()
+        color.setNamedColor(name)
+        color.setAlpha(alpha)
+        return color
 
 
 VisualSpace = 10
