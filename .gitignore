@@ -46,6 +46,6 @@ TODO
 .idea/
 qrc_*
 ui_*
-*.ts
+*.qm
 
 lupdate.sh

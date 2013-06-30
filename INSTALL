@@ -2,12 +2,12 @@ Ensure that Python 3.3 or greater and PyQt4 (based on Qt 4.8 or greater, but not
 on your system. On Linux, you should refer to distribution manuals to find out which packages are
 required (for example, on Ubuntu you should install python3 and python3-pyqt4 packages).
 If Windows is your OS of choice, you can download Python from official site:
-....http://python.org/download
+    http://python.org/download
 and PyQt from here:
-....http://www.riverbankcomputing.co.uk/software/pyqt/download
+    http://www.riverbankcomputing.co.uk/software/pyqt/download
 
 After all requirements are met, go to "src" subdirectory of Microhex and run the following command in terminal:
-....python3 ./build.py ./
+    python3 ./build.py ./
 
 Now you can run Microhex application with:
-....python3 ./run.py
+    python3 ./run.py
