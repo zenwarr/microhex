@@ -6,7 +6,7 @@ from PyQt4.QtCore import QByteArray
 
 class TestEditor(unittest.TestCase):
     def test(self):
-        editor = Editor()
+        editor = Editor(deviceFromBytes(b''))
 
         self.assertEqual(len(editor), 0)
         self.assertEqual(len(editor.spans), 0)
@@ -162,7 +162,7 @@ class TestEditor(unittest.TestCase):
 
         editor.undo()
         self.assertEqual(editor.readAll(), b'Hello, World!')
-        self.assertFalse(editor.isModified)
+        self.assertTrue(editor.isModified)
 
         array2 = QByteArray()
         device2 = BufferDevice(array2)
@@ -177,3 +177,20 @@ class TestEditor(unittest.TestCase):
         editor.writeSpan(10, FillSpan(editor, b'\x00', 5))
 
         self.assertTrue(editor.isRangeModified(30, 1))
+
+    def testb2(self):
+        editor = Editor(deviceFromBytes(QByteArray(b'Hello, World!')))
+
+        editor.writeSpan(5, DataSpan(editor, b'!!'))
+        self.assertEqual(editor.readAll(), b'Hello!!World!')
+
+        editor.undo()
+        self.assertEqual(editor.readAll(), b'Hello, World!')
+        self.assertFalse(editor.isModified)
+        self.assertFalse(editor.isRangeModified(5, 1))
+
+        editor.redo()
+        self.assertEqual(editor.readAll(), b'Hello!!World!')
+        self.assertTrue(editor.isModified)
+        self.assertTrue(editor.isRangeModified(5, 1))
+

@@ -525,7 +525,7 @@ class HexSubWindow(QWidget):
     def title(self):
         name = self.name
         if self.hexWidget.url.isLocalFile():
-            name = self.hexWidget.url.toLocalFile()
+            name = QFileInfo(self.hexWidget.url.toLocalFile()).fileName()
         return name
 
     @property
