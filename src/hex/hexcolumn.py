@@ -124,9 +124,12 @@ class HexColumnModel(hexwidget.ColumnModel):
     def _updateRowCount(self):
         self._rowCount = len(self.editor) // self.bytesOnRow + bool(len(self.editor) % self.bytesOnRow)
 
-    def insertDefaultIndex(self, before_index):
-        pos = before_index.data(self.EditorPositionRole)
-        self.editor.insertSpan(pos, editor.FillSpan(self.editor, b'\x00', self.valuecodec.dataSize))
+    def defaultIndexData(self, before_index, role=Qt.EditRole):
+        if before_index:
+            if role == Qt.EditRole:
+                return '0' * self._cellTextSize
+            elif role == self.EditorDataRole:
+                return b'\x00' * self.valuecodec.dataSize
 
     def createValidator(self):
         return HexColumnValidator(self.formatter, self.valuecodec)
@@ -141,13 +144,16 @@ class HexColumnValidator(QValidator):
     def validate(self, text):
         import struct
 
+        if not text:
+            return self.Intermediate
+
         r1 = self.formatter.validate(text)
-        if r1 == QValidator.Acceptable:
+        if r1 == self.Acceptable:
             try:
                 self.codec.encode(self.formatter.parse(text))
                 return r1
             except struct.error:
-                return QValidator.Invalid
+                return self.Invalid
         return r1
 
 

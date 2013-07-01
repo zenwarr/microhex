@@ -278,8 +278,23 @@ class ColumnModel(QObject):
         text length for cell."""
         return False
 
-    def insertDefaultIndex(self, before_index):
+    def defaultIndexData(self, before_index, role=Qt.EditRole):
+        """Returns data for index that should be inserted before given cell (or after last index
+        if :before_index: is invalid) when any character is typed in while in insert mode.
+        It is enough for method to support only Qt.EditRole and ColumnModel.EditorDataRole roles.
+        """
         raise NotImplementedError()
+
+    def insertIndex(self, before_index):
+        """Insert data for new default index just before :before_index: or at the end of model if :before_index:
+        is invalid and model does not support virtual indexes. Should return new index"""
+        pos = before_index.data(self.EditorPositionRole)
+        if pos >= 0:
+            data_to_insert = self.defaultIndexData(before_index, self.EditorDataRole)
+            if data_to_insert:
+                self.editor.insertSpan(pos, DataSpan(self.editor, data_to_insert))
+                return self.indexFromPosition(pos)
+        raise ValueError('failed to insert index before given one')
 
     def createValidator(self):
         return None
@@ -1272,9 +1287,6 @@ class Column(QObject):
 
         return document
 
-    def insertDefaultCell(self, before_index):
-        self.sourceModel.insertDefaultIndex(before_index)
-
     def removeIndex(self, index):
         pos = index.data(ColumnModel.EditorPositionRole)
         size = index.data(ColumnModel.DataSizeRole)
@@ -1717,6 +1729,7 @@ class HexWidget(QWidget):
         if index:
             original_text = index.data(Qt.EditRole)
             changed_text = None
+            insert_new_cell = False
 
             if event.key() == Qt.Key_Backspace:
                 if self._cursorOffset == 0:
@@ -1728,11 +1741,9 @@ class HexWidget(QWidget):
                     changed_text = original_text[:cursor_offset-1] + original_text[cursor_offset:]
             elif event.text():
                 if self._cursorOffset == 0 and self._insertMode:
-                    # when in insert mode, pressing character key when cursor is at beginning of cell, inserts new cell
-                    self._leadingColumn.insertDefaultCell(index)
-                    # now caret position points to inserted index and caret index is invalid
-                    index = self.caretIndex(self._leadingColumn)
-                    original_text = index.data(Qt.EditRole)
+                    # when in insert mode, pressing character key when cursor is at beginning of cell inserts new cell
+                    original_text = self._leadingColumn.sourceModel.defaultIndexData(Qt.EditRole)
+                    insert_new_cell = True
 
                 if self._leadingColumn.regular:
                     # replace character at cursor offset
@@ -1746,7 +1757,15 @@ class HexWidget(QWidget):
                 if validator is not None and validator.validate(changed_text) != QValidator.Acceptable:
                     return
 
-                index.setData(changed_text)
+                if insert_new_cell:
+                    self.editor.beginComplexAction()
+                    try:
+                        index = self._leadingColumn.sourceModel.insertIndex(index)
+                        index.setData(changed_text)
+                    finally:
+                        self.editor.endComplexAction()
+                else:
+                    index.setData(changed_text)
 
             if changed_text:
                 # advance cursor

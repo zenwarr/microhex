@@ -176,9 +176,12 @@ class CharColumnModel(hexwidget.ColumnModel):
         self._updateRowCount()
         self.dataResized.emit(self.lastRealIndex)
 
-    def insertDefaultIndex(self, before_index):
-        pos = before_index.data(self.EditorPositionRole)
-        self.editor.insertSpan(pos, editor.FillSpan(self.editor, b'\x00', self.codec.unitSize))
+    def defaultIndexData(self, before_index, role=Qt.EditRole):
+        if before_index:
+            if role == Qt.EditRole:
+                return '\x00'
+            elif role == self.EditorDataRole:
+                return self.codec.encodeString('\x00')
 
     def createValidator(self):
         return CharColumnValidator(self.codec)
