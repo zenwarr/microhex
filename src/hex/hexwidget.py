@@ -536,7 +536,7 @@ class ColumnDocumentBackend(QObject):
         QObject.__init__(self)
         self._document = None
         self._column = column
-        
+
     @property
     def document(self):
         if self._document is None:
@@ -791,7 +791,7 @@ class Column(QObject):
         self.sourceModel = model
         self.model = FrameProxyModel(model)
         self.model.dataChanged.connect(self._onDataChanged)
-        self.model.modelReset.connect(self._updateCache)
+        self.model.modelReset.connect(self._invalidateCache)
         self.model.frameScrolled.connect(self._onFrameScrolled)
         self.model.frameResized.connect(self._onFrameResized)
 
@@ -810,11 +810,12 @@ class Column(QObject):
         self._validator = self.sourceModel.createValidator()
 
         self._spaced = self.sourceModel.preferSpaced
-        self._cache = []
+        self._cache = None
         # if self.sourceModel.regular:
         #     self._documentBackend = TableDocumentBackend(self)
         # else:
         self._documentBackend = PlainTextDocumentBackend(self)
+        self._documentDirty = True
         self._documentBackend.documentUpdated.connect(self._onDocumentUpdated)
 
     @property
@@ -825,7 +826,7 @@ class Column(QObject):
     def geometry(self, rect):
         self._geom = rect
         self._updateGeometry()
-        self.updateRequested.emit()  # even if frame not changed, we should redraw widget
+        # self.updateRequested.emit()  # even if frame was not changed, we should redraw widget
 
     @property
     def showHeader(self):
@@ -835,8 +836,7 @@ class Column(QObject):
     def showHeader(self, show):
         self._showHeader = show
         self._updateGeometry()
-        self._updateCache()
-        self.updateRequested.emit()
+        # self.updateRequested.emit()
 
     def idealHeaderHeight(self):
         return self._fontMetrics.height() + VisualSpace / 2
@@ -856,7 +856,7 @@ class Column(QObject):
             return QRectF(QPointF(0, 0), QSizeF(self.geometry.width(), self._headerHeight))
         else:
             return QRectF()
-    
+
     def getRectForHeaderItem(self, section_index):
         cell_rect = self.getRectForIndex(self.model.index(0, section_index))
         return QRectF(QPointF(cell_rect.x(), 0), QSizeF(cell_rect.width(), self.headerRect.height()))
@@ -915,6 +915,7 @@ class Column(QObject):
         self._documentBackend.clear()
         self.headerResizeRequested.emit()
         self._updateGeometry()
+        self.updateRequested.emit()
 
     @property
     def editor(self):
@@ -928,21 +929,26 @@ class Column(QObject):
     def spaced(self, new_spaced):
         if self._spaced != new_spaced:
             self._spaced = new_spaced
-            self._updateCache()
+            self._invalidateCache()
 
     @property
     def regular(self):
         return self.sourceModel.regular
 
     def getRowCachedData(self, visible_row_index):
-        return self._cache[visible_row_index] if 0 <= visible_row_index < len(self._cache) else None
+        if self._cache is None:
+            self._adjustCacheRows()
+        if 0 <= visible_row_index < self._visibleRows:
+            cached_row = self._cache[visible_row_index]
+            if cached_row is None:
+                self._updateCachedRow(visible_row_index)
+            return self._cache[visible_row_index]
 
     def getIndexCachedData(self, index):
         index = self.model.fromSourceIndex(index)
         row_data = self.getRowCachedData(index.row)
         if row_data is not None and index.column < len(row_data.items):
             return row_data.items[index.column]
-        return None
 
     def getRectForIndex(self, index):
         index = self.model.fromSourceIndex(index)
@@ -1019,6 +1025,7 @@ class Column(QObject):
         paint_context = QAbstractTextDocumentLayout.PaintContext()
         paint_context.palette.setColor(QPalette.Text, self._theme.textColor if is_leading else self._theme.inactiveTextColor)
         # standard QTextDocument.draw also sets clip rect here, but we already have one
+        self._renderDocumentData()
         self._documentBackend.document.documentLayout().draw(painter, paint_context)
 
         painter.restore()
@@ -1086,16 +1093,48 @@ class Column(QObject):
         self._visibleRows = self._fullVisibleRows + bool(int(real_height) % int(self._fontMetrics.height()))
         self.model.resizeFrame(self._visibleRows)
 
-    def _updateCache(self):
-        self._cache = [None for row in range(self._visibleRows)]
-        self._documentBackend.clear()
+    def _adjustCacheRows(self):
+        """Adjusts row count in cache, but does not update any rows.
+        """
+        if self._cache is None:
+            self._cache = [None] * self._visibleRows
+        elif len(self._cache) > self._visibleRows:
+            self._cache = self._cache[:self._visibleRows]
+        elif len(self._cache) < self._visibleRows:
+            self._cache += [None] * (self._visibleRows - len(self._cache))
+        else:
+            return
 
-        for row in range(self._visibleRows):
-            self._updateCachedRow(row)
+        self._documentDirty = True
 
-        self._updateHeaderData()
+    def _invalidateCache(self):
+        """Invalidate entire cache"""
+        self._cache = None
+        self._documentDirty = True
 
-        self.updateRequested.emit()
+    def _invalidateRow(self, row_index):
+        """Invalidate only specified row in cache"""
+        if self._cache is not None and 0 <= row_index < len(self._cache):
+            self._cache[row_index] = None
+            self._documentDirty = True
+
+    def _renderDocumentData(self):
+        """Ensures that document will contain actual data after calling this method"""
+        if self._documentDirty:
+            if self._cache is None:
+                self._adjustCacheRows()
+
+            for row_index in range(self._visibleRows):
+                self._renderRowDataToDocument(row_index)
+
+            self._updateHeaderData()
+
+            self._documentDirty = False
+
+    def _renderRowDataToDocument(self, row_index):
+        """Updates cached row in document"""
+        if 0 <= row_index < self._visibleRows:
+            self._documentBackend.updateRow(row_index, self.getRowCachedData(row_index))
 
     def _onDocumentUpdated(self):
         ideal_width = self._documentBackend._document.idealWidth() + VisualSpace * 2
@@ -1141,9 +1180,13 @@ class Column(QObject):
 
         row_data.html += '</div>'
         self._cache[row_index] = row_data
-        self._documentBackend.updateRow(row_index, row_data)
 
     def _onFrameScrolled(self, new_first_row, old_first_row):
+        if self._cache is None:
+            return
+        else:
+            self._adjustCacheRows()
+
         # do we have any rows that can be kept in cache?
         if new_first_row > old_first_row and new_first_row < old_first_row + len(self._cache):
             # frame is scrolled down, we can copy some rows from bottom to top
@@ -1155,9 +1198,10 @@ class Column(QObject):
                 # remove first scrolled_by rows from document
                 self._documentBackend.removeRows(0, scrolled_by)
                 self._documentBackend.insertRows(-1, scrolled_by)
+            self._documentDirty = True
 
             for row in range(scrolled_by):
-                self._updateCachedRow(valid_rows + row)
+                self._invalidateRow(valid_rows + row)
         elif new_first_row < old_first_row and new_first_row + len(self._cache) > old_first_row:
             # frame is scrolled up, we can copy some rows from top to bottom
             scrolled_by = old_first_row - new_first_row
@@ -1169,37 +1213,36 @@ class Column(QObject):
                 self._documentBackend.removeRows(valid_rows, scrolled_by)
                 # and insert some rows into beginning
                 self._documentBackend.insertRows(0, scrolled_by)
+            self._documentDirty = True
 
             for row in range(scrolled_by):
-                self._updateCachedRow(row)
+                self._invalidateRow(row)
         else:
             # unfortunately... we should totally reset cache
-            self._updateCache()
+            self._invalidateCache()
         self.updateRequested.emit()
 
     def _onFrameResized(self, new_frame_size, old_frame_size):
+        if self._cache is None:
+            return
+        else:
+            self._adjustCacheRows()
+
         if new_frame_size < old_frame_size:
             # just remove some rows...
-            self._cache[new_frame_size:] = []
-
             if self._documentBackend.generated:
                 self._documentBackend.removeRows(new_frame_size, old_frame_size - new_frame_size)
         else:
             # add new rows and initialize them
-            self._cache += [RowData()] * (new_frame_size - old_frame_size)
-
             if self._documentBackend.generated:
                 self._documentBackend.insertRows(-1, new_frame_size - old_frame_size)
-
-            for row in range(new_frame_size - old_frame_size):
-                self._updateCachedRow(row + old_frame_size)
 
         self.updateRequested.emit()
 
     def _onDataChanged(self, first_index, last_index):
         current_row = first_index.row
         while current_row <= last_index.row:
-            self._updateCachedRow(current_row)
+            self._invalidateRow(current_row)
             current_row += 1
         self.updateRequested.emit()
 
@@ -1700,7 +1743,7 @@ class HexWidget(QWidget):
 
             if changed_text is not None:
                 validator = self._leadingColumn.validator
-                if validator is not None and validator.validate(changed_text) == QValidator.Invalid:
+                if validator is not None and validator.validate(changed_text) != QValidator.Acceptable:
                     return
 
                 index.setData(changed_text)

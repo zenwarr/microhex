@@ -136,8 +136,16 @@ class CharColumnModel(hexwidget.ColumnModel):
         if raw_data == current_data:
             return
 
-        self.editor.remove(position, len(current_data))
-        self.editor.insertSpan(position, editor.DataSpan(self.editor, raw_data))
+        data_span = editor.DataSpan(self.editor, raw_data)
+        if len(current_data) == len(raw_data):
+            self.editor.writeSpan(position, data_span)
+        else:
+            self.editor.beginComplexAction()
+            try:
+                self.editor.remove(position, len(current_data))
+                self.editor.insertSpan(position, editor.DataSpan(self.editor, raw_data))
+            finally:
+                self.editor.endComplexAction()
 
     def _translateToVisualCharacter(self, text):
         import unicodedata
@@ -182,7 +190,9 @@ class CharColumnValidator(QValidator):
         self.codec = codec
 
     def validate(self, text):
-        return self.Acceptable if self.codec.canEncode(text) else self.Invalid
+        if not text:
+            return self.Intermediate
+        return self.Acceptable if self.codec.canEncode(text) and len(text) == 1 else self.Invalid
 
 
 class CharColumnProvider(columnproviders.AbstractColumnProvider):
