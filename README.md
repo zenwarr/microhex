@@ -11,7 +11,7 @@ In actual version the following features are available:
 -   loading not entire file, but only specified range of bytes
 -   freezing loaded data size (no operation that changes data size will be allowed)
 -   loading file in read-only and read-write mode
--   loading very large files (size is limited only by free RAM) without memory and time overhead
+-   loading very large files without memory and time overhead
 -   files can be loaded into RAM (to keep data safe from changes made by another applications) or file data fill be read only when necessary.
 -   copy and paste (only data copied from Microhex yet)
 -   undo and redo operations not limited to state where file was saved (you can undo changes even after you have saved it to disk)
