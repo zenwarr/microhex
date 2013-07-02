@@ -397,11 +397,7 @@ class MainWindow(QMainWindow):
 
     @forActiveWidget
     def setupActiveColumn(self):
-        import hex.columnproviders as columnproviders
-        active_column = self.activeSubWidget.hexWidget.leadingColumn
-        if active_column is not None:
-            dlg = columnproviders.ConfigureColumnDialog(self, self.activeSubWidget.hexWidget, active_column.sourceModel)
-            dlg.exec_()
+        self.activeSubWidget.hexWidget.setupActiveColumn()
 
     @forActiveWidget
     def addColumn(self):

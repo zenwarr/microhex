@@ -3,7 +3,7 @@ from PyQt4.QtGui import QColor, QFont, QFontMetricsF, QPolygonF, QWidget, QScrol
                         QPainter, QBrush, QPalette, QPen, QApplication, QRegion, QLineEdit, QValidator, \
                         QTextEdit, QTextOption, QSizePolicy, QStyle, QStyleOptionFrameV2, QTextCursor, QTextDocument, \
                         QTextBlockFormat, QPlainTextDocumentLayout, QAbstractTextDocumentLayout, QTextCharFormat, \
-                        QTextTableFormat, QRawFont, QKeyEvent, QFontDatabase
+                        QTextTableFormat, QRawFont, QKeyEvent, QFontDatabase, QMenu
 import math
 import html
 from hex.valuecodecs import IntegerCodec
@@ -1365,8 +1365,16 @@ class HexWidget(QWidget):
         self._insertMode = True
 
         self._showHeader = True
-
         self._dx = 0
+
+        self._contextMenu = QMenu()
+        self._actionCopy = self._contextMenu.addAction(utils.tr('Copy'))
+        self._actionCopy.triggered.connect(self.copy)
+        self._actionPaste = self._contextMenu.addAction(utils.tr('Paste'))
+        self._actionPaste.triggered.connect(self.paste)
+        self._contextMenu.addSeparator()
+        self._actionSetup = self._contextMenu.addAction(utils.tr('Setup column...'))
+        self._actionSetup.triggered.connect(self.setupActiveColumn)
 
         palette = QPalette(self.view.palette())
         palette.setColor(QPalette.Background, self._theme.backgroundColor)
@@ -1960,7 +1968,7 @@ class HexWidget(QWidget):
                 self.leadingColumn = self._columns[column_index]
 
     def _mousePress(self, event):
-        if event.button() == Qt.LeftButton:
+        if event.button() in (Qt.LeftButton, Qt.RightButton):
             mouse_pos = self._widgetToAbsolute(event.posF())
             column = self.columnFromPoint(mouse_pos)
             if column is not None:
@@ -1977,7 +1985,7 @@ class HexWidget(QWidget):
                         self.endEditMode()
                         self.caretPosition = activated_index.data(ColumnModel.EditorPositionRole)
 
-                        if not activated_index.virtual:
+                        if not activated_index.virtual and event.button() == Qt.LeftButton:
                             self._selectStartIndex = activated_index
                             self._selectStartColumn = column
                             self._mousePressPoint = mouse_pos
@@ -2053,6 +2061,25 @@ class HexWidget(QWidget):
                 return column
         return None
 
+    def _contextMenu(self, event):
+        pos = self._widgetToAbsolute(QPointF(event.pos()))
+        column = self.columnFromPoint(pos)
+        if column is not None:
+            if self._leadingColumn is not column:
+                self.leadingColumn = column
+
+        self._actionCopy.setEnabled(self.hasSelection)
+        self._actionSetup.setEnabled(column is not None)
+
+        self._contextMenu.popup(event.globalPos())
+
+    def setupActiveColumn(self):
+        import hex.columnproviders as columnproviders
+
+        if self._leadingColumn is not None:
+            dlg = columnproviders.ConfigureColumnDialog(self, self, self._leadingColumn.sourceModel)
+            dlg.exec_()
+
     _eventHandlers = {
         QEvent.Paint: _paint,
         QEvent.Wheel: _wheel,
@@ -2061,7 +2088,8 @@ class HexWidget(QWidget):
         QEvent.MouseButtonPress: _mousePress,
         QEvent.MouseButtonRelease: _mouseRelease,
         QEvent.MouseMove: _mouseMove,
-        QEvent.MouseButtonDblClick: _mouseDoubleClick
+        QEvent.MouseButtonDblClick: _mouseDoubleClick,
+        QEvent.ContextMenu: _contextMenu
     }
 
     def eventFilter(self, obj, event):
