@@ -126,10 +126,11 @@ class HexColumnModel(hexwidget.ColumnModel):
 
     def defaultIndexData(self, before_index, role=Qt.EditRole):
         if before_index:
-            if role == Qt.EditRole:
-                return '0' * self._cellTextSize
-            elif role == self.EditorDataRole:
-                return b'\x00' * self.valuecodec.dataSize
+            data = b'\x00' * self.valuecodec.dataSize
+            if role == self.EditorDataRole:
+                return data
+            elif role == Qt.EditRole:
+                return self.formatter.format(self.valuecodec.decode(data))
 
     def createValidator(self):
         return HexColumnValidator(self.formatter, self.valuecodec)
