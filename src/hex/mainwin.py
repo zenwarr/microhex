@@ -51,12 +51,17 @@ class MainWindow(QMainWindow):
         self.createActions()
         self.buildMenus()
         self.buildStatusbar()
+        self.buildToolbar()
 
         geom = globalQuickSettings['mainWindow.geometry']
         if geom and isinstance(geom, str):
             self.restoreGeometry(QByteArray.fromHex(geom))
         else:
             self.resize(500, 400)
+
+        state = globalQuickSettings['mainWindow.state']
+        if state and isinstance(state, str):
+            self.restoreState(QByteArray.fromHex(state))
 
         app = QApplication.instance()
         for file_to_load in files_to_load:
@@ -252,6 +257,21 @@ class MainWindow(QMainWindow):
         statusbar.addPermanentWidget(self.lblReadOnly)
         statusbar.addPermanentWidget(self.lblInsertMode)
 
+    def buildToolbar(self):
+        self.generalToolBar = self.addToolBar(utils.tr("General"))
+        self.generalToolBar.setObjectName('toolbar_general')
+        self.generalToolBar.addAction(self.actionCreateDocument)
+        self.generalToolBar.addAction(self.actionOpenFile)
+        self.generalToolBar.addAction(self.actionSave)
+
+        self.editToolBar = self.addToolBar(utils.tr('Edit'))
+        self.editToolBar.setObjectName('toolbar_edit')
+        self.editToolBar.addAction(self.actionUndo)
+        self.editToolBar.addAction(self.actionRedo)
+        self.editToolBar.addAction(self.actionCopy)
+        self.editToolBar.addAction(self.actionPaste)
+        self.editToolBar.addAction(self.actionInsertMode)
+
     def showEvent(self, event):
         if not self._inited:
             self._inited = True
@@ -263,6 +283,7 @@ class MainWindow(QMainWindow):
                 return
 
         globalQuickSettings['mainWindow.geometry'] = str(self.saveGeometry().toHex(), encoding='ascii')
+        globalQuickSettings['mainWindow.state'] = str(self.saveState().toHex(), encoding='ascii')
 
     def closeActiveTab(self):
         self.closeTab(self.tabsWidget.currentIndex())
