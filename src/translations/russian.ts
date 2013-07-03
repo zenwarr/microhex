@@ -2,6 +2,19 @@
 <!DOCTYPE TS>
 <TS version="2.0" language="ru_RU">
 <context>
+    <name>GotoDialog</name>
+    <message>
+        <location filename="gotodialog.ui" line="14"/>
+        <source>Go to</source>
+        <translation>Переход</translation>
+    </message>
+    <message>
+        <location filename="gotodialog.ui" line="22"/>
+        <source>Go to address:</source>
+        <translation>Перейти к адресу:</translation>
+    </message>
+</context>
+<context>
     <name>LoadFileDialog</name>
     <message>
         <location filename="loadfiledialog.ui" line="14"/>
@@ -180,7 +193,7 @@
         <translation>не удалось сохранить настройки: {0}</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="189"/>
+        <location filename="mainwin.py" line="194"/>
         <source>File</source>
         <translation>Файл</translation>
     </message>
@@ -200,7 +213,7 @@
         <translation>Выход</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="267"/>
+        <location filename="mainwin.py" line="274"/>
         <source>Edit</source>
         <translation>Правка</translation>
     </message>
@@ -235,7 +248,7 @@
         <translation>Выделить все</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="215"/>
+        <location filename="mainwin.py" line="222"/>
         <source>View</source>
         <translation>Вид</translation>
     </message>
@@ -245,7 +258,7 @@
         <translation>Показывать заголовок</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="230"/>
+        <location filename="mainwin.py" line="237"/>
         <source>?</source>
         <translation>?</translation>
     </message>
@@ -255,12 +268,12 @@
         <translation>О программе...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="314"/>
+        <location filename="mainwin.py" line="321"/>
         <source>Open file</source>
         <translation>Открыть файл</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="227"/>
+        <location filename="mainwin.py" line="234"/>
         <source>Tools</source>
         <translation>Инструменты</translation>
     </message>
@@ -555,47 +568,47 @@
         <translation>Создать...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="299"/>
+        <location filename="mainwin.py" line="306"/>
         <source>Save</source>
         <translation>Сохранить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="238"/>
+        <location filename="mainwin.py" line="245"/>
         <source>Read-only</source>
         <translation>Только чтение</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="238"/>
+        <location filename="mainwin.py" line="245"/>
         <source>Read-write</source>
         <translation>Чтение и запись</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="249"/>
+        <location filename="mainwin.py" line="256"/>
         <source>Insert</source>
         <translation>Вставка</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="249"/>
+        <location filename="mainwin.py" line="256"/>
         <source>Overwrite</source>
         <translation>Перезапись</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="295"/>
+        <location filename="mainwin.py" line="302"/>
         <source>Close editor</source>
         <translation>Закрыть редактор</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="297"/>
+        <location filename="mainwin.py" line="304"/>
         <source>Document {0} has unsaved changed. Do you want to save it?</source>
         <translation>В документе {0} есть несохраненные изменения. Сохранить их?</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="300"/>
+        <location filename="mainwin.py" line="307"/>
         <source>Do not save</source>
         <translation>Не сохранять</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="344"/>
+        <location filename="mainwin.py" line="351"/>
         <source>New document</source>
         <translation>Новый документ</translation>
     </message>
@@ -610,7 +623,7 @@
         <translation>Сохранить как...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="335"/>
+        <location filename="mainwin.py" line="342"/>
         <source>Save file as</source>
         <translation>Сохранить файл как</translation>
     </message>
@@ -675,9 +688,14 @@
         <translation>без диалога параметров загрузки</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="261"/>
+        <location filename="mainwin.py" line="268"/>
         <source>General</source>
         <translation>Общее</translation>
+    </message>
+    <message>
+        <location filename="mainwin.py" line="187"/>
+        <source>Goto...</source>
+        <translation>Перейти к...</translation>
     </message>
 </context>
 </TS>

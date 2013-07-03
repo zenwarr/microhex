@@ -20,9 +20,8 @@ class IntegerEdit(QAbstractSpinBox):
         self._number = 0
 
         self._baseButton = QToolButton(self)
-        # self._baseButton.setAutoRaise(True)
         self._baseButton.setStyleSheet('QToolButton::menu-indicator { image: none; }')
-        self._baseButton.setFocusProxy(self.lineEdit())
+        self._baseButton.setFocusPolicy(Qt.NoFocus)
         self._baseMenu = QMenu()
         self._baseActionGroup = QActionGroup(self)
         self._baseActionGroup.setExclusive(True)

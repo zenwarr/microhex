@@ -184,6 +184,11 @@ class MainWindow(QMainWindow):
                                              PropertyObserver(self, 'activeSubWidget.hexWidget'))
         self.actionZoomReset.triggered.connect(self.zoomReset)
 
+        self.actionGoto = ObservingAction(QIcon(), utils.tr('Goto...'),
+                                          PropertyObserver(self, 'activeSubWidget.hexWidget'))
+        self.actionGoto.setShortcut(QKeySequence('Ctrl+G'))
+        self.actionGoto.triggered.connect(self.goto)
+
     def buildMenus(self):
         menubar = self.menuBar()
         self.fileMenu = menubar.addMenu(utils.tr('File'))
@@ -211,6 +216,8 @@ class MainWindow(QMainWindow):
         self.editMenu.addSeparator()
         self.editMenu.addAction(self.actionRemoveSelected)
         self.editMenu.addAction(self.actionFillZeros)
+        self.editMenu.addSeparator()
+        self.editMenu.addAction(self.actionGoto)
 
         self.viewMenu = menubar.addMenu(utils.tr('View'))
         self.viewMenu.addAction(self.actionShowHeader)
@@ -488,6 +495,14 @@ class MainWindow(QMainWindow):
     @forActiveWidget
     def zoomReset(self):
         self.activeSubWidget.hexWidget.zoomReset()
+
+    @forActiveWidget
+    def goto(self):
+        from hex.gotodialog import GotoDialog
+
+        dlg = GotoDialog(self, self.activeSubWidget.hexWidget)
+        if dlg.exec_() == QDialog.Accepted:
+            self.activeSubWidget.hexWidget.goto(dlg.address)
 
 
 class PropertyObserver(QObject):
