@@ -167,6 +167,18 @@ class MainWindow(QMainWindow):
         self.actionAbout = QAction(QIcon.fromTheme('help-about'), utils.tr('About program...'), None)
         self.actionAbout.triggered.connect(self.showAbout)
 
+        self.actionZoomIn = ObservingAction(QIcon.fromTheme('zoom-in'), utils.tr('Increase font'),
+                                            PropertyObserver(self, 'activeSubWidget.hexWidget'))
+        self.actionZoomIn.triggered.connect(self.zoomIn)
+
+        self.actionZoomOut = ObservingAction(QIcon.fromTheme('zoom-out'), utils.tr('Decrease font'),
+                                             PropertyObserver(self, 'activeSubWidget.hexWidget'))
+        self.actionZoomOut.triggered.connect(self.zoomOut)
+
+        self.actionZoomReset = ObservingAction(QIcon.fromTheme('zoom-original'), utils.tr('Reset original font size'),
+                                             PropertyObserver(self, 'activeSubWidget.hexWidget'))
+        self.actionZoomReset.triggered.connect(self.zoomReset)
+
     def buildMenus(self):
         menubar = self.menuBar()
         self.fileMenu = menubar.addMenu(utils.tr('File'))
@@ -197,6 +209,10 @@ class MainWindow(QMainWindow):
 
         self.viewMenu = menubar.addMenu(utils.tr('View'))
         self.viewMenu.addAction(self.actionShowHeader)
+        self.viewMenu.addSeparator()
+        self.viewMenu.addAction(self.actionZoomIn)
+        self.viewMenu.addAction(self.actionZoomOut)
+        self.viewMenu.addAction(self.actionZoomReset)
         self.viewMenu.addSeparator()
         self.viewMenu.addAction(self.actionSetupColumn)
         self.viewMenu.addAction(self.actionAddColumn)
@@ -439,6 +455,18 @@ class MainWindow(QMainWindow):
     @forActiveWidget
     def save(self):
         self.activeSubWidget.hexWidget.save()
+
+    @forActiveWidget
+    def zoomIn(self):
+        self.activeSubWidget.hexWidget.zoom(1)
+
+    @forActiveWidget
+    def zoomOut(self):
+        self.activeSubWidget.hexWidget.zoom(-1)
+
+    @forActiveWidget
+    def zoomReset(self):
+        self.activeSubWidget.hexWidget.zoomReset()
 
 
 class PropertyObserver(QObject):

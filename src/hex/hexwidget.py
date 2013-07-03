@@ -1614,6 +1614,9 @@ class HexWidget(QWidget):
                 new_font.setPointSize(new_font_size)
                 self.setFont(new_font)
 
+    def zoomReset(self):
+        self.setFont(appsettings.getFontFromSetting(settings.globalSettings()['hexwidget.font']))
+
     def isIndexVisible(self, index, full_visible=True):
         column = self.columnFromIndex(index)
         return bool(column is not None and column.isIndexVisible(index, full_visible))

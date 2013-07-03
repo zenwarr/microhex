@@ -71,6 +71,16 @@
         <source>Alternating row colors</source>
         <translation type="unfinished">Чередующиеся цвета строк</translation>
     </message>
+    <message>
+        <location filename="settingsdialog.ui" line="149"/>
+        <source>Font:</source>
+        <translation type="unfinished">Шрифт:</translation>
+    </message>
+    <message>
+        <location filename="settingsdialog.ui" line="174"/>
+        <source>Choose...</source>
+        <translation type="unfinished">Выбрать...</translation>
+    </message>
 </context>
 <context>
     <name>utils</name>
@@ -155,107 +165,107 @@
         <translation type="unfinished">Полностью загрузить в RAM (только до {0})</translation>
     </message>
     <message>
-        <location filename="loadfiledialog.py" line="45"/>
+        <location filename="loadfiledialog.py" line="54"/>
         <source>{0} to be loaded</source>
         <translation type="unfinished">Будет загружено {0}</translation>
     </message>
     <message>
-        <location filename="main.py" line="27"/>
+        <location filename="main.py" line="28"/>
         <source>failed to load settings: {0}</source>
         <translation type="unfinished">не удалось загрузить настройки: {0}</translation>
     </message>
     <message>
-        <location filename="main.py" line="45"/>
+        <location filename="main.py" line="77"/>
         <source>failed to save settings: {0}</source>
         <translation type="unfinished">не удалось сохранить настройки: {0}</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="160"/>
+        <location filename="mainwin.py" line="184"/>
         <source>File</source>
         <translation type="unfinished">Файл</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="64"/>
+        <location filename="mainwin.py" line="76"/>
         <source>Open file...</source>
         <translation type="unfinished">Открыть файл...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="78"/>
+        <location filename="mainwin.py" line="90"/>
         <source>Close</source>
         <translation type="unfinished">Закрыть</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="82"/>
+        <location filename="mainwin.py" line="94"/>
         <source>Exit</source>
         <translation type="unfinished">Выход</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="171"/>
+        <location filename="mainwin.py" line="195"/>
         <source>Edit</source>
         <translation type="unfinished">Правка</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="85"/>
+        <location filename="mainwin.py" line="97"/>
         <source>Undo</source>
         <translation type="unfinished">Отменить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="90"/>
+        <location filename="mainwin.py" line="102"/>
         <source>Redo</source>
         <translation type="unfinished">Повторить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="95"/>
+        <location filename="mainwin.py" line="107"/>
         <source>Copy</source>
         <translation type="unfinished">Копировать</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="100"/>
+        <location filename="mainwin.py" line="112"/>
         <source>Paste</source>
         <translation type="unfinished">Вставить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="105"/>
+        <location filename="mainwin.py" line="117"/>
         <source>Clear selection</source>
         <translation type="unfinished">Убрать выделение</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="110"/>
+        <location filename="mainwin.py" line="122"/>
         <source>Select all</source>
         <translation type="unfinished">Выделить все</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="186"/>
+        <location filename="mainwin.py" line="210"/>
         <source>View</source>
         <translation type="unfinished">Вид</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="130"/>
+        <location filename="mainwin.py" line="142"/>
         <source>Show header</source>
         <translation type="unfinished">Показывать заголовок</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="197"/>
+        <location filename="mainwin.py" line="225"/>
         <source>?</source>
         <translation type="unfinished">?</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="155"/>
+        <location filename="mainwin.py" line="167"/>
         <source>About program...</source>
         <translation type="unfinished">О программе...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="267"/>
+        <location filename="mainwin.py" line="293"/>
         <source>Open file</source>
         <translation type="unfinished">Открыть файл</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="194"/>
+        <location filename="mainwin.py" line="222"/>
         <source>Tools</source>
         <translation type="unfinished">Инструменты</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="152"/>
+        <location filename="mainwin.py" line="164"/>
         <source>Settings...</source>
         <translation type="unfinished">Настройки...</translation>
     </message>
@@ -290,27 +300,27 @@
         <translation type="unfinished">Ассемблер</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="114"/>
+        <location filename="settingsdialog.py" line="131"/>
         <source>Restore defaults</source>
         <translation type="unfinished">Сбросить</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="114"/>
+        <location filename="settingsdialog.py" line="131"/>
         <source>Do you really want to reset all application settings right now? This action cannot be undone</source>
         <translation type="unfinished">Вы действительно хотите сбросить настройки приложения? Это действие не может быть отменено</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="115"/>
+        <location filename="mainwin.py" line="127"/>
         <source>Insert mode</source>
         <translation type="unfinished">Режим вставки</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="121"/>
+        <location filename="mainwin.py" line="133"/>
         <source>Remove selected</source>
         <translation type="unfinished">Удалить выделенное</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="126"/>
+        <location filename="mainwin.py" line="138"/>
         <source>Fill selected with zeros</source>
         <translation type="unfinished">Заполнить выделенное нулями</translation>
     </message>
@@ -405,12 +415,12 @@
         <translation type="obsolete">Колонок в строке</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="136"/>
+        <location filename="mainwin.py" line="148"/>
         <source>Setup column...</source>
         <translation type="unfinished">Настроить колонку...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="140"/>
+        <location filename="mainwin.py" line="152"/>
         <source>Add column...</source>
         <translation type="unfinished">Добавить колонку...</translation>
     </message>
@@ -470,7 +480,7 @@
         <translation type="unfinished">Настроить колонку {0}</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="144"/>
+        <location filename="mainwin.py" line="156"/>
         <source>Remove column</source>
         <translation type="unfinished">Удалить колонку</translation>
     </message>
@@ -500,7 +510,7 @@
         <translation type="unfinished">Положение:</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="148"/>
+        <location filename="mainwin.py" line="160"/>
         <source>Add address bar to column...</source>
         <translation type="unfinished">Добавить панель адреса для колонки...</translation>
     </message>
@@ -540,52 +550,52 @@
         <translation type="unfinished">начальное состояние</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="60"/>
+        <location filename="mainwin.py" line="72"/>
         <source>Create...</source>
         <translation type="unfinished">Создать...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="250"/>
+        <location filename="mainwin.py" line="278"/>
         <source>Save</source>
         <translation type="unfinished">Сохранить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="205"/>
+        <location filename="mainwin.py" line="233"/>
         <source>Read-only</source>
         <translation type="unfinished">Только чтение</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="205"/>
+        <location filename="mainwin.py" line="233"/>
         <source>Read-write</source>
         <translation type="unfinished">Чтение и запись</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="216"/>
+        <location filename="mainwin.py" line="244"/>
         <source>Insert</source>
         <translation type="unfinished">Вставка</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="216"/>
+        <location filename="mainwin.py" line="244"/>
         <source>Overwrite</source>
         <translation type="unfinished">Перезапись</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="246"/>
+        <location filename="mainwin.py" line="274"/>
         <source>Close editor</source>
         <translation type="unfinished">Закрыть редактор</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="248"/>
+        <location filename="mainwin.py" line="276"/>
         <source>Document {0} has unsaved changed. Do you want to save it?</source>
         <translation type="unfinished">В документе {0} есть несохраненные изменения. Сохранить их?</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="251"/>
+        <location filename="mainwin.py" line="279"/>
         <source>Do not save</source>
         <translation type="unfinished">Не сохранять</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="293"/>
+        <location filename="mainwin.py" line="323"/>
         <source>New document</source>
         <translation type="unfinished">Новый документ</translation>
     </message>
@@ -595,12 +605,12 @@
         <translation type="unfinished">не удалось сохранить {0}: не все данные были записаны</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="73"/>
+        <location filename="mainwin.py" line="85"/>
         <source>Save as...</source>
         <translation type="unfinished">Сохранить как...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="284"/>
+        <location filename="mainwin.py" line="314"/>
         <source>Save file as</source>
         <translation type="unfinished">Сохранить файл как</translation>
     </message>
@@ -608,6 +618,56 @@
         <location filename="settingsdialog.py" line="35"/>
         <source>Hex view</source>
         <translation type="unfinished">Редактор</translation>
+    </message>
+    <message>
+        <location filename="main.py" line="33"/>
+        <source>Crossplatform hex-editing software</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="main.py" line="35"/>
+        <source>show application version and exit</source>
+        <translation type="unfinished">показать версию и выйти</translation>
+    </message>
+    <message>
+        <location filename="main.py" line="38"/>
+        <source>reset application settings to defaults</source>
+        <translation type="unfinished">сбросить настройки приложения на умолчания</translation>
+    </message>
+    <message>
+        <location filename="main.py" line="40"/>
+        <source>load files in read-only mode</source>
+        <translation type="unfinished">загрузить файлы только для чтения</translation>
+    </message>
+    <message>
+        <location filename="main.py" line="42"/>
+        <source>freeze size of loaded documents</source>
+        <translation type="unfinished">зафиксировать размер загруженных документов</translation>
+    </message>
+    <message>
+        <location filename="mainwin.py" line="170"/>
+        <source>Increase font</source>
+        <translation type="unfinished">Увеличить шрифт</translation>
+    </message>
+    <message>
+        <location filename="mainwin.py" line="174"/>
+        <source>Decrease font</source>
+        <translation type="unfinished">Уменьшить шрифт</translation>
+    </message>
+    <message>
+        <location filename="mainwin.py" line="178"/>
+        <source>Reset original font size</source>
+        <translation type="unfinished">Восстановить исходный размер шрифта</translation>
+    </message>
+    <message>
+        <location filename="settingsdialog.py" line="98"/>
+        <source>Choose font for hex view</source>
+        <translation type="unfinished">Выбрать шрифт для редактора</translation>
+    </message>
+    <message>
+        <location filename="main.py" line="44"/>
+        <source>do not invoke load dialog</source>
+        <translation type="unfinished">без диалога параметров загрузки</translation>
     </message>
 </context>
 </TS>

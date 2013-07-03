@@ -42,7 +42,7 @@ class Application(QApplication):
         self.argparser.add_argument('--freeze-size', '-f', dest='freezeSize', action='store_true',
                                     help=utils.tr('freeze size of loaded documents'))
         self.argparser.add_argument('--no-loaddialog', '-nl', dest='noLoadDialog', action='store_true',
-                                    help=utils.tr('do not invoke load dialog for specified files'))
+                                    help=utils.tr('do not invoke load options dialog'))
         self.argparser.add_argument('files', nargs='*')
 
         self.args = self.argparser.parse_args()
