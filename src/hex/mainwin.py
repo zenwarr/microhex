@@ -25,7 +25,7 @@ globalQuickSettings = settings.globalQuickSettings()
 class MainWindow(QMainWindow):
     activeSubWidgetChanged = pyqtSignal(object)
 
-    def __init__(self):
+    def __init__(self, files_to_load):
         QMainWindow.__init__(self)
         self._inited = False
 
@@ -55,6 +55,18 @@ class MainWindow(QMainWindow):
         geom = globalQuickSettings['mainWindow.geometry']
         if geom and isinstance(geom, str):
             self.restoreGeometry(QByteArray.fromHex(geom))
+        else:
+            self.resize(500, 400)
+
+        app = QApplication.instance()
+        for file_to_load in files_to_load:
+            load_options = devices.FileLoadOptions()
+            load_options.readOnly = app.args.readOnly
+            load_options.freezeSize = app.args.freezeSize
+            if app.args.noLoadDialog:
+                self.openFile(file_to_load, load_options)
+            else:
+                self.openFileWithOptionsDialog(file_to_load, load_options)
 
     def createActions(self):
         self.actionCreateDocument = QAction(QIcon.fromTheme('document-new'), utils.tr('Create...'), None)
@@ -262,15 +274,17 @@ class MainWindow(QMainWindow):
         return True
 
     def openFileDialog(self):
-        from hex.loadfiledialog import LoadFileDialog
-
         filename = QFileDialog.getOpenFileName(self, utils.tr('Open file'), utils.lastFileDialogPath())
         if filename:
             utils.setLastFileDialogPath(filename)
+            self.openFileWithOptionsDialog(filename, None)
 
-            load_dialog = LoadFileDialog(self, filename)
-            if load_dialog.exec_() == LoadFileDialog.Accepted:
-                self.openFile(filename, load_dialog.loadOptions)
+    def openFileWithOptionsDialog(self, filename, load_options=None):
+        from hex.loadfiledialog import LoadFileDialog
+
+        load_dialog = LoadFileDialog(self, filename, load_options)
+        if load_dialog.exec_() == LoadFileDialog.Accepted:
+            self.openFile(filename, load_dialog.loadOptions)
 
     def openFile(self, filename, load_options=None):
         e = editor.Editor(devices.deviceFromUrl(QUrl.fromLocalFile(filename), load_options))
