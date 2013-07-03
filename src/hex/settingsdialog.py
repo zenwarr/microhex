@@ -1,4 +1,4 @@
-from PyQt4.QtGui import QDialogButtonBox, QListWidgetItem, QMessageBox
+from PyQt4.QtGui import QDialogButtonBox, QListWidgetItem, QMessageBox, QFont, QFontDialog
 from hex.forms.ui_settingsdialog import Ui_SettingsDialog
 import hex.utils as utils
 import hex.settings as settings
@@ -86,7 +86,23 @@ class SettingsDialog(utils.Dialog):
                     self.ui.cmbTranslations.setCurrentIndex(index)
                 index += 1
         elif page_data.page is self.ui.pageHex:
+            import hex.appsettings as appsettings
+
             self.ui.chkAlternatingRows.setChecked(globalSettings['hexwidget.alternating_rows'])
+
+            self._hexWidgetFont = appsettings.getFontFromSetting(globalSettings['hexwidget.font'])
+            self._updateHexWidgetFont()
+            self.ui.btnChooseFont.clicked.connect(self._chooseHexWidgetFont)
+
+    def _chooseHexWidgetFont(self):
+        font, ok = QFontDialog.getFont(self._hexWidgetFont, self, utils.tr('Choose font for hex view'))
+        if ok:
+            self._hexWidgetFont = font
+            self._updateHexWidgetFont()
+
+    def _updateHexWidgetFont(self):
+        self.ui.lblFont.setText('{0}, {1} pt'.format(self._hexWidgetFont.family(), self._hexWidgetFont.pointSize()))
+        self.ui.lblFont.setFont(self._hexWidgetFont)
 
     def accept(self):
         self._save()
@@ -109,6 +125,7 @@ class SettingsDialog(utils.Dialog):
             globalSettings['app.translation'] = self.ui.cmbTranslations.itemData(translation_index)
         elif page_data.page is self.ui.pageHex:
             globalSettings['hexwidget.alternating_rows'] = self.ui.chkAlternatingRows.isChecked()
+            globalSettings['hexwidget.font'] = self._hexWidgetFont.toString()
 
     def _reset(self):
         if QMessageBox.question(self, utils.tr('Restore defaults'),

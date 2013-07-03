@@ -1,5 +1,5 @@
 from PyQt4.QtCore import QCoreApplication, QByteArray
-from PyQt4.QtGui import QDialog
+from PyQt4.QtGui import QDialog, QFontDatabase
 import os
 
 
@@ -102,3 +102,7 @@ def underscoreToCamelCase(underscore):
             result.append(ch.upper() if word_start else ch)
             word_start = False
     return ''.join(result)
+
+
+def isFontInstalled(font_family):
+    return font_family in QFontDatabase().families()

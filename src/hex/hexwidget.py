@@ -13,6 +13,7 @@ from hex.proxystyle import ProxyStyle
 import hex.encodings as encodings
 import hex.utils as utils
 import hex.settings as settings
+import hex.appsettings as appsettings
 
 
 # Why we need to make different model/view classes? Why not to use existing ones?
@@ -433,8 +434,6 @@ class FrameProxyModel(ColumnModel):
 
 class Theme(object):
     def __init__(self):
-        self.fontData = (('Ubuntu Mono', 13), ('Consolas', 13), ('Courier New', 11))
-        self.font = self.fontFromData(self.fontData)
         self.backgroundColor = QColor(250, 250, 245)
         self.textColor = QColor(Qt.black)
         self.borderColor = QColor(Qt.black)
@@ -455,9 +454,7 @@ class Theme(object):
         theme_obj = settings[name]
         for key in theme_obj.keys():
             attr = utils.underscoreToCamelCase(key)
-            if key == 'font':
-                self.font = self.fontFromData(theme_obj['font'])
-            elif not hasattr(self, attr) or not callable(getattr(self, attr)):
+            if not hasattr(self, attr) or not callable(getattr(self, attr)):
                 stored_value = theme_obj[key]
                 if isinstance(stored_value, str):
                     color = self.colorFromName(theme_obj[key])
@@ -473,26 +470,7 @@ class Theme(object):
                 if color.alpha() != 255:
                     color_name += ':' + str(color.alpha())
                 theme_obj[utils.camelCaseToUnderscore(attr_name)] = color_name
-        theme_obj.font = self.fontData
         settings[name] = theme_obj
-
-    @staticmethod
-    def isFontInstalled(font_family):
-        """It seems that Qt has no standard way to determine if font is installed on system, but we have
-         QRawFont.supportsCharacter method!"""
-        return font_family in QFontDatabase().families()
-
-    @staticmethod
-    def fontFromData(font_data):
-        if isinstance(font_data, (list, tuple)):
-            for font_choice in font_data:
-                if isinstance(font_choice, (list, tuple)) and len(font_choice) >= 2:
-                    font_name = font_choice[0] if isinstance(font_choice[0], str) else ''
-                    font_size = font_choice[1] if isinstance(font_choice[1], int) else -1
-                    if font_name and font_size > 0:
-                        font = QFont(font_name, font_size)
-                        if Theme.isFontInstalled(font_name):
-                            return font
 
     @staticmethod
     def colorFromName(name):
@@ -1407,7 +1385,7 @@ class HexWidget(QWidget):
         self.view.setPalette(palette)
         self.view.setAutoFillBackground(True)
 
-        self.setFont(self._theme.font)
+        self.setFont(appsettings.getFontFromSetting(globalSettings['hexwidget.font']))
 
         from hex.hexcolumn import HexColumnModel
         from hex.charcolumn import CharColumnModel
@@ -1438,6 +1416,8 @@ class HexWidget(QWidget):
             self.showHeader = value
         elif name == 'hexwidget.alternating_rows':
             self.view.update()
+        elif name == 'hexwidget.font':
+            self.setFont(appsettings.getFontFromSetting(value))
 
     @property
     def editor(self):

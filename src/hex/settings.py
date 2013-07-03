@@ -271,7 +271,8 @@ class Settings(QObject):
 
         with self.lock:
             if setting_name in self.registered:
-                return copy.deepcopy(self.registered[setting_name].default)
+                default = self.registered[setting_name].default
+                return default() if callable(default) else copy.deepcopy(default)
             elif self.__strictControl:
                 raise SettingsError('reading unregistered setting %s' % setting_name)
             else:
