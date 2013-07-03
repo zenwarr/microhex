@@ -1,6 +1,7 @@
 from PyQt4.QtCore import QFileInfo, QDir, QTranslator, QCoreApplication
 import hex.utils as utils
 import hex.settings as settings
+import hex.appsettings as appsettings
 import os
 
 
@@ -50,7 +51,7 @@ def availableModules():
 def initApplicationTranslation():
     global _activeModule
 
-    language = settings.globalSettings()['app.translation']
+    language = settings.globalSettings()[appsettings.App_Translation]
     if language:
         filename = os.path.join(utils.applicationPath, 'translations/' + language)
         translator = QTranslator()

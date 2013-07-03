@@ -3,6 +3,7 @@ from hex.forms.ui_loadfiledialog import Ui_LoadFileDialog
 import hex.utils as utils
 import hex.formatters as formatters
 import hex.settings as settings
+import hex.appsettings as appsettings
 import hex.devices as devices
 
 
@@ -31,7 +32,7 @@ class LoadFileDialog(utils.Dialog):
         self.ui.chkLoadRange.toggled.connect(self._onLoadRangeChecked)
         self.ui.chkFreezeSize.toggled.connect(self._onFreezeSizeChecked)
 
-        self._maxMemoryLoadSize = globalSettings['files.max_memoryload_size']
+        self._maxMemoryLoadSize = globalSettings[appsettings.Files_MaxMemoryLoadSize]
         self.ui.chkMemoryLoad.setText(utils.tr('Completely read into memory (up to {0})').format(
                         utils.formatSize(self._maxMemoryLoadSize)))
 

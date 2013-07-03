@@ -1,7 +1,8 @@
-from PyQt4.QtCore import QSize, QMargins, pyqtSignal, Qt
+from PyQt4.QtCore import QMargins, pyqtSignal, Qt
 from PyQt4.QtGui import QAbstractSpinBox, QToolButton, QMenu, QActionGroup, QValidator
 import hex.utils as utils
 import hex.settings as settings
+import hex.appsettings as appsettings
 import hex.formatters as formatters
 
 
@@ -29,8 +30,8 @@ class IntegerEdit(QAbstractSpinBox):
         self._baseButton.setPopupMode(QToolButton.InstantPopup)
         self._baseButton.setText(str(base))
 
-        style = globalSettings['integeredit.default_style']
-        self._formatter = formatters.IntegerFormatter(base, style, uppercase=globalSettings['integeredit.uppercase'])
+        style = globalSettings[appsettings.IntegerEdit_DefaultStyle]
+        self._formatter = formatters.IntegerFormatter(base, style, uppercase=globalSettings[appsettings.IntegerEdit_Uppercase])
 
         for standard_base in (('Hex', 16), ('Dec', 10), ('Oct', 8), ('Bin', 2)):
             self._addBase(utils.tr(standard_base[0]), standard_base[1])

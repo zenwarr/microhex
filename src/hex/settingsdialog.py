@@ -3,6 +3,7 @@ from hex.forms.ui_settingsdialog import Ui_SettingsDialog
 import hex.utils as utils
 import hex.settings as settings
 import hex.translate as translate
+import hex.appsettings as appsettings
 
 
 globalSettings = settings.globalSettings()
@@ -66,16 +67,16 @@ class SettingsDialog(utils.Dialog):
 
     def _initStandardPage(self, page_data):
         if page_data.page is self.ui.pageLoading:
-            self.ui.maximalRAMLoadSize.number = globalSettings['files.max_memoryload_size']
+            self.ui.maximalRAMLoadSize.number = globalSettings[appsettings.Files_MaxMemoryLoadSize]
         elif page_data.page is self.ui.pageMisc:
-            self.ui.chkIntegerEditUppercase.setChecked(globalSettings['integeredit.uppercase'])
+            self.ui.chkIntegerEditUppercase.setChecked(globalSettings[appsettings.IntegerEdit_Uppercase])
 
             self.ui.cmbIntegerEditStyle.clear()
             for style_data in ((utils.tr('No style'), 'none'), (utils.tr('C'), 'c'), (utils.tr('Assembler'), 'asm')):
                 self.ui.cmbIntegerEditStyle.addItem(style_data[0], style_data[1])
 
             self.ui.cmbIntegerEditStyle.setCurrentIndex(self.ui.cmbIntegerEditStyle.findData(
-                                globalSettings['integeredit.default_style']))
+                                globalSettings[appsettings.IntegerEdit_DefaultStyle]))
         elif page_data.page is self.ui.pageTranslation:
             self.ui.cmbTranslations.clear()
 
@@ -86,11 +87,9 @@ class SettingsDialog(utils.Dialog):
                     self.ui.cmbTranslations.setCurrentIndex(index)
                 index += 1
         elif page_data.page is self.ui.pageHex:
-            import hex.appsettings as appsettings
+            self.ui.chkAlternatingRows.setChecked(globalSettings[appsettings.HexWidget_AlternatingRows])
 
-            self.ui.chkAlternatingRows.setChecked(globalSettings['hexwidget.alternating_rows'])
-
-            self._hexWidgetFont = appsettings.getFontFromSetting(globalSettings['hexwidget.font'])
+            self._hexWidgetFont = appsettings.getFontFromSetting(globalSettings[appsettings.HexWidget_Font])
             self._updateHexWidgetFont()
             self.ui.btnChooseFont.clicked.connect(self._chooseHexWidgetFont)
 
@@ -115,17 +114,17 @@ class SettingsDialog(utils.Dialog):
 
     def _saveStandardPage(self, page_data):
         if page_data.page is self.ui.pageLoading:
-            globalSettings['files.max_memoryload_size'] = self.ui.maximalRAMLoadSize.number
+            globalSettings[appsettings.Files_MaxMemoryLoadSize] = self.ui.maximalRAMLoadSize.number
         elif page_data.page is self.ui.pageMisc:
-            globalSettings['integeredit.uppercase'] = self.ui.chkIntegerEditUppercase.isChecked()
+            globalSettings[appsettings.IntegerEdit_Uppercase] = self.ui.chkIntegerEditUppercase.isChecked()
             style_index = self.ui.cmbIntegerEditStyle.currentIndex()
-            globalSettings['integeredit.default_style'] = self.ui.cmbIntegerEditStyle.itemData(style_index)
+            globalSettings[appsettings.IntegerEdit_DefaultStyle] = self.ui.cmbIntegerEditStyle.itemData(style_index)
         elif page_data.page is self.ui.pageTranslation:
             translation_index = self.ui.cmbTranslations.currentIndex()
-            globalSettings['app.translation'] = self.ui.cmbTranslations.itemData(translation_index)
+            globalSettings[appsettings.App_Translation] = self.ui.cmbTranslations.itemData(translation_index)
         elif page_data.page is self.ui.pageHex:
-            globalSettings['hexwidget.alternating_rows'] = self.ui.chkAlternatingRows.isChecked()
-            globalSettings['hexwidget.font'] = self._hexWidgetFont.toString()
+            globalSettings[appsettings.HexWidget_AlternatingRows] = self.ui.chkAlternatingRows.isChecked()
+            globalSettings[appsettings.HexWidget_Font] = self._hexWidgetFont.toString()
 
     def _reset(self):
         if QMessageBox.question(self, utils.tr('Restore defaults'),

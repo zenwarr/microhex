@@ -1,23 +1,34 @@
-import hex.settings as settings
 from PyQt4.QtGui import QFont
 
 
 _is_registered = False
 
 
+App_Translation = 'app.translation'
+IntegerEdit_Uppercase = 'integeredit.uppercase'
+IntegerEdit_DefaultStyle = 'integeredit.default_style'
+Files_MaxMemoryLoadSize = 'files.max_memoryload_size'
+HexWidget_ShowHeader = 'hexwidget.show_header'
+HexWidget_DefaultTheme = 'hexwidget.default_theme'
+HexWidget_AlternatingRows = 'hexwidget.alternating_rows'
+HexWidget_Font = 'hexwidget.font'
+
+
 def doRegister():
+    import hex.settings as settings
+
     global _is_registered
 
     if not _is_registered:
         _settings_to_register = (
-            ('integeredit.uppercase', False, bool),
-            ('integeredit.default_style', 'c', str),
-            ('files.max_memoryload_size', 1024 * 1024 * 10, int),
-            ('hexwidget.show_header', True, bool),
-            ('app.translation', '', str),
-            ('hexwidget.default_theme', dict(), dict),
-            ('hexwidget.alternating_rows', True, bool),
-            ('hexwidget.font', ('Ubuntu Mono,13,-1,5,50,0,0,0,0,0',
+            (IntegerEdit_Uppercase, False, bool),
+            (IntegerEdit_DefaultStyle, 'c', str),
+            (Files_MaxMemoryLoadSize, 1024 * 1024 * 10, int),
+            (HexWidget_ShowHeader, True, bool),
+            (App_Translation, '', str),
+            (HexWidget_DefaultTheme, dict(), dict),
+            (HexWidget_AlternatingRows, True, bool),
+            (HexWidget_Font, ('Ubuntu Mono,13,-1,5,50,0,0,0,0,0',
                                      'Consolas,13,-1,5,50,0,0,0,0,0',
                                      'Courier New,10,-1,5,50,0,0,0,0,0'), (list, tuple, str))
         )

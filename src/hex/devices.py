@@ -4,11 +4,12 @@ import weakref
 import os
 from PyQt4.QtCore import QIODevice, QFile, QFileInfo, QBuffer, QUrl, QByteArray, QObject, pyqtSignal
 import hex.settings as settings
+import hex.appsettings as appsettings
 import hex.utils as utils
 
 
 globalSettings = settings.globalSettings()
-MaxMemoryLoadSize = globalSettings['files.max_memoryload_size']
+MaxMemoryLoadSize = globalSettings[appsettings.Files_MaxMemoryLoadSize]
 MaximalWriteBlock = 1024 * 1024 * 64  # 64 MB
 
 
@@ -194,7 +195,7 @@ class FileDevice(QtProxyDevice):
             file_info = QFileInfo(filename)
             if not options.forceNew and not file_info.exists():
                 raise IOError(utils.tr('file {0} does not exist').format(filename))
-            if options.memoryLoad and file_info.size() > globalSettings['files.max_memoryload_size']:
+            if options.memoryLoad and file_info.size() > globalSettings[appsettings.Files_MaxMemoryLoadSize]:
                 raise IOError(utils.tr('cannot load file into memory that has size {0}')
                                         .format(utils.formatSize(file_info.size())))
 

@@ -1025,7 +1025,7 @@ class Column(QObject):
 
         painter.setPen(self._theme.textColor if is_leading else self._theme.inactiveTextColor)
 
-        if settings.globalSettings()['hexwidget.alternating_rows']:
+        if settings.globalSettings()[appsettings.HexWidget_AlternatingRows]:
             for row_index in range(self._visibleRows):
                 if (row_index + self._firstVisibleRow) % 2:
                     rect = self.rectForRow(row_index)
@@ -1330,7 +1330,7 @@ class HexWidget(QWidget):
         global DefaultTheme
         if DefaultTheme is None:
             DefaultTheme = Theme()
-            DefaultTheme.load(globalSettings, 'hexwidget.default_theme')
+            DefaultTheme.load(globalSettings, appsettings.HexWidget_DefaultTheme)
 
         self.view = QWidget(self)
         self.view.installEventFilter(self)
@@ -1385,7 +1385,7 @@ class HexWidget(QWidget):
         self.view.setPalette(palette)
         self.view.setAutoFillBackground(True)
 
-        self.setFont(appsettings.getFontFromSetting(globalSettings['hexwidget.font']))
+        self.setFont(appsettings.getFontFromSetting(globalSettings[appsettings.HexWidget_Font]))
 
         from hex.hexcolumn import HexColumnModel
         from hex.charcolumn import CharColumnModel
@@ -1406,17 +1406,17 @@ class HexWidget(QWidget):
         globalSettings.settingChanged.connect(self._onSettingChanged)
 
     def loadSettings(self, settings):
-        self.showHeader = settings['hexwidget.show_header']
+        self.showHeader = settings[appsettings.HexWidget_ShowHeader]
 
     def saveSettings(self, settings):
-        settings['hexwidget.show_header'] = self.showHeader
+        settings[appsettings.HexWidget_ShowHeader] = self.showHeader
 
     def _onSettingChanged(self, name, value):
-        if name == 'hexwidget.show_header':
+        if name == appsettings.HexWidget_ShowHeader:
             self.showHeader = value
-        elif name == 'hexwidget.alternating_rows':
+        elif name == appsettings.HexWidget_AlternatingRows:
             self.view.update()
-        elif name == 'hexwidget.font':
+        elif name == appsettings.HexWidget_Font:
             self.setFont(appsettings.getFontFromSetting(value))
 
     @property
@@ -1615,7 +1615,7 @@ class HexWidget(QWidget):
                 self.setFont(new_font)
 
     def zoomReset(self):
-        self.setFont(appsettings.getFontFromSetting(settings.globalSettings()['hexwidget.font']))
+        self.setFont(appsettings.getFontFromSetting(settings.globalSettings()[appsettings.HexWidget_Font]))
 
     def isIndexVisible(self, index, full_visible=True):
         column = self.columnFromIndex(index)
