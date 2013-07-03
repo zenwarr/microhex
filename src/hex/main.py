@@ -1,6 +1,7 @@
 import locale
 import os
 import sys
+import argparse
 from PyQt4.QtGui import QApplication
 import hex.settings as settings
 import hex.appsettings as appsettings
@@ -29,12 +30,43 @@ class Application(QApplication):
         translate.initApplicationTranslation()
 
     def startUp(self):
+        self.argparser = argparse.ArgumentParser(prog='microhex',
+                                                 description=utils.tr('Crossplatform hex-editing software'))
+        self.argparser.add_argument('--version', '-v', action='version', version='{0} {1}'.format(self.applicationName(),
+                                                                                                  self.applicationVersion()),
+                                    help=utils.tr('show application version and exit'))
+        self.argparser.add_argument('--reset-settings', dest='resetSettings', action='store_true',
+                                    help=utils.tr('reset application settings to defaults'))
+        self.argparser.add_argument('--read-only', '-r', dest='readOnly', action='store_true',
+                                    help=utils.tr('load files in read-only mode'))
+        self.argparser.add_argument('--freeze-size', '-f', dest='freezeSize', action='store_true',
+                                    help=utils.tr('freeze size of loaded documents'))
+        self.argparser.add_argument('--no-loaddialog', '-nl', dest='noLoadDialog', action='store_true',
+                                    help=utils.tr('do not invoke load dialog for specified files'))
+        self.argparser.add_argument('files', nargs='*')
+
+        self.args = self.argparser.parse_args()
+        # filenames can contain ~ in some cases (unfortunately Qt does not understand it)
+        self.args.files = [os.path.expanduser(file) for file in self.args.files]
+
+        if self.args.resetSettings:
+            # reset settings and reload
+            settings.globalSettings().reset()
+            settings.globalQuickSettings().reset()
+
+            # maybe we should retranslate application
+            translate.initApplicationTranslation()
+
+        # hidden option --test, should not be visible in argument list...
         if '--test' in self.arguments():
-            from hex.test import runTests
-            runTests()
+            try:
+                from hex.test import runTests
+                runTests()
+            except ImportError:
+                pass
         else:
             from hex.mainwin import MainWindow
-            self.mainWindow = MainWindow()
+            self.mainWindow = MainWindow(self.args.files)
             self.mainWindow.show()
 
     def shutdown(self):

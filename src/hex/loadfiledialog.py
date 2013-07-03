@@ -10,7 +10,7 @@ globalSettings = settings.globalSettings()
 
 
 class LoadFileDialog(utils.Dialog):
-    def __init__(self, parent, filename):
+    def __init__(self, parent, filename, load_options=None):
         utils.Dialog.__init__(self, parent, name='load_file_dialog')
         self.ui = Ui_LoadFileDialog()
         self.ui.setupUi(self)
@@ -36,6 +36,15 @@ class LoadFileDialog(utils.Dialog):
                         utils.formatSize(self._maxMemoryLoadSize)))
 
         self._updateLoadSize()
+
+        if load_options is not None:
+            self.ui.chkReadOnly.setChecked(load_options.readOnly)
+            self.ui.chkFreezeSize.setChecked(load_options.freezeSize)
+            self.ui.chkMemoryLoad.setChecked(load_options.memoryLoad)
+            self.ui.chkLoadRange.setChecked(load_options.range is not None)
+            if load_options.range is not None:
+                self.ui.rangeStart.number = load_options.range[0]
+                self.ui.rangeLength.number = load_options.range[1]
 
     def _onRangeStartChanged(self, new_start):
         self.ui.rangeLength.maximum = self.fileSize - new_start
