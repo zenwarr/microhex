@@ -341,7 +341,7 @@ def globalSettings():
     if _globalSettings is None:
         # under tests we should always return default values for all settings without reading
         # configuration file. This is possible only if strict_control is disabled.
-        _globalSettings = Settings(defaultSettingsFilename)
+        _globalSettings = Settings(defaultSettingsFilename, strict_control=True)
     return _globalSettings
 
 

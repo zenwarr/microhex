@@ -66,6 +66,11 @@
         <source>Maximal size for file to be completely loaded into RAM:</source>
         <translation type="unfinished">Максимальный размер файла для загрузки в RAM:</translation>
     </message>
+    <message>
+        <location filename="settingsdialog.ui" line="137"/>
+        <source>Alternating row colors</source>
+        <translation type="unfinished">Чередующиеся цвета строк</translation>
+    </message>
 </context>
 <context>
     <name>utils</name>
@@ -270,27 +275,27 @@
         <translation type="unfinished">Перевод (Translation)</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="73"/>
+        <location filename="settingsdialog.py" line="74"/>
         <source>No style</source>
         <translation type="unfinished">Нет</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="73"/>
+        <location filename="settingsdialog.py" line="74"/>
         <source>C</source>
         <translation type="unfinished">C</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="73"/>
+        <location filename="settingsdialog.py" line="74"/>
         <source>Assembler</source>
         <translation type="unfinished">Ассемблер</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="109"/>
+        <location filename="settingsdialog.py" line="114"/>
         <source>Restore defaults</source>
         <translation type="unfinished">Сбросить</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="109"/>
+        <location filename="settingsdialog.py" line="114"/>
         <source>Do you really want to reset all application settings right now? This action cannot be undone</source>
         <translation type="unfinished">Вы действительно хотите сбросить настройки приложения? Это действие не может быть отменено</translation>
     </message>
@@ -310,17 +315,17 @@
         <translation type="unfinished">Заполнить выделенное нулями</translation>
     </message>
     <message>
-        <location filename="charcolumn.py" line="191"/>
+        <location filename="charcolumn.py" line="204"/>
         <source>Character column</source>
         <translation type="unfinished">Колонка символов</translation>
     </message>
     <message>
-        <location filename="charcolumn.py" line="210"/>
+        <location filename="charcolumn.py" line="223"/>
         <source>Encoding:</source>
         <translation type="unfinished">Кодировка:</translation>
     </message>
     <message>
-        <location filename="charcolumn.py" line="222"/>
+        <location filename="charcolumn.py" line="235"/>
         <source>Bytes on row:</source>
         <translation type="unfinished">Байт в строке:</translation>
     </message>
@@ -340,7 +345,7 @@
         <translation type="obsolete">Настроить колонку</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="157"/>
+        <location filename="hexcolumn.py" line="164"/>
         <source>Integer column</source>
         <translation type="unfinished">Колонка целых чисел</translation>
     </message>
@@ -360,12 +365,12 @@
         <translation type="obsolete">Порядок байт</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="187"/>
+        <location filename="hexcolumn.py" line="194"/>
         <source>Little endian</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="188"/>
+        <location filename="hexcolumn.py" line="195"/>
         <source>Big endian</source>
         <translation type="unfinished"></translation>
     </message>
@@ -375,22 +380,22 @@
         <translation type="obsolete">Система счисления</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="205"/>
+        <location filename="hexcolumn.py" line="212"/>
         <source>Hex</source>
         <translation type="unfinished">Шестнадцатиричная</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="205"/>
+        <location filename="hexcolumn.py" line="212"/>
         <source>Dec</source>
         <translation type="unfinished">Десятичная</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="205"/>
+        <location filename="hexcolumn.py" line="212"/>
         <source>Oct</source>
         <translation type="unfinished">Восьмиричная</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="205"/>
+        <location filename="hexcolumn.py" line="212"/>
         <source>Bin</source>
         <translation type="unfinished">Двоичная</translation>
     </message>
@@ -435,27 +440,27 @@
         <translation type="unfinished">Учетверенное слово</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="176"/>
+        <location filename="hexcolumn.py" line="183"/>
         <source>Binary format:</source>
         <translation type="unfinished">Двоичный формат:</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="180"/>
+        <location filename="hexcolumn.py" line="187"/>
         <source>Signed values:</source>
         <translation type="unfinished">Со знаком:</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="186"/>
+        <location filename="hexcolumn.py" line="193"/>
         <source>Endianess:</source>
         <translation type="unfinished">Порядок байт:</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="204"/>
+        <location filename="hexcolumn.py" line="211"/>
         <source>Base:</source>
         <translation type="unfinished">Система счисления:</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="214"/>
+        <location filename="hexcolumn.py" line="221"/>
         <source>Columns on row:</source>
         <translation type="unfinished">Колонок в строке:</translation>
     </message>
@@ -598,6 +603,11 @@
         <location filename="mainwin.py" line="284"/>
         <source>Save file as</source>
         <translation type="unfinished">Сохранить файл как</translation>
+    </message>
+    <message>
+        <location filename="settingsdialog.py" line="35"/>
+        <source>Hex view</source>
+        <translation type="unfinished">Редактор</translation>
     </message>
 </context>
 </TS>

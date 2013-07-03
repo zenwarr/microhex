@@ -35,7 +35,8 @@ class SettingsDialog(utils.Dialog):
         standard_pages = (
             (utils.tr('Loading'), self.ui.pageLoading),
             (utils.tr('Misc'), self.ui.pageMisc),
-            (utils.tr('Translation'), self.ui.pageTranslation)
+            (utils.tr('Translation'), self.ui.pageTranslation),
+            (utils.tr('Hex view'), self.ui.pageHex)
         )
 
         for page in standard_pages:
@@ -84,6 +85,8 @@ class SettingsDialog(utils.Dialog):
                 if module == translate.activeModule():
                     self.ui.cmbTranslations.setCurrentIndex(index)
                 index += 1
+        elif page_data.page is self.ui.pageHex:
+            self.ui.chkAlternatingRows.setChecked(globalSettings['hexwidget.alternating_rows'])
 
     def accept(self):
         self._save()
@@ -104,6 +107,8 @@ class SettingsDialog(utils.Dialog):
         elif page_data.page is self.ui.pageTranslation:
             translation_index = self.ui.cmbTranslations.currentIndex()
             globalSettings['app.translation'] = self.ui.cmbTranslations.itemData(translation_index)
+        elif page_data.page is self.ui.pageHex:
+            globalSettings['hexwidget.alternating_rows'] = self.ui.chkAlternatingRows.isChecked()
 
     def _reset(self):
         if QMessageBox.question(self, utils.tr('Restore defaults'),

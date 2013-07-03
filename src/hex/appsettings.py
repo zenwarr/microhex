@@ -14,7 +14,8 @@ def doRegister():
             ('files.max_memoryload_size', 1024 * 1024 * 10, int),
             ('hexwidget.show_header', True, bool),
             ('app.translation', '', str),
-            ('hexwidget.default_theme', dict(), dict)
+            ('hexwidget.default_theme', dict(), dict),
+            ('hexwidget.alternating_rows', True, bool)
         )
 
         s = settings.globalSettings()

@@ -449,6 +449,7 @@ class Theme(object):
         self.headerBackgroundColor = self.backgroundColor
         self.headerTextColor = self.textColor
         self.headerInactiveTextColor = self.inactiveTextColor
+        self.alternateRowColor = QColor(225, 225, 210)
 
     def load(self, settings, name):
         theme_obj = settings[name]
@@ -600,7 +601,8 @@ class PlainTextDocumentBackend(ColumnDocumentBackend):
 
             cursor = QTextCursor(self._document)
             block_format = self._documentBlockFormat
-            for row_data in self._column._cache:
+            for row_index in range(self._column.visibleRows):
+                row_data = self._column.getRowCachedData(row_index)
                 cursor.movePosition(QTextCursor.End)
                 cursor.insertHtml(row_data.html)
                 cursor.insertBlock()
@@ -669,6 +671,16 @@ class PlainTextDocumentBackend(ColumnDocumentBackend):
                 y = block_rect.y() + line.position().y()
                 width = self._column._fontMetrics.width(index_data.text)
                 return QRectF(x, y, width, self._column._fontMetrics.height())
+        return QRectF()
+
+    def rectForRow(self, row_index):
+        self.generateDocument()
+
+        block = self._document.findBlockByLineNumber(row_index)
+        if block.isValid():
+            block_rect = self._document.documentLayout().blockBoundingRect(block)
+            return block_rect
+
         return QRectF()
 
     def cursorPositionInCell(self, row_index, cell_index, cursor_offset):
@@ -1034,11 +1046,20 @@ class Column(QObject):
         painter.save()
 
         painter.setPen(self._theme.textColor if is_leading else self._theme.inactiveTextColor)
+
+        if settings.globalSettings()['hexwidget.alternating_rows']:
+            for row_index in range(self._visibleRows):
+                if (row_index + self._firstVisibleRow) % 2:
+                    rect = self.rectForRow(row_index)
+                    rect = QRectF(QPointF(0, rect.y() + self.documentOrigin.y()), QSizeF(self.geometry.width(), rect.height()))
+                    painter.fillRect(rect, QBrush(self._theme.alternateRowColor))
+
         painter.translate(self.documentOrigin)
 
         # little trick to quickly change default text color for document without re-generating it
         paint_context = QAbstractTextDocumentLayout.PaintContext()
         paint_context.palette.setColor(QPalette.Text, self._theme.textColor if is_leading else self._theme.inactiveTextColor)
+        paint_context.palette.setColor(QPalette.Window, QColor(0, 0, 0, 0))
         # standard QTextDocument.draw also sets clip rect here, but we already have one
         self._renderDocumentData()
         self._documentBackend.document.documentLayout().draw(painter, paint_context)
@@ -1298,6 +1319,9 @@ class Column(QObject):
     def validator(self):
         return self._validator
 
+    def rectForRow(self, row_index):
+        return self._documentBackend.rectForRow(row_index)
+
 
 def _translate(x, dx, dy=0):
     if hasattr(x, 'translated'):
@@ -1323,10 +1347,12 @@ class HexWidget(QWidget):
 
         QWidget.__init__(self, parent)
 
+        globalSettings = settings.globalSettings()
+
         global DefaultTheme
         if DefaultTheme is None:
             DefaultTheme = Theme()
-            DefaultTheme.load(settings.globalSettings(), 'hexwidget.default_theme')
+            DefaultTheme.load(globalSettings, 'hexwidget.default_theme')
 
         self.view = QWidget(self)
         self.view.installEventFilter(self)
@@ -1399,11 +1425,19 @@ class HexWidget(QWidget):
         self.editor.canRedoChanged.connect(self.canRedoChanged, Qt.QueuedConnection)
         self.editor.isModifiedChanged.connect(self.isModifiedChanged, Qt.QueuedConnection)
 
+        globalSettings.settingChanged.connect(self._onSettingChanged)
+
     def loadSettings(self, settings):
         self.showHeader = settings['hexwidget.show_header']
 
     def saveSettings(self, settings):
         settings['hexwidget.show_header'] = self.showHeader
+
+    def _onSettingChanged(self, name, value):
+        if name == 'hexwidget.show_header':
+            self.showHeader = value
+        elif name == 'hexwidget.alternating_rows':
+            self.view.update()
 
     @property
     def editor(self):
