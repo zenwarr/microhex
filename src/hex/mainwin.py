@@ -57,7 +57,7 @@ class MainWindow(QMainWindow):
         if geom and isinstance(geom, str):
             self.restoreGeometry(QByteArray.fromHex(geom))
         else:
-            self.resize(500, 400)
+            self.resize(800, 600)
 
         state = globalQuickSettings['mainWindow.state']
         if state and isinstance(state, str):
@@ -587,7 +587,6 @@ class HexSubWindow(QWidget):
             self.icon = QIcon()
         self.name = name
         self.hexWidget = HexWidget(self, editor)
-        self.hexWidget.loadSettings(globalSettings)
         self.hexWidget.isModifiedChanged.connect(self._onModifiedChanged)
         self.hexWidget.urlChanged.connect(self._onUrlChanged)
         self.setFocusProxy(self.hexWidget)

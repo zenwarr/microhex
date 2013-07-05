@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>GotoDialog</class>
+ <widget class="QDialog" name="GotoDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>400</width>
+    <height>93</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Go to</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <widget class="QLabel" name="label">
+       <property name="text">
+        <string>Go to address:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="IntegerEdit" name="intAddress" native="true">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>1</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>IntegerEdit</class>
+   <extends>QWidget</extends>
+   <header>hex.integeredit</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>accepted()</signal>
+   <receiver>GotoDialog</receiver>
+   <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>276</x>
+     <y>62</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>4</x>
+     <y>65</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>rejected()</signal>
+   <receiver>GotoDialog</receiver>
+   <slot>reject()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>355</x>
+     <y>54</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>2</x>
+     <y>42</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>

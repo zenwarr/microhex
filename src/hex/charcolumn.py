@@ -8,11 +8,7 @@ import hex.utils as utils
 
 
 class CharColumnModel(hexwidget.ColumnModel):
-    """This column displays data as characters in one of possible encodings. It depends on encoding how many bytes
-    will occupy each cell. Since even cells of one row can have different number of bytes, we can either have constant
-    number of bytes for row or constant number of columns in it. In first case this leads to awful (unaligned) look of widget in
-    case of multi-byte encodings (utf-8, for example). Second case leads to awful behaviour - CharColumn and HexColumn
-    cannot be synchronized to display same bytes on same rows (this behaviour is common to other hex-editors).
+    """This column displays data as characters in one of possible encodings.
     """
 
     ReplacementCharacter = '·'
@@ -51,12 +47,14 @@ class CharColumnModel(hexwidget.ColumnModel):
         return -1
 
     def columnCount(self, row):
-        return self.bytesOnRow // self.codec.unitSize
+        return self.bytesOnRow // self.codec.unitSize if row >= 0 else -1
 
     def realRowCount(self):
         return self._rowCount
 
     def realColumnCount(self, row):
+        if row < 0:
+            return -1
         position = row * self.bytesOnRow
         if position >= len(self.editor):
             return 0
@@ -111,9 +109,6 @@ class CharColumnModel(hexwidget.ColumnModel):
                 return '!' if role == Qt.DisplayRole else ''
         return None
 
-    def headerData(self, section, role=Qt.DisplayRole):
-        return None
-
     def indexFlags(self, index):
         flags = self.FlagEditable
         if not self.lastRealIndex or (index.row + 1 >= self.realRowCount() and index > self.lastRealIndex):
@@ -126,26 +121,29 @@ class CharColumnModel(hexwidget.ColumnModel):
         if not index or index.model is not self:
             raise ValueError('invalid index')
 
-        position = self.indexData(index, self.EditorPositionRole)
-        if position is None or position < 0:
-            raise ValueError('invalid position for index resolved')
+        if role == Qt.EditRole:
+            position = self.indexData(index, self.EditorPositionRole)
+            if position is None or position < 0:
+                raise ValueError('invalid position for index resolved')
 
-        raw_data = self.codec.encodeString(value)
-        current_data = self.indexData(index, self.EditorDataRole)
+            raw_data = self.codec.encodeString(value)
+            current_data = self.indexData(index, self.EditorDataRole)
 
-        if raw_data == current_data:
-            return
+            if raw_data == current_data:
+                return
 
-        data_span = editor.DataSpan(self.editor, raw_data)
-        if len(current_data) == len(raw_data):
-            self.editor.writeSpan(position, data_span)
+            data_span = editor.DataSpan(self.editor, raw_data)
+            if len(current_data) == len(raw_data):
+                self.editor.writeSpan(position, data_span)
+            else:
+                self.editor.beginComplexAction()
+                try:
+                    self.editor.remove(position, len(current_data))
+                    self.editor.insertSpan(position, editor.DataSpan(self.editor, raw_data))
+                finally:
+                    self.editor.endComplexAction()
         else:
-            self.editor.beginComplexAction()
-            try:
-                self.editor.remove(position, len(current_data))
-                self.editor.insertSpan(position, editor.DataSpan(self.editor, raw_data))
-            finally:
-                self.editor.endComplexAction()
+            raise ValueError('data for given role is not writeable')
 
     def _translateToVisualCharacter(self, text):
         import unicodedata

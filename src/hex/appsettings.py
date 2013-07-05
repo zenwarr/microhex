@@ -12,6 +12,7 @@ HexWidget_ShowHeader = 'hexwidget.show_header'
 HexWidget_DefaultTheme = 'hexwidget.default_theme'
 HexWidget_AlternatingRows = 'hexwidget.alternating_rows'
 HexWidget_Font = 'hexwidget.font'
+HexWidget_BlockCursor = 'hexwidget.block_cursor'
 
 
 def doRegister():
@@ -30,7 +31,8 @@ def doRegister():
             (HexWidget_AlternatingRows, True, bool),
             (HexWidget_Font, ('Ubuntu Mono,13,-1,5,50,0,0,0,0,0',
                                      'Consolas,13,-1,5,50,0,0,0,0,0',
-                                     'Courier New,10,-1,5,50,0,0,0,0,0'), (list, tuple, str))
+                                     'Courier New,10,-1,5,50,0,0,0,0,0'), (list, tuple, str)),
+            (HexWidget_BlockCursor, False, bool)
         )
 
         s = settings.globalSettings()

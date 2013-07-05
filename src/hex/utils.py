@@ -106,3 +106,16 @@ def underscoreToCamelCase(underscore):
 
 def isFontInstalled(font_family):
     return font_family in QFontDatabase().families()
+
+
+def checkRangesIntersect(start1, length1, start2, length2):
+    if start2 < start1:
+        t = start2
+        start2 = start1
+        start1 = t
+
+        t = length2
+        length2 = length1
+        length1 = t
+
+    return not (start2 - start1 <= length1)

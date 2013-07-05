@@ -88,7 +88,7 @@ class AbstractDevice(QObject):
         """
         bytes_written = self._write(position, data)
         # if data is written into cache frame, drop cache
-        if check_ranges_intersect(position, len(data), self._cacheStart, len(self._cache)):
+        if utils.checkRangesIntersect(position, len(data), self._cacheStart, len(self._cache)):
             self._cache = []
         return bytes_written
 
@@ -387,16 +387,3 @@ def deviceFromBytes(data, load_options=None):
     load_options = load_options or BufferLoadOptions()
     load_options.data = data if isinstance(data, QByteArray) else QByteArray(data)
     return deviceFromUrl(QUrl('data://'), load_options)
-
-
-def check_ranges_intersect(start1, length1, start2, length2):
-    if start2 < start1:
-        t = start2
-        start2 = start1
-        start1 = t
-
-        t = length2
-        length2 = length1
-        length1 = t
-
-    return not (start2 - start1 <= length1)

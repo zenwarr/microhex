@@ -233,7 +233,8 @@ class Settings(QObject):
             self.allSettings = {}
             if self.__strictControl:
                 for changed_setting in changed_settings:
-                    self.settingChanged.emit(changed_setting, self.defaultValue(changed_setting))
+                    if changed_setting in self.registered:
+                        self.settingChanged.emit(changed_setting, self.defaultValue(changed_setting))
 
     def resetSetting(self, setting_name):
         """Reset only single setting to its default value. SettingsError raised if this setting is not registered.

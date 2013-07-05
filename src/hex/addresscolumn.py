@@ -49,6 +49,8 @@ class AddressColumnModel(hexwidget.ColumnModel):
         return 0
 
     def columnCount(self, row):
+        if not self.hasRow(row):
+            return -1
         return 1 if self._linkedModel is not None and self._linkedModel.hasRow(row) else 0
 
     def realRowCount(self):
@@ -57,6 +59,8 @@ class AddressColumnModel(hexwidget.ColumnModel):
         return 0
 
     def realColumnCount(self, row):
+        if not self.hasRow(row):
+            return -1
         if self._linkedModel is not None:
             return int(bool(self._linkedModel.realColumnCount(row)))
         return 0

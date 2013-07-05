@@ -137,72 +137,25 @@ class ModelIndex(object):
         return prev_index
 
 
-class ColumnModel(QObject):
-    EditorDataRole = Qt.UserRole + 1
-    EditorPositionRole = Qt.UserRole + 2
-    DataSizeRole = Qt.UserRole + 3
-
-    FlagVirtual = 1
-    FlagEditable = 2
-    FlagModified = 4
-
-    dataChanged = pyqtSignal(ModelIndex, ModelIndex)
-    dataResized = pyqtSignal(ModelIndex)  # argument is new last real index
-    modelReset = pyqtSignal()
-
-    def __init__(self, editor=None):
+class AbstractModel(QObject):
+    def __init__(self):
         QObject.__init__(self)
-        self.name = ''
-        self.__editor = None
-        self.editor = editor
-
-    @property
-    def editor(self):
-        return self.__editor
-
-    @editor.setter
-    def editor(self, new_editor):
-        if self.__editor is not new_editor:
-            if self.__editor is not None:
-                with self.__editor.lock:
-                    self.__editor.dataChanged.disconnect(self.onEditorDataChanged)
-                    self.__editor.resized.disconnect(self.onEditorDataResized)
-                self.__editor = None
-
-            self.__editor = new_editor
-            if new_editor is not None:
-                with new_editor.lock:
-                    new_editor.dataChanged.connect(self.onEditorDataChanged, Qt.QueuedConnection)
-                    new_editor.resized.connect(self.onEditorDataResized, Qt.QueuedConnection)
-
-    def reset(self):
-        self.modelReset.emit()
 
     def rowCount(self):
         """Should return -1 if model has infinite number of rows."""
         raise NotImplementedError()
 
-    def realRowCount(self):
-        """Should return positive integer, infinite number of real rows is not allowed"""
-        return self.rowCount()
-
     def columnCount(self, row):
         """Should return -1 if no row exists"""
         raise NotImplementedError()
 
-    def realColumnCount(self, row):
-        return self.columnCount(row)
-
     def index(self, row, column):
-        """Create index for row and column. Can return virtual index"""
+        """Create index for row and column."""
         return ModelIndex(row, column, self) if self.hasIndex(row, column) else ModelIndex()
 
     def lastRowIndex(self, row):
         """Return last index on given row."""
         return self.index(row, self.columnCount(row) - 1)
-
-    def lastRealRowIndex(self, row):
-        return self.index(row, self.realColumnCount(row) - 1)
 
     def indexFlags(self, index):
         return 0
@@ -210,27 +163,18 @@ class ColumnModel(QObject):
     def indexData(self, index, role=Qt.DisplayRole):
         return None
 
-    def headerData(self, section, role=Qt.DisplayRole):
-        # this is standard header data. It works only for regular columns and displays offset from start of the row.
-        if self.regular and role == Qt.DisplayRole:
-            if 0 <= section <= self.columnCount(0):
-                cell_offset = self.index(0, section).data(self.EditorPositionRole)
-                return IntegerFormatter(base=16).format(cell_offset)
-
     def hasIndex(self, row, column):
         """Return True if there is index at row and column in this model"""
-        if self.rowCount() < 0 or row < self.rowCount():
-            return column < self.columnCount(row)
+        if row >= 0 and (self.rowCount() < 0 or row < self.rowCount()):
+            return 0 <= column < self.columnCount(row)
         return False
 
-    def hasRealIndex(self, row, column):
-        return row < self.realRowCount() and column < self.realColumnCount(row)
-
     def hasRow(self, row):
-        return row >= 0 and (self.rowCount() < 0 or row + 1 < self.rowCount())
+        return row >= 0 and (self.rowCount() < 0 or row < self.rowCount())
 
     @property
     def firstIndex(self):
+        """Return first index in the model"""
         return self.index(0, 0)
 
     @property
@@ -243,8 +187,74 @@ class ColumnModel(QObject):
         index = ModelIndex()
         while not index and row >= 0:
             index = self.lastRowIndex(row)
-            row += 1
+            row -= 1
         return index
+
+    def setIndexData(self, index, value, role=Qt.EditRole):
+        return False
+
+
+class ColumnModel(AbstractModel):
+    dataChanged = pyqtSignal(ModelIndex, ModelIndex)  # first argument is first changed index, second is last one
+    dataResized = pyqtSignal(ModelIndex)  # argument is new last real index
+    modelReset = pyqtSignal()  # emitted when model is totally resetted
+    headerDataChanged = pyqtSignal()
+
+    EditorDataRole = Qt.UserRole + 1
+    EditorPositionRole = Qt.UserRole + 2
+    DataSizeRole = Qt.UserRole + 3
+
+    FlagVirtual = 1
+    FlagEditable = 2
+    FlagModified = 4
+
+    def __init__(self, editor=None):
+        AbstractModel.__init__(self)
+        self.name = ''
+        self._editor = None
+        self.editor = editor
+
+    def reset(self):
+        self.modelReset.emit()
+
+    @property
+    def editor(self):
+        return self._editor
+
+    @editor.setter
+    def editor(self, new_editor):
+        if self._editor is not new_editor:
+            if self._editor is not None:
+                with self._editor.lock:
+                    self._editor.dataChanged.disconnect(self.onEditorDataChanged)
+                    self._editor.resized.disconnect(self.onEditorDataResized)
+                self._editor = None
+
+            self._editor = new_editor
+            if new_editor is not None:
+                with new_editor.lock:
+                    new_editor.dataChanged.connect(self.onEditorDataChanged, Qt.QueuedConnection)
+                    new_editor.resized.connect(self.onEditorDataResized, Qt.QueuedConnection)
+
+    @property
+    def isInfinite(self):
+        return self.rowCount() < 0
+
+    def realRowCount(self):
+        """Should return positive integer, infinite number of real rows is not allowed"""
+        return self.rowCount()
+
+    def realColumnCount(self, row):
+        return self.columnCount(row)
+
+    def lastRealRowIndex(self, row):
+        return self.index(row, self.realColumnCount(row) - 1)
+
+    def hasRealIndex(self, row, column):
+        return (0 <= row < self.realRowCount()) and (0 <= column < self.realColumnCount(row))
+
+    def headerData(self, section, role=Qt.DisplayRole):
+        return None
 
     @property
     def lastRealIndex(self):
@@ -254,9 +264,6 @@ class ColumnModel(QObject):
             index = self.lastRealRowIndex(row)
             row -= 1
         return index
-
-    def setIndexData(self, index, value, role=Qt.EditRole):
-        return False
 
     def onEditorDataChanged(self, start, length):
         pass
@@ -275,8 +282,8 @@ class ColumnModel(QObject):
 
     @property
     def regular(self):
-        """Return True if this model is regular. Regular models have same number of columns in each row and same
-        text length for cell."""
+        """Return True if this model is regular. Regular models have same number of columns on each row
+        (except last one, if one does exist), same text length and data size for each cell."""
         return False
 
     def defaultIndexData(self, before_index, role=Qt.EditRole):
@@ -297,14 +304,24 @@ class ColumnModel(QObject):
                 return self.indexFromPosition(pos)
         raise ValueError('failed to insert index before given one')
 
+    def removeIndex(self, index):
+        pos = index.data(self.EditorPositionRole)
+        size = index.data(self.DataSizeRole)
+        if pos < 0 or size < 0:
+            raise ValueError()
+        self.editor.remove(pos, size)
+
     def createValidator(self):
+        """Validator is used to check values entered by user while editing column data. If createValidator returns
+        None, all values will be considered valid."""
         return None
 
 
-def index_range(start_index, end_index, include_last):
+def index_range(start_index, end_index, include_last=False):
     """Iterator allows traversing through model indexes."""
     if not start_index or not end_index or end_index < start_index:
         return
+
     current_index = start_index
     while current_index:
         if include_last and not (current_index <= end_index):
@@ -315,76 +332,49 @@ def index_range(start_index, end_index, include_last):
         current_index = current_index.next
 
 
-class EmptyColumnModel(ColumnModel):
-    def rowCount(self):
-        return 0
-
-    def columnCount(self, row):
-        return 0
-
-    def indexFromPosition(self, position):
-        return ModelIndex()
-
-
-class FrameProxyModel(ColumnModel):
-    """This proxy model displays only number of rows starting after given first row. Proxy model does not check
-    if there are indexes on these rows."""
+class FrameModel(AbstractModel):
+    """This model filters source ColumnModel to display only specified number of rows starting from given first row.
+    FrameModel does not check if there are real source model rows corresponding to frame rows. Number of rows
+    in this model always equal to frame size, even if source model has no enough rows to fill the frame.
+    Frame can be scrolled and resized.
+    """
 
     frameScrolled = pyqtSignal(int, int)  # first argument is new first frame row, second one is old first frame row
     frameResized = pyqtSignal(int, int)  # first argument is new frame size, second one is old frame size
+    rowsUpdated = pyqtSignal(int, int)  # first argument is first modified frame row, second one is number of modified rows
+                                # signal is emitted for rows that has been modified (and not emitted when frame scrolled)
 
     def __init__(self, source_model):
-        ColumnModel.__init__(self, None)
-        self.__firstRow = 0
-        self.__rowCount = 0
-        self.sourceModel = source_model or EmptyColumnModel()
-        self.sourceModel.dataChanged.connect(self.__onDataChanged)
-        self.sourceModel.dataResized.connect(self.__onDataResized)
-        self.sourceModel.modelReset.connect(self.modelReset)
-
-    def setFrame(self, first_row, row_count):
-        self.resizeFrame(row_count)
-        self.scrollFrame(first_row)
+        AbstractModel.__init__(self)
+        self._firstRow = 0
+        self._rowCount = 0
+        self._lastSourceIndex = source_model.lastRealIndex
+        self.sourceModel = source_model
+        self.sourceModel.dataChanged.connect(self._onDataChanged)
+        self.sourceModel.dataResized.connect(self._onDataResized)
+        self.sourceModel.modelReset.connect(self._onModelResetted)
 
     def scrollFrame(self, new_first_row):
-        if self.__firstRow != new_first_row:
-            old_first_row = self.__firstRow
-            self.__firstRow = new_first_row
+        if self._firstRow != new_first_row:
+            old_first_row = self._firstRow
+            self._firstRow = new_first_row
             self.frameScrolled.emit(new_first_row, old_first_row)
 
     def resizeFrame(self, new_frame_size):
-        if self.__rowCount != new_frame_size:
-            old_size = self.__rowCount
-            self.__rowCount = new_frame_size
+        if self._rowCount != new_frame_size:
+            old_size = self._rowCount
+            self._rowCount = new_frame_size
             self.frameResized.emit(new_frame_size, old_size)
 
     def rowCount(self):
-        model_row_count = self.sourceModel.rowCount()
-        if model_row_count >= 0:
-            return min(self.__rowCount, model_row_count)
-        else:
-            return self.__rowCount
+        """Row count is always equal to frame size, even if source model has no enough rows to fill the frame"""
+        return self._rowCount
 
     def columnCount(self, row):
-        return self.sourceModel.columnCount(row + self.__firstRow)
-
-    def realRowCount(self):
-        return min(self.__rowCount, self.sourceModel.rowCount())
-
-    def realColumnCount(self, row):
-        return self.sourceModel.realColumnCount(row + self.__firstRow)
-
-    def indexFromPosition(self, position):
-        return self.fromSourceIndex(self.sourceModel.indexFromPosition(position))
+        return max(self.sourceModel.columnCount(row + self._firstRow), 0)
 
     def index(self, row, column=0):
-        return self.fromSourceIndex(self.sourceModel.index(row + self.__firstRow, column))
-
-    def hasIndex(self, row, column):
-        return ColumnModel.hasIndex(self, row, column) and self.sourceModel.hasIndex(row + self.__firstRow, column)
-
-    def hasRealIndex(self, row, column):
-        return ColumnModel.hasIndex(self, row, column) and self.sourceModel.hasRealIndex(row + self.__firstRow, column)
+        return self.toFrameIndex(self.sourceModel.index(row + self._firstRow, column))
 
     def indexData(self, index, role=Qt.DisplayRole):
         return self.sourceModel.indexData(self.toSourceIndex(index), role)
@@ -395,41 +385,48 @@ class FrameProxyModel(ColumnModel):
     def setIndexData(self, index, value, role=Qt.EditRole):
         return self.sourceModel.setIndexData(self.toSourceIndex(index), value, role)
 
-    def headerData(self, section, role=Qt.DisplayRole):
-        return self.sourceModel.headerData(section, role)
-
     def toSourceIndex(self, index):
         if not index or index.model is self.sourceModel:
             return index
         elif self.hasIndex(index.row, index.column):
-            return self.sourceModel.index(index.row + self.__firstRow, index.column)
+            return self.sourceModel.index(index.row + self._firstRow, index.column)
         else:
             return ModelIndex()
 
-    def fromSourceIndex(self, index):
+    def toFrameIndex(self, index):
         if not index or index.model is self:
             return index
-        elif self.hasIndex(index.row - self.__firstRow, index.column):
-            return ModelIndex(index.row - self.__firstRow, index.column, self)
-        else:
-            return ModelIndex()
+        return AbstractModel.index(self, index.row - self._firstRow, index.column)
 
-    def __onDataChanged(self, first, last):
+    def _onDataChanged(self, first_index, last_index):
         # check if update area lays inside frame
-        if last.row < self.__firstRow or first.row > self.toSourceIndex(self.lastIndex).row:
+        if last_index.row < self._firstRow or first_index.row >= self._firstRow + self._rowCount:
             return
+        first_row = first_index.row - self._firstRow
+        self.rowsUpdated.emit(first_row, min(last_index.row - first_index.row + 1, self._rowCount - first_row))
 
-        first = self.fromSourceIndex(first) or self.firstIndex
-        last = self.fromSourceIndex(last) or self.lastIndex
+    def _onDataResized(self, new_last_index):
+        # as number of rows will not be affected, the only thing this can cause is updating some indexes.
+        if not new_last_index:
+            # boundary case: model has data and was cleared
+            first_model_row = 0
+            last_model_row = self._lastSourceIndex.row
+        elif not self._lastSourceIndex:
+            # boundary case: model was empty and was expanded
+            first_model_row = 0
+            last_model_row = new_last_index.row
+        else:
+            first_model_row = min(self._lastSourceIndex.row, new_last_index.row)
+            last_model_row = max(self._lastSourceIndex.row, new_last_index.row)
 
-        self.dataChanged.emit(first, last)
+        self._lastSourceIndex = new_last_index
 
-    def __onDataResized(self, new_last_index):
-        self.modelReset.emit()
+        # now check if changes affect frame
+        if not (last_model_row < self._firstRow or first_model_row >= self._firstRow + self._rowCount):
+            self.rowsUpdated.emit(first_model_row - self._firstRow, last_model_row - first_model_row + 1)
 
-    @property
-    def regular(self):
-        return self.sourceModel.regular
+    def _onModelResetted(self):
+        self.rowsUpdated.emit(0, self._rowCount)
 
 
 class Theme(object):
@@ -524,6 +521,8 @@ class IndexData(object):
 
 
 class ColumnDocumentBackend(QObject):
+    """Document backend controls generation of QTextDocument html structure and interacts with underlying QTextDocument."""
+
     documentUpdated = pyqtSignal()
 
     def __init__(self, column):
@@ -553,38 +552,43 @@ class ColumnDocumentBackend(QObject):
     def insertRow(self, row_index, number_of_rows):
         raise NotImplementedError()
 
-    def rectForCell(self, row_index, cell_index):
+    def rectForIndex(self, index):
         raise NotImplementedError()
 
-    def cursorPositionInCell(self, row_index, cell_index, cursor_offset):
+    def cursorPositionInIndex(self, index, cursor_offset):
         raise NotImplementedError()
 
-    def cellFromPoint(self, point):
+    def indexFromPoint(self, point):
         raise NotImplementedError()
 
     def cursorPositionFromPoint(self, point):
         raise NotImplementedError()
 
-    def clear(self):
+    def invalidate(self):
         self._document = None
 
 
-class PlainTextDocumentBackend(ColumnDocumentBackend):
+class TextDocumentBackend(ColumnDocumentBackend):
     def __init__(self, column):
         ColumnDocumentBackend.__init__(self, column)
 
     def generateDocument(self):
+        """Generates document if backend was invalidated."""
         if self._document is None:
             self._document = self._column.createDocumentTemplate()
 
             cursor = QTextCursor(self._document)
-            block_format = self._documentBlockFormat
-            for row_index in range(self._column.visibleRows):
-                row_data = self._column.getRowCachedData(row_index)
-                cursor.movePosition(QTextCursor.End)
-                cursor.insertHtml(row_data.html)
-                cursor.insertBlock()
-                cursor.setBlockFormat(block_format)
+            cursor.beginEditBlock()
+            try:
+                block_format = self._documentBlockFormat
+                for row_index in range(self._column.visibleRows):
+                    row_data = self._column.getRowCachedData(row_index)
+                    cursor.movePosition(QTextCursor.End)
+                    cursor.insertHtml(row_data.html)
+                    cursor.insertBlock()
+                    cursor.setBlockFormat(block_format)
+            finally:
+                cursor.endEditBlock()
 
             self.documentUpdated.emit()
 
@@ -606,42 +610,47 @@ class PlainTextDocumentBackend(ColumnDocumentBackend):
 
     def removeRows(self, row_index, number_of_rows):
         if self._document is not None:
-            for x in range(number_of_rows):
-                block = self._document.findBlockByLineNumber(row_index)
-                if block.isValid():
-                    cursor = QTextCursor(block)
-                    cursor.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+            block = self._document.findBlockByLineNumber(row_index)
+            if block.isValid():
+                cursor = QTextCursor(block)
+                cursor.beginEditBlock()
+                try:
+                    for x in range(number_of_rows):
+                        cursor.movePosition(QTextCursor.NextBlock, QTextCursor.KeepAnchor)
                     cursor.removeSelectedText()
-                    if row_index == 0:
-                        cursor.deleteChar()
+                finally:
+                    cursor.endEditBlock()
 
             self.documentUpdated.emit()
 
     def insertRows(self, row_index, number_of_rows):
         if self._document is not None:
-            for x in range(number_of_rows):
-                if row_index < 0:
-                    cursor = QTextCursor(self._document)
-                    cursor.movePosition(QTextCursor.End)
-                else:
-                    block = self._document.findBlockByLineNumber(row_index)
-                    cursor = QTextCursor(block)
+            if row_index < 0:
+                cursor = QTextCursor(self._document)
+                cursor.movePosition(QTextCursor.End)
+            else:
+                block = self._document.findBlockByLineNumber(row_index)
+                cursor = QTextCursor(block)
 
-                cursor.insertBlock()
-                cursor.setBlockFormat(self._documentBlockFormat)
+            cursor.beginEditBlock()
+            try:
+                for x in range(number_of_rows):
+                    cursor.insertBlock()
+                    cursor.setBlockFormat(self._documentBlockFormat)
+            finally:
+                cursor.endEditBlock()
 
             self.documentUpdated.emit()
 
-    def rectForCell(self, row_index, cell_index):
-        self.generateDocument()
-
-        try:
-            index_data = self._column._cache[row_index].items[cell_index]
-        except IndexError:
+    def rectForIndex(self, index):
+        index = self._column.frameModel.toFrameIndex(index)
+        if not index:
             return QRectF()
 
+        self.generateDocument()
+        index_data = self._column.getIndexCachedData(index)
         if index_data is not None:
-            block = self._document.findBlockByLineNumber(row_index)
+            block = self._document.findBlockByLineNumber(index.row)
             if block.isValid():
                 block_rect = self._document.documentLayout().blockBoundingRect(block)
                 line = block.layout().lineAt(0)
@@ -652,6 +661,9 @@ class PlainTextDocumentBackend(ColumnDocumentBackend):
         return QRectF()
 
     def rectForRow(self, row_index):
+        if isinstance(row_index, ModelIndex):
+            return self.rectForRow(self._column.frameModel.toFrameIndex(row_index).row)
+
         self.generateDocument()
 
         block = self._document.findBlockByLineNumber(row_index)
@@ -661,16 +673,12 @@ class PlainTextDocumentBackend(ColumnDocumentBackend):
 
         return QRectF()
 
-    def cursorPositionInCell(self, row_index, cell_index, cursor_offset):
-        try:
-            index_data = self._column._cache[row_index].items[cell_index]
-        except IndexError:
-            return QPointF()
-
+    def cursorPositionInIndex(self, index, cursor_offset):
+        index_data = self._column.getIndexCachedData(index)
         if cursor_offset < 0 or cursor_offset >= len(index_data.text):
             return QPointF()
 
-        block = self._document.findBlockByLineNumber(row_index)
+        block = self._document.findBlockByLineNumber(index.row)
         if not block.isValid():
             return QPointF()
 
@@ -691,114 +699,28 @@ class PlainTextDocumentBackend(ColumnDocumentBackend):
             for column in range(len(row_data.items)):
                 index_data = row_data.items[column]
                 if index_data.firstCharIndex + len(index_data.text) > line_char_index:
-                    return (row_index, column), line_char_index - index_data.firstCharIndex
-        return (-1, -1), 0
+                    return index_data.index, line_char_index - index_data.firstCharIndex
+        return ModelIndex(), 0
 
-    def cellFromPoint(self, point):
+    def indexFromPoint(self, point):
         return self._positionForPoint(point)[0]
 
     def cursorPositionFromPoint(self, point):
         return self._positionForPoint(point)[1]
 
 
-# class TableDocumentBackend(ColumnDocumentBackend):
-#     def __init__(self, column):
-#         ColumnDocumentBackend.__init__(self, column)
-#
-#     def generateDocument(self):
-#         if self._document is None:
-#             self._document = self._column.createDocumentTemplate()
-#
-#             cursor = QTextCursor(self._document)
-#
-#             cursor.beginEditBlock()
-#             try:
-#                 self._table = cursor.insertTable(len(self._column._cache), self._column.model.columnCount(0))
-#                 self._table.setFormat(self._tableFormat)
-#                 for row_index in range(len(self._column._cache)):
-#                     for column_index in range(self._table.columns()):
-#                         cell = self._table.cellAt(row_index, column_index)
-#                         cursor = cell.firstCursorPosition()
-#                         try:
-#                             cursor.insertHtml(self._column._cache[row_index].items[column_index].html)
-#                         except IndexError:
-#                             pass
-#             finally:
-#                 cursor.endEditBlock()
-#
-#             self.documentUpdated.emit()
-#
-#     @property
-#     def _tableFormat(self):
-#         fmt = QTextTableFormat()
-#         fmt.setBorderStyle(QTextTableFormat.BorderStyle_None)
-#         fmt.setBorder(0)
-#         fmt.setCellPadding(0)
-#         fmt.setCellSpacing(0)
-#         return fmt
-#
-#     def updateRow(self, row_index, row_data):
-#         if self._document is not None:
-#             cursor = self._table.cellAt(row_index, 0).firstCursorPosition()
-#             cursor.movePosition(QTextCursor.NextRow)
-#             cursor.removeSelectedText()
-#             cursor.beginEditBlock()  # we do not use undo/redo, but this thing increases perfomance, blocking updating
-#                                      # layout until endEditBlock is called.
-#             try:
-#                 for column_index in range(self._table.columns()):
-#                     cursor = self._table.cellAt(row_index, column_index).firstCursorPosition()
-#                     cursor.insertHtml(row_data.items[column_index].html)
-#             finally:
-#                 cursor.endEditBlock()
-#
-#             self.documentUpdated.emit()
-#
-#     def removeRows(self, row_index, number_of_rows):
-#         if self._document is not None:
-#             self._table.removeRows(row_index, number_of_rows)
-#             self.documentUpdated.emit()
-#
-#     def insertRows(self, row_index, number_of_rows):
-#         if self._document is not None:
-#             if row_index < 0:
-#                 self._table.appendRows(number_of_rows)
-#             else:
-#                 self._table.insertRows(row_index, number_of_rows)
-#
-#             self.documentUpdated.emit()
-#
-#     def rectForCell(self, row_index, cell_index):
-#         self.generateDocument()
-#
-#         cursor = self._table.cellAt(row_index, cell_index).firstCursorPosition()
-#         if not cursor.isNull():
-#             return self._document.documentLayout().blockBoundingRect(cursor.block())
-#
-#         return QRectF()
-#
-#     def cellFromPoint(self, point):
-#         self.generateDocument()
-#
-#         for row_index in range(len(self._column._cache)):
-#             for column_index in range(self._table.columns()):
-#                 if self.rectForCell(row_index, column_index).contains(point):
-#                     return row_index, column_index
-#         return -1, -1
-
-
 class Column(QObject):
     updateRequested = pyqtSignal()
     resizeRequested = pyqtSignal(QSizeF)
-    headerResizeRequested = pyqtSignal()
+    headerResized = pyqtSignal()
 
     def __init__(self, model):
         QObject.__init__(self)
-        self.sourceModel = model
-        self.model = FrameProxyModel(model)
-        self.model.dataChanged.connect(self._onDataChanged)
-        self.model.modelReset.connect(self._invalidateCache)
-        self.model.frameScrolled.connect(self._onFrameScrolled)
-        self.model.frameResized.connect(self._onFrameResized)
+        self.dataModel = model
+        self.frameModel = FrameModel(model)
+        self.frameModel.frameScrolled.connect(self._onFrameScrolled)
+        self.frameModel.frameResized.connect(self._onFrameResized)
+        self.frameModel.rowsUpdated.connect(self._onRowsUpdated)
 
         self._geom = QRectF()
         self._font = QFont()
@@ -809,19 +731,19 @@ class Column(QObject):
         self._visibleRows = 0
         self._firstVisibleRow = 0
 
-        self._showHeader = False
-        self._headerHeight = False
+        self._showHeader = True
+        self._headerHeight = 0
         self._headerData = []
-        self._validator = self.sourceModel.createValidator()
+        self._validator = self.dataModel.createValidator()
 
-        self._spaced = self.sourceModel.preferSpaced
-        self._cache = None
-        # if self.sourceModel.regular:
-        #     self._documentBackend = TableDocumentBackend(self)
-        # else:
-        self._documentBackend = PlainTextDocumentBackend(self)
-        self._documentDirty = True
+        self._spaced = self.dataModel.preferSpaced
+        self._cache = []
+        self._documentDirty = False
+        self._documentBackend = TextDocumentBackend(self)
         self._documentBackend.documentUpdated.connect(self._onDocumentUpdated)
+
+        self._updateHeaderData()
+        self.dataModel.headerDataChanged.connect(self._updateHeaderData)
 
     @property
     def geometry(self):
@@ -831,7 +753,6 @@ class Column(QObject):
     def geometry(self, rect):
         self._geom = rect
         self._updateGeometry()
-        # self.updateRequested.emit()  # even if frame was not changed, we should redraw widget
 
     @property
     def showHeader(self):
@@ -841,7 +762,6 @@ class Column(QObject):
     def showHeader(self, show):
         self._showHeader = show
         self._updateGeometry()
-        # self.updateRequested.emit()
 
     def idealHeaderHeight(self):
         return self._fontMetrics.height() + VisualSpace / 2
@@ -852,8 +772,10 @@ class Column(QObject):
 
     @headerHeight.setter
     def headerHeight(self, height):
-        self._headerHeight = height
-        self.updateRequested.emit()
+        if self._headerHeight != height:
+            self._headerHeight = height
+            self.headerResized.emit()
+            self._updateGeometry()
 
     @property
     def headerRect(self):
@@ -862,8 +784,8 @@ class Column(QObject):
         else:
             return QRectF()
 
-    def getRectForHeaderItem(self, section_index):
-        cell_rect = self.getRectForIndex(self.model.index(0, section_index))
+    def rectForHeaderItem(self, section_index):
+        cell_rect = self.rectForIndex(self.frameModel.index(0, section_index))
         return QRectF(QPointF(cell_rect.x(), 0), QSizeF(cell_rect.width(), self.headerRect.height()))
 
     @property
@@ -873,7 +795,7 @@ class Column(QObject):
     def scrollToFirstRow(self, source_row_index):
         if self._firstVisibleRow != source_row_index:
             self._firstVisibleRow = source_row_index
-            self.model.scrollFrame(self._firstVisibleRow)
+            self.frameModel.scrollFrame(self._firstVisibleRow)
 
     @property
     def lastFullVisibleRow(self):
@@ -897,15 +819,15 @@ class Column(QObject):
 
     @property
     def firstVisibleIndex(self):
-        return self.model.index(0, 0)
+        return self.frameModel.index(0, 0)
 
     @property
     def lastVisibleIndex(self):
-        return self.model.lastRowIndex(self._visibleRows - 1)
+        return self.frameModel.lastIndex
 
     @property
     def lastFullVisibleIndex(self):
-        return self.model.lastRowIndex(self._fullVisibleRows - 1)
+        return self.frameModel.lastRowIndex(self._fullVisibleRows - 1)
 
     @property
     def font(self):
@@ -915,16 +837,15 @@ class Column(QObject):
     def font(self, new_font):
         self._font = new_font
         self._fontMetrics = QFontMetricsF(new_font)
-        if hasattr(self.sourceModel, 'renderFont'):  # well, this is hack until i invent better solution...
-            self.sourceModel.renderFont = new_font
-        self._documentBackend.clear()
-        self.headerResizeRequested.emit()
+        if hasattr(self.dataModel, 'renderFont'):  # well, this is hack until i invent better solution...
+            self.dataModel.renderFont = new_font
+        self._documentBackend.invalidate()
+        self.headerResized.emit()  # this can adjust geometry again...
         self._updateGeometry()
-        self.updateRequested.emit()
 
     @property
     def editor(self):
-        return self.sourceModel.editor
+        return self.dataModel.editor
 
     @property
     def spaced(self):
@@ -938,85 +859,95 @@ class Column(QObject):
 
     @property
     def regular(self):
-        return self.sourceModel.regular
+        return self.dataModel.regular
 
     def getRowCachedData(self, visible_row_index):
-        if self._cache is None:
-            self._adjustCacheRows()
         if 0 <= visible_row_index < self._visibleRows:
-            cached_row = self._cache[visible_row_index]
-            if cached_row is None:
+            if self._cache[visible_row_index] is None:
                 self._updateCachedRow(visible_row_index)
             return self._cache[visible_row_index]
 
     def getIndexCachedData(self, index):
-        index = self.model.fromSourceIndex(index)
+        index = self.frameModel.toFrameIndex(index)
         row_data = self.getRowCachedData(index.row)
         if row_data is not None and index.column < len(row_data.items):
             return row_data.items[index.column]
 
-    def getRectForIndex(self, index):
-        index = self.model.fromSourceIndex(index)
-        rect = self._documentBackend.rectForCell(index.row, index.column)
-        return rect.translated(self.documentOrigin)
+    def rectForIndex(self, index):
+        return self._documentBackend.rectForIndex(index).translated(self.documentOrigin)
 
     def cursorPositionInIndex(self, index, cursor_offset):
-        index = self.model.fromSourceIndex(index)
-        pos = self._documentBackend.cursorPositionInCell(index.row, index.column, cursor_offset)
-        return QPointF(pos.x() + self.documentOrigin.x(), pos.y() + self.documentOrigin.y())
+        return _translate(self._documentBackend.cursorPositionInIndex(index, cursor_offset), self.documentOrigin)
 
-    def getPolygonsForRange(self, first_index, last_index):
-        first_index = self.model.toSourceIndex(first_index)
-        last_index = self.model.toSourceIndex(last_index)
+    def _alignRectangles(self, rects):
+        if len(rects) < 2:
+            return
 
-        first_visible_source_index = self.model.toSourceIndex(self.firstVisibleIndex)
-        last_visible_source_index = self.model.toSourceIndex(self.lastVisibleIndex)
-        if not first_index or not last_index or (first_index > last_visible_source_index or
-                                                         last_index < first_visible_source_index):
+        for j in range(1, len(rects)):
+            space = rects[j].top() - rects[j - 1].bottom()
+            rects[j - 1].moveBottom(rects[j - 1].bottom() + space / 2)
+            rects[j].moveTop(rects[j].top() - space / 2)
+
+    def polygonsForRange(self, first_index, last_index):
+        """Return tuple of polygons covering range of indexes from first_index until last_index (last_index is also
+        included). Result tuple can include up to 2 polygons."""
+
+        first_index = self.frameModel.toSourceIndex(first_index)
+        last_index = self.frameModel.toSourceIndex(last_index)
+
+        if not first_index or not last_index:
             return tuple()
 
+        first_visible_source_index = self.frameModel.toSourceIndex(self.firstVisibleIndex)
+        last_visible_source_index = self.frameModel.toSourceIndex(self.lastVisibleIndex)
+        if first_index > last_visible_source_index or last_index < first_visible_source_index:
+            return tuple()
+
+        # collapse range to frame boundaries
         first_index = max(first_index, first_visible_source_index)
         last_index = min(last_index, last_visible_source_index)
 
         if first_index == last_index:
-            return QPolygonF(self.getRectForIndex(first_index)),
+            return QPolygonF(self.rectForIndex(first_index)),
         else:
-            r1 = self.getRectForIndex(first_index)
-            r2 = self.getRectForIndex(last_index)
+            r1 = self.rectForIndex(first_index)
+            row1_rect = self.rectForRow(first_index)
+            rect1 = QRectF(QPointF(r1.left(), row1_rect.top()), row1_rect.bottomRight())
+
+            r2 = self.rectForIndex(last_index)
+            row2_rect = self.rectForRow(last_index)
+            rect2 = QRectF(row2_rect.topLeft(), QPointF(r2.right(), row2_rect.bottom()))
 
             if first_index.row == last_index.row:
-                return QPolygonF(QRectF(r1.topLeft(), r2.bottomRight())),
+                return QPolygonF(QRectF(QPointF(r1.left(), row1_rect.top()), QPointF(r2.right(), row2_rect.bottom()))),
             elif first_index.row + 1 == last_index.row and r1.left() > r2.right():
-                first_row_last_index = self.sourceModel.lastRowIndex(first_index.row)
-                return (
-                    QPolygonF(QRectF(r1.topLeft(), self.getRectForIndex(first_row_last_index).bottomRight())),
-                    QPolygonF(QRectF(QPointF(VisualSpace, r2.top()), r2.bottomRight()))
-                )
+                self._alignRectangles((rect1, rect2))
+                return QPolygonF(rect1), QPolygonF(rect2)
             else:
-                range_polygon = QPolygonF()
+                rects = []
+                for row_index in range(first_index.row + 1, last_index.row):
+                    rects.append(self.rectForRow(row_index - self._firstVisibleRow))
 
-                for row_index in range(first_index.row, last_index.row):
-                    index = self.sourceModel.index(row_index, self.sourceModel.columnCount(row_index) - 1)
-                    index_rect = self.getRectForIndex(index)
-                    range_polygon.append(index_rect.topRight())
-                    range_polygon.append(index_rect.bottomRight())
+                rects = [rect1] + rects + [rect2]
+                self._alignRectangles(rects)
 
-                range_polygon.append(r2.topRight())
-                range_polygon.append(r2.bottomRight())
-                range_polygon.append(self.getRectForIndex(self.sourceModel.index(last_index.row, 0)).bottomLeft())
-                range_polygon.append(self.getRectForIndex(self.sourceModel.index(first_index.row, 0)).bottomLeft())
-                range_polygon.append(r1.bottomLeft())
-                range_polygon.append(r1.topLeft())
+                polygon = QPolygonF()
+                for rect in rects:
+                    polygon.append(rect.topLeft())
+                    polygon.append(rect.bottomLeft())
 
-                return range_polygon,
+                for rect in reversed(rects):
+                    polygon.append(rect.bottomRight())
+                    polygon.append(rect.topRight())
+
+                return polygon,
 
     def indexFromPoint(self, point):
-        point = QPointF(point.x() - self.documentOrigin.x(), point.y() - self.documentOrigin.y())
-        row, column = self._documentBackend.cellFromPoint(point)
-        return self.model.toSourceIndex(self.model.index(row, column))
+        point = _translate(point, -self.documentOrigin.x(), -self.documentOrigin.y())
+        return self.frameModel.toSourceIndex(self._documentBackend.indexFromPoint(point))
 
     def cursorPositionFromPoint(self, point):
-        point = QPointF(point.x() - self.documentOrigin.x(), point.y() - self.documentOrigin.y())
+        point = _translate(point, -self.documentOrigin.x(), -self.documentOrigin.y())
         return self._documentBackend.cursorPositionFromPoint(point)
 
     def paint(self, paint_data, is_leading):
@@ -1029,7 +960,7 @@ class Column(QObject):
             for row_index in range(self._visibleRows):
                 if (row_index + self._firstVisibleRow) % 2:
                     rect = self.rectForRow(row_index)
-                    rect = QRectF(QPointF(0, rect.y() + self.documentOrigin.y()), QSizeF(self.geometry.width(), rect.height()))
+                    rect = QRectF(QPointF(0, rect.y()), QSizeF(self.geometry.width(), rect.height()))
                     painter.fillRect(rect, QBrush(self._theme.alternateRowColor))
 
         painter.translate(self.documentOrigin)
@@ -1049,9 +980,9 @@ class Column(QObject):
     def paintCaret(self, paint_data, is_leading, caret_position):
         painter = paint_data.painter
         if caret_position >= 0:
-            caret_index = self.model.fromSourceIndex(self.sourceModel.indexFromPosition(caret_position))
+            caret_index = self.dataModel.indexFromPosition(caret_position)
             if caret_index and self.isIndexVisible(caret_index, False):
-                caret_rect = self.getRectForIndex(caret_index)
+                caret_rect = self.rectForIndex(caret_index)
                 painter.setBrush(QBrush(self._theme.caretBackgroundColor))
                 painter.setPen(self._theme.caretBorderColor)
                 painter.drawRect(caret_rect)
@@ -1059,8 +990,8 @@ class Column(QObject):
     def paintSelection(self, paint_data, is_leading, selection):
         if selection is not None and len(selection) > 0:
             painter = paint_data.painter
-            for sel_polygon in self.getPolygonsForRange(self.sourceModel.indexFromPosition(selection.start),
-                                        self.sourceModel.indexFromPosition(selection.start + len(selection) -1)):
+            for sel_polygon in self.polygonsForRange(self.dataModel.indexFromPosition(selection.start),
+                                        self.dataModel.indexFromPosition(selection.start + len(selection) - 1)):
                 painter.setBrush(self._theme.selectionBackgroundColor)
                 painter.setPen(QPen(QBrush(self._theme.selectionBorderColor), 2.0))
                 painter.drawPolygon(sel_polygon)
@@ -1072,11 +1003,8 @@ class Column(QObject):
     def _updateHeaderData(self):
         self._headerData = []
 
-        if not self.showHeader or not self.model.regular:
-            return
-
-        for column_index in range(self.model.columnCount(0)):
-            cell_data = self.model.headerData(column_index, Qt.DisplayRole)
+        for column_index in range(self.dataModel.columnCount(0)):
+            cell_data = self.dataModel.headerData(column_index, Qt.DisplayRole)
             if not isinstance(cell_data, str):
                 cell_data = ''
             header_item_data = self.HeaderItemData()
@@ -1094,61 +1022,37 @@ class Column(QObject):
         painter.fillRect(self.headerRect, self._theme.headerBackgroundColor)
 
         for section_index in range(len(self._headerData)):
-            rect = self.getRectForHeaderItem(section_index)
-            painter.drawText(rect, Qt.AlignHCenter|Qt.TextSingleLine, self._headerData[section_index].text)
+            rect = self.rectForHeaderItem(section_index)
+            painter.drawText(rect, Qt.AlignHCenter | Qt.TextSingleLine, self._headerData[section_index].text)
 
     @property
     def documentOrigin(self):
         return QPointF(VisualSpace, self.headerRect.height() + VisualSpace / 2)
 
     def _updateGeometry(self):
+        """Should be called every time column geometry (size, font, header height) was changed. Recalculates
+        number of visible rows and adjusts frame size"""
+
         real_height = max(self._geom.height() - self.documentOrigin.y(), 0)
         self._fullVisibleRows = int(real_height // self._fontMetrics.height())
         self._visibleRows = self._fullVisibleRows + bool(int(real_height) % int(self._fontMetrics.height()))
-        self.model.resizeFrame(self._visibleRows)
-
-    def _adjustCacheRows(self):
-        """Adjusts row count in cache, but does not update any rows.
-        """
-        if self._cache is None:
-            self._cache = [None] * self._visibleRows
-        elif len(self._cache) > self._visibleRows:
-            self._cache = self._cache[:self._visibleRows]
-        elif len(self._cache) < self._visibleRows:
-            self._cache += [None] * (self._visibleRows - len(self._cache))
-        else:
-            return
-
-        self._documentDirty = True
+        self.frameModel.resizeFrame(self._visibleRows)
+        self.updateRequested.emit()  # we cannot rely on resizeFrame to initiate column update: frame size can
+                                     # remain the same (for small resizes) but column still needs to be repainted.
 
     def _invalidateCache(self):
-        """Invalidate entire cache"""
-        self._cache = None
+        self._cache = [None] * self._visibleRows
         self._documentDirty = True
 
-    def _invalidateRow(self, row_index):
-        """Invalidate only specified row in cache"""
-        if self._cache is not None and 0 <= row_index < len(self._cache):
-            self._cache[row_index] = None
-            self._documentDirty = True
-
     def _renderDocumentData(self):
-        """Ensures that document will contain actual data after calling this method"""
+        """Document will contain actual data after calling this method"""
         if self._documentDirty:
-            if self._cache is None:
-                self._adjustCacheRows()
-
-            for row_index in range(self._visibleRows):
-                self._renderRowDataToDocument(row_index)
-
-            self._updateHeaderData()
-
+            for row_index in range(len(self._cache)):
+                # update only invalidated rows
+                if self._cache[row_index] is None:
+                    self._updateCachedRow(row_index)
+                    self._documentBackend.updateRow(row_index, self._cache[row_index])
             self._documentDirty = False
-
-    def _renderRowDataToDocument(self, row_index):
-        """Updates cached row in document"""
-        if 0 <= row_index < self._visibleRows:
-            self._documentBackend.updateRow(row_index, self.getRowCachedData(row_index))
 
     def _onDocumentUpdated(self):
         ideal_width = self._documentBackend._document.idealWidth() + VisualSpace * 2
@@ -1156,13 +1060,11 @@ class Column(QObject):
             self.resizeRequested.emit(QSizeF(ideal_width, self._geom.height()))
 
     def _updateCachedRow(self, row_index):
-        assert(0 <= row_index < len(self._cache))
-
         row_data = RowData()
         row_data.html = '<div class="row">'
-        column_count = self.model.columnCount(row_index)
+        column_count = self.frameModel.columnCount(row_index)
         for column_index in range(column_count):
-            index = self.model.toSourceIndex(self.model.index(row_index, column_index))
+            index = self.frameModel.toSourceIndex(self.frameModel.index(row_index, column_index))
             index_data = IndexData(index)
             index_data.firstCharIndex = len(row_data.text)
             index_data.firstHtmlCharIndex = len(row_data.html)
@@ -1196,11 +1098,6 @@ class Column(QObject):
         self._cache[row_index] = row_data
 
     def _onFrameScrolled(self, new_first_row, old_first_row):
-        if self._cache is None:
-            return
-        else:
-            self._adjustCacheRows()
-
         # do we have any rows that can be kept in cache?
         if new_first_row > old_first_row and new_first_row < old_first_row + len(self._cache):
             # frame is scrolled down, we can copy some rows from bottom to top
@@ -1212,10 +1109,9 @@ class Column(QObject):
                 # remove first scrolled_by rows from document
                 self._documentBackend.removeRows(0, scrolled_by)
                 self._documentBackend.insertRows(-1, scrolled_by)
-            self._documentDirty = True
 
-            for row in range(scrolled_by):
-                self._invalidateRow(valid_rows + row)
+            self._cache[valid_rows:valid_rows+scrolled_by] = [None] * scrolled_by
+            self._documentDirty = True
         elif new_first_row < old_first_row and new_first_row + len(self._cache) > old_first_row:
             # frame is scrolled up, we can copy some rows from top to bottom
             scrolled_by = old_first_row - new_first_row
@@ -1227,46 +1123,41 @@ class Column(QObject):
                 self._documentBackend.removeRows(valid_rows, scrolled_by)
                 # and insert some rows into beginning
                 self._documentBackend.insertRows(0, scrolled_by)
-            self._documentDirty = True
 
-            for row in range(scrolled_by):
-                self._invalidateRow(row)
+            self._cache[0:scrolled_by] = [None] * scrolled_by
+            self._documentDirty = True
         else:
             # unfortunately... we should totally reset cache
-            self._invalidateCache()
+            self._cache = [None] * self._visibleRows
+            self._documentBackend.invalidate()
+
         self.updateRequested.emit()
 
     def _onFrameResized(self, new_frame_size, old_frame_size):
-        if self._cache is None:
-            return
-        else:
-            self._adjustCacheRows()
+        if len(self._cache) > new_frame_size:
+            self._cache = self._cache[:new_frame_size]
+        elif len(self._cache) < new_frame_size:
+            self._cache += [None] * (new_frame_size - len(self._cache))
 
-        if new_frame_size < old_frame_size:
-            # just remove some rows...
-            if self._documentBackend.generated:
+        if self._documentBackend.generated:
+            if new_frame_size < old_frame_size:
+                # just remove some rows...
                 self._documentBackend.removeRows(new_frame_size, old_frame_size - new_frame_size)
-        else:
-            # add new rows and initialize them
-            if self._documentBackend.generated:
+            else:
+                # add new rows and initialize them
                 self._documentBackend.insertRows(-1, new_frame_size - old_frame_size)
+            self._documentDirty = True
 
         self.updateRequested.emit()
 
-    def _onDataChanged(self, first_index, last_index):
-        current_row = first_index.row
-        while current_row <= last_index.row:
-            self._invalidateRow(current_row)
-            current_row += 1
+    def _onRowsUpdated(self, first_row, row_count):
+        self._cache[first_row:first_row + row_count] = [None] * row_count
+        self._documentDirty = True
         self.updateRequested.emit()
 
     def isIndexVisible(self, index, full_visible=False):
-        if not index or index.model is not self.model and index.model is not self.sourceModel:
-            return False
-
-        index = self.model.fromSourceIndex(index)
-        rows_count = self.fullVisibleRows if full_visible else self.visibleRows
-        return bool(self.model.toSourceIndex(index) and index.row < rows_count)
+        index = self.frameModel.toFrameIndex(index)
+        return (bool(index) and index.row < self._fullVisibleRows) if full_visible else bool(index)
 
     def createDocumentTemplate(self):
         document = QTextDocument()
@@ -1278,30 +1169,22 @@ class Column(QObject):
             .cell-mod {{
                 color: {mod_color};
             }}
-
-            .highlight {{
-                color: green;
-            }}
         """.format(mod_color=self._theme.modifiedTextColor.name()))
 
         return document
-
-    def removeIndex(self, index):
-        pos = index.data(ColumnModel.EditorPositionRole)
-        size = index.data(ColumnModel.DataSizeRole)
-        if pos < 0 or size < 0:
-            raise ValueError()
-        self.editor.remove(pos, size)
 
     @property
     def validator(self):
         return self._validator
 
     def rectForRow(self, row_index):
-        return self._documentBackend.rectForRow(row_index)
+        return self._documentBackend.rectForRow(row_index).translated(self.documentOrigin)
 
 
 def _translate(x, dx, dy=0):
+    if isinstance(dx, (QPoint, QPointF)):
+        return _translate(x, dx.x(), dx.y())
+
     if hasattr(x, 'translated'):
         return x.translated(QPointF(dx, dy))
     elif isinstance(x, (QPoint, QPointF)):
@@ -1353,7 +1236,7 @@ class HexWidget(QWidget):
 
         self._theme = DefaultTheme
         self._editor = editor
-        self._columns = list()
+        self._columns = []
         self._leadingColumn = None
         self._caretPosition = 0
         self._selections = []
@@ -1365,10 +1248,10 @@ class HexWidget(QWidget):
         self._cursorVisible = False
         self._cursorOffset = 0
         self._cursorTimer = None
-        self._blockCursor = False
+        self._blockCursor = globalSettings[appsettings.HexWidget_BlockCursor]
         self._insertMode = True
 
-        self._showHeader = True
+        self._showHeader = globalSettings[appsettings.HexWidget_ShowHeader]
         self._dx = 0
 
         self._contextMenu = QMenu()
@@ -1404,9 +1287,6 @@ class HexWidget(QWidget):
         self.editor.isModifiedChanged.connect(self.isModifiedChanged, Qt.QueuedConnection)
 
         globalSettings.settingChanged.connect(self._onSettingChanged)
-
-    def loadSettings(self, settings):
-        self.showHeader = settings[appsettings.HexWidget_ShowHeader]
 
     def saveSettings(self, settings):
         settings[appsettings.HexWidget_ShowHeader] = self.showHeader
@@ -1461,7 +1341,7 @@ class HexWidget(QWidget):
             self._updateCursorOffset()
 
     def caretIndex(self, column):
-        return column.sourceModel.indexFromPosition(self.caretPosition) if column is not None else ModelIndex()
+        return column.dataModel.indexFromPosition(self.caretPosition) if column is not None else ModelIndex()
 
     def insertColumn(self, model, at_index=-1):
         if model is not None:
@@ -1477,7 +1357,7 @@ class HexWidget(QWidget):
 
             column.updateRequested.connect(self._onColumnUpdateRequested)
             column.resizeRequested.connect(self._onColumnResizeRequested)
-            column.headerResizeRequested.connect(self._adjustHeaderHeights)
+            column.headerResized.connect(self._adjustHeaderHeights)
 
             if self._leadingColumn is None:
                 self._leadingColumn = column
@@ -1490,7 +1370,7 @@ class HexWidget(QWidget):
         self.insertColumn(model)
 
     def columnFromIndex(self, index):
-        return utils.first(cd for cd in self._columns if cd.sourceModel is index.model or cd.model is index.model)
+        return utils.first(cd for cd in self._columns if cd.dataModel is index.model or cd.frameModel is index.model)
 
     def _columnToAbsolute(self, column, d):
         if column is None:
@@ -1553,8 +1433,7 @@ class HexWidget(QWidget):
 
         # header border
         if self.showHeader:
-            painter.drawLine(QLineF(0, self.headerHeight, self.view.width(), self.headerHeight))
-
+            painter.drawLine(self._absoluteToWidget(QLineF(0, self.headerHeight, self.view.width(), self.headerHeight)))
 
     def _wheel(self, event):
         if event.orientation() == Qt.Vertical:
@@ -1565,33 +1444,31 @@ class HexWidget(QWidget):
         event.accept()
 
     def scroll(self, row_delta):
-        """Delta is number of rows to scroll by. Negative means scroll up, positive - down."""
+        """Delta is number of rows to scroll by. Negative means scroll up, positive - down.
+        Scrolls by as much rows as possible."""
         if row_delta and self._leadingColumn is not None:
             new_first_row = self.leadingColumn.firstVisibleRow + row_delta
-            model_row_count = self._leadingColumn.sourceModel.rowCount()
-            if new_first_row < 0:
-                new_first_row = 0
-            elif model_row_count >= 0 and new_first_row >= model_row_count:
-                new_first_row = model_row_count - 1
-            self.scrollToLeadingColumnRow(new_first_row)
+            self.scrollToLeadingColumnRow(new_first_row, correct=True)
 
     def scrollToLeadingColumnRow(self, first_row, correct=False):
+        """Scrolls to given row. If :correct: is True, will adjust too small or too big :first_row: to closest
+        allowed values; otherwise will do nothing when :first_row: is invalid.
+        """
+
+        if 0 <= self._leadingColumn.dataModel.rowCount() <= first_row:
+            if correct:
+                first_row = self.leadingColumn.dataModel.rowCount() - 1
+            else:
+                return
         if first_row < 0:
             if correct:
                 first_row = 0
             else:
                 return
-        elif self.leadingColumn.sourceModel.rowCount() >= 0:
-            if first_row >= self.leadingColumn.sourceModel.rowCount():
-                if correct:
-                    first_row = self.leadingColumn.sourceModel.rowCount() - 1
-                else:
-                    return
 
         self.leadingColumn.scrollToFirstRow(first_row)
         self.syncColumnsFrames()
         self._updateScrollBars()
-        self.update()
 
     def syncColumnsFrames(self, sync_row=0):
         for column in self._columns:
@@ -1599,10 +1476,10 @@ class HexWidget(QWidget):
 
     def syncColumnFrame(self, column, sync_row=0):
         if self.leadingColumn is not None and column is not None and column is not self.leadingColumn:
-            editor_position = self.leadingColumn.model.index(sync_row, 0).data(ColumnModel.EditorPositionRole)
+            editor_position = self.leadingColumn.frameModel.index(sync_row, 0).data(ColumnModel.EditorPositionRole)
             if editor_position is not None:
                 # position frame of non-leading column so same data will be on same row
-                sync_index = column.sourceModel.indexFromPosition(editor_position)
+                sync_index = column.dataModel.indexFromPosition(editor_position)
                 column_first_row = sync_index.row - sync_row if sync_index.row >= sync_row else 0
                 column.scrollToFirstRow(column_first_row)
 
@@ -1619,7 +1496,9 @@ class HexWidget(QWidget):
 
     def isIndexVisible(self, index, full_visible=True):
         column = self.columnFromIndex(index)
-        return bool(column is not None and column.isIndexVisible(index, full_visible))
+        if column is not None:
+            return bool(column is not None and column.isIndexVisible(index, full_visible))
+        return False
 
     def _resize(self, event):
         for column in self._columns:
@@ -1632,7 +1511,7 @@ class HexWidget(QWidget):
         should_show = self._shouldShowVScroll
         if should_show:
             lc = self._leadingColumn
-            max_value = max(lc.sourceModel.realRowCount() - 1, lc.firstVisibleRow)
+            max_value = max(lc.dataModel.realRowCount() - 1, lc.firstVisibleRow)
             self.vScrollBar.setRangeLarge(0, max_value)
             self.vScrollBar.setPageStepLarge(lc.visibleRows)
             # self.vScrollBar.setSingleStepLarge(1)
@@ -1655,7 +1534,7 @@ class HexWidget(QWidget):
         lc = self._leadingColumn
         if lc is None:
             return False
-        model = lc.sourceModel
+        model = lc.dataModel
         return lc.firstVisibleRow > 0 or model.realRowCount() > lc.visibleRows or (0 < model.realRowCount() <= lc.firstVisibleRow)
 
     @property
@@ -1676,7 +1555,7 @@ class HexWidget(QWidget):
         self.view.update()
 
     def _onColumnUpdateRequested(self):
-        self.view.update()
+        self.view.update(self.sender().geometry.toRect())
 
     def _onColumnResizeRequested(self, new_size):
         column_to_resize = self.sender()
@@ -1761,13 +1640,13 @@ class HexWidget(QWidget):
                     # remove index from the left
                     index_to_remove = index.previous
                     if index_to_remove and not index_to_remove.virtual:
-                        self._leadingColumn.removeIndex(index_to_remove)
+                        self._leadingColumn.dataModel.removeIndex(index_to_remove)
                 else:
                     changed_text = original_text[:cursor_offset-1] + original_text[cursor_offset:]
             elif event.text():
                 if self._cursorOffset == 0 and self._insertMode:
                     # when in insert mode, pressing character key when cursor is at beginning of cell inserts new cell
-                    original_text = self._leadingColumn.sourceModel.defaultIndexData(Qt.EditRole)
+                    original_text = self._leadingColumn.dataModel.defaultIndexData(Qt.EditRole)
                     insert_new_cell = True
 
                 if self._leadingColumn.regular:
@@ -1785,7 +1664,7 @@ class HexWidget(QWidget):
                 if insert_new_cell:
                     self.editor.beginComplexAction()
                     try:
-                        index = self._leadingColumn.sourceModel.insertIndex(index)
+                        index = self._leadingColumn.dataModel.insertIndex(index)
                         index.setData(changed_text)
                     finally:
                         self.editor.endComplexAction()
@@ -1810,11 +1689,11 @@ class HexWidget(QWidget):
         self._goCaretIndex(self.caretIndex(self._leadingColumn).previous)
 
     def _goRowStart(self):
-        self._goCaretIndex(self._leadingColumn.sourceModel.index(self.caretIndex(self._leadingColumn).row, 0))
+        self._goCaretIndex(self._leadingColumn.dataModel.index(self.caretIndex(self._leadingColumn).row, 0))
 
     def _goRowEnd(self):
         index = self.caretIndex(self._leadingColumn)
-        self._goCaretIndex(self._leadingColumn.sourceModel.lastRowIndex(index.row))
+        self._goCaretIndex(self._leadingColumn.dataModel.lastRowIndex(index.row))
 
     def _goScreenDown(self):
         self._goByRows(self._leadingColumn.fullVisibleRows - 1)
@@ -1829,10 +1708,10 @@ class HexWidget(QWidget):
         self._goByRows(1)
 
     def _goEditorStart(self):
-        self._goCaretIndex(self._leadingColumn.sourceModel.index(0, 0))
+        self._goCaretIndex(self._leadingColumn.dataModel.index(0, 0))
 
     def _goEditorEnd(self):
-        self._goCaretIndex(self._leadingColumn.sourceModel.lastRealIndex)
+        self._goCaretIndex(self._leadingColumn.dataModel.lastRealIndex)
 
     def _goNextCharacter(self):
         caret_index = self.caretIndex(self._leadingColumn)
@@ -1885,13 +1764,13 @@ class HexWidget(QWidget):
         if not caret_index:
             return
 
-        data_model = self._leadingColumn.sourceModel
+        data_model = self._leadingColumn.dataModel
 
         new_row = caret_index.row + row_count
+        if data_model.rowCount() >= 0 and new_row >= data_model.rowCount():
+            new_row = data_model.rowCount() - 1
         if new_row < 0:
             new_row = 0
-        elif data_model.rowCount() >= 0 and new_row >= data_model.rowCount():
-            new_row = data_model.rowCount() - 1
 
         new_caret_index = None
         while not new_caret_index and data_model.hasRow(new_row):
@@ -1934,13 +1813,12 @@ class HexWidget(QWidget):
             new_index = self.caretIndex(self._leadingColumn)
             if old_index:
                 # we will not select virtual indexes, but keep selection starting point for them
-                if not old_index.virtual and not new_index.virtual:
-                    # if we do not have any selection, create new one
-                    if not self._selectStartIndex:
-                        self._selectStartIndex = old_index
-                        self._selectStartColumn = self.leadingColumn
+                if not self._selectStartIndex:
+                    self._selectStartIndex = old_index
+                    self._selectStartColumn = self.leadingColumn
 
-                    # and create selection between stored position and current caret position
+                if not old_index.virtual and not new_index.virtual:
+                    # create selection between stored position and current caret position
                     sel = self.selectionBetweenIndexes(new_index, self._selectStartIndex)
                     self.selections = [sel]
             else:
@@ -1993,7 +1871,7 @@ class HexWidget(QWidget):
                     self.leadingColumn = column
 
                 pos = self._absoluteToColumn(column, mouse_pos)
-                activated_index = column.model.toSourceIndex(column.indexFromPoint(pos))
+                activated_index = column.frameModel.toSourceIndex(column.indexFromPoint(pos))
                 if activated_index:
                     if self._editMode and activated_index == self.caretIndex(column):
                         # move cursor position to nearest character
@@ -2019,13 +1897,16 @@ class HexWidget(QWidget):
             column = self.columnFromPoint(mouse_pos)
             if column is not None:
                 hover_index = column.indexFromPoint(self._absoluteToColumn(column, mouse_pos))
-                if hover_index and column.sourceModel.rowCount() < 0 and hover_index > column.sourceModel.lastRealIndex:
-                    hover_index = column.sourceModel.lastRealIndex
+                if hover_index and hover_index > column.dataModel.lastRealIndex:
+                    hover_index = column.dataModel.lastRealIndex
 
                 if hover_index:
                     selections = None
+
+                    # check if current mouse position is close to point where selection was started.
+                    # In this case remove selection.
                     if hover_index == self.caretIndex(column):
-                        index_rect = self._columnToAbsolute(column, column.getRectForIndex(hover_index))
+                        index_rect = self._columnToAbsolute(column, column.rectForIndex(hover_index))
                         hit_rect = QRectF(QPointF(), QSizeF(index_rect.width() // 2, index_rect.height() // 2))
                         hit_rect.moveCenter(self._mousePressPoint)
                         if hit_rect.contains(mouse_pos):
@@ -2036,7 +1917,6 @@ class HexWidget(QWidget):
 
                     if selections != self._selections:
                         self.selections = selections
-                        self.view.update()
 
             self._stopScrollTimer()
 
@@ -2094,7 +1974,7 @@ class HexWidget(QWidget):
         import hex.columnproviders as columnproviders
 
         if self._leadingColumn is not None:
-            dlg = columnproviders.ConfigureColumnDialog(self, self, self._leadingColumn.sourceModel)
+            dlg = columnproviders.ConfigureColumnDialog(self, self, self._leadingColumn.dataModel)
             dlg.exec_()
 
     _eventHandlers = {
@@ -2135,7 +2015,7 @@ class HexWidget(QWidget):
 
     def startEditMode(self):
         if not self._editMode and not self._editor.readOnly:
-            caret_index = self._leadingColumn.sourceModel.indexFromPosition(self._caretPosition)
+            caret_index = self._leadingColumn.dataModel.indexFromPosition(self._caretPosition)
             # check if current index is editable
             if caret_index and caret_index.flags & ColumnModel.FlagEditable:
                 self._editMode = True
@@ -2316,7 +2196,7 @@ class HexWidget(QWidget):
                 column_index = leading_column_index
             else:
                 column_index = leading_column_index + 1
-            address_column_model.linkedModel = self._leadingColumn.sourceModel
+            address_column_model.linkedModel = self._leadingColumn.dataModel
             self.insertColumn(address_column_model, column_index)
 
     @property
@@ -2338,7 +2218,7 @@ class HexWidget(QWidget):
 
     def reset(self):
         for column in self._columns:
-            column.sourceModel.reset()
+            column.dataModel.reset()
 
     @property
     def url(self):

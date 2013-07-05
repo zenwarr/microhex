@@ -30,6 +30,15 @@ class Application(QApplication):
         translate.initApplicationTranslation()
 
     def startUp(self):
+        # hidden option --test, should not be visible in argument list...
+        if '--test' in self.arguments():
+            try:
+                from hex.test import runTests
+                runTests()
+            except ImportError:
+                pass
+            return
+
         self.argparser = argparse.ArgumentParser(prog='microhex',
                                                  description=utils.tr('Crossplatform hex-editing software'))
         self.argparser.add_argument('--version', '-v', action='version', version='{0} {1}'.format(self.applicationName(),
@@ -57,17 +66,9 @@ class Application(QApplication):
             # maybe we should retranslate application
             translate.initApplicationTranslation()
 
-        # hidden option --test, should not be visible in argument list...
-        if '--test' in self.arguments():
-            try:
-                from hex.test import runTests
-                runTests()
-            except ImportError:
-                pass
-        else:
-            from hex.mainwin import MainWindow
-            self.mainWindow = MainWindow(self.args.files)
-            self.mainWindow.show()
+        from hex.mainwin import MainWindow
+        self.mainWindow = MainWindow(self.args.files)
+        self.mainWindow.show()
 
     def shutdown(self):
         for s in (settings.globalSettings(), settings.globalQuickSettings()):

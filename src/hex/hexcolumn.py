@@ -33,13 +33,15 @@ class HexColumnModel(hexwidget.ColumnModel):
         return -1
 
     def columnCount(self, row):
-        return self.columnsOnRow
+        return self.columnsOnRow if row >= 0 else -1
 
     def realRowCount(self):
         return self._rowCount
 
     def realColumnCount(self, row):
-        if row + 1 == self._rowCount:
+        if row < 0:
+            return -1
+        elif row + 1 == self._rowCount:
             count = (len(self.editor) % self.bytesOnRow) // self.valuecodec.dataSize
             return count or self.columnsOnRow
         elif row >= self._rowCount:
@@ -80,17 +82,20 @@ class HexColumnModel(hexwidget.ColumnModel):
         if not index or index.model is not self:
             raise ValueError('invalid index')
 
-        position = self.indexData(index, self.EditorPositionRole)
-        if position is None or position < 0:
-            raise ValueError('invalid position for index resolved')
+        if role == Qt.EditRole:
+            position = self.indexData(index, self.EditorPositionRole)
+            if position is None or position < 0:
+                raise ValueError('invalid position for index resolved')
 
-        raw_data = self.valuecodec.encode(self.formatter.parse(value))
-        current_data = self.indexData(index, self.EditorDataRole)
+            raw_data = self.valuecodec.encode(self.formatter.parse(value))
+            current_data = self.indexData(index, self.EditorDataRole)
 
-        if raw_data == current_data:
-            return
+            if raw_data == current_data:
+                return
 
-        self.editor.writeSpan(position, editor.DataSpan(self.editor, raw_data))
+            self.editor.writeSpan(position, editor.DataSpan(self.editor, raw_data))
+        else:
+            raise ValueError('data for given role is not writable')
 
     def indexFlags(self, index):
         flags = hexwidget.ColumnModel.FlagEditable
@@ -100,6 +105,10 @@ class HexColumnModel(hexwidget.ColumnModel):
                                                                    index.data(self.DataSizeRole)):
             flags |= hexwidget.ColumnModel.FlagModified
         return flags
+
+    def headerData(self, section, role=Qt.DisplayRole):
+        if role == Qt.DisplayRole and 0 <= section < self.columnsOnRow:
+            return formatters.IntegerFormatter(base=16).format(section * self.valuecodec.dataSize)
 
     @property
     def bytesOnRow(self):
