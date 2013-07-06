@@ -674,6 +674,10 @@ class TextDocumentBackend(ColumnDocumentBackend):
         return QRectF()
 
     def cursorPositionInIndex(self, index, cursor_offset):
+        index = self._column.frameModel.toFrameIndex(index)
+        if not index:
+            return QPointF()
+
         index_data = self._column.getIndexCachedData(index)
         if cursor_offset < 0 or cursor_offset >= len(index_data.text):
             return QPointF()
