@@ -37,7 +37,7 @@ class Application(QApplication):
                 runTests()
             except ImportError:
                 pass
-            return
+            return False
 
         self.argparser = argparse.ArgumentParser(prog='microhex',
                                                  description=utils.tr('Crossplatform hex-editing software'))
@@ -70,6 +70,8 @@ class Application(QApplication):
         self.mainWindow = MainWindow(self.args.files)
         self.mainWindow.show()
 
+        return True
+
     def shutdown(self):
         for s in (settings.globalSettings(), settings.globalQuickSettings()):
             try:
@@ -83,9 +85,12 @@ def main():
     os.chdir(os.path.expanduser('~'))
 
     app = Application()
-    app.startUp()
+    started = app.startUp()
     try:
-        return_code = app.exec_()
+        if started:
+            return_code = app.exec_()
+        else:
+            return_code = 0
     finally:
         app.shutdown()
     return return_code

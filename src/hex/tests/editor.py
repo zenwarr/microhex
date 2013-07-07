@@ -1,7 +1,10 @@
 import unittest
+import threading
+import time
 from hex.editor import Editor, Span, DataSpan, FillSpan, OutOfBoundsError
 from hex.devices import BufferDevice, deviceFromBytes
 from PyQt4.QtCore import QByteArray
+import hex.utils as utils
 
 
 class TestEditor(unittest.TestCase):
@@ -53,7 +56,7 @@ class TestEditor(unittest.TestCase):
         self.assertEqual(len(editor.spans[1]), 3)
         self.assertEqual(len(editor.spans[2]), 8)
 
-        self.assertEqual(editor.readAtEnd(5, 20), b', World!')
+        self.assertEqual(editor.read(5, 20), b', World!')
 
         self.assertTrue(editor.isModified)
 
@@ -194,3 +197,111 @@ class TestEditor(unittest.TestCase):
         self.assertTrue(editor.isModified)
         self.assertTrue(editor.isRangeModified(5, 1))
 
+    def test3(self):
+        editor = Editor(deviceFromBytes(QByteArray(b'Hello, World!')))
+
+        cursor = editor.createReadCursor()
+        with cursor.activate():
+            self.assertEqual(cursor[0], b'H')
+            self.assertEqual(cursor[0:2], b'He')
+            self.assertEqual(cursor.minimal, 0)
+            self.assertEqual(cursor.maximal, -1)
+
+            cursor.position = 5
+            self.assertEqual(cursor[0], b',')
+            self.assertEqual(cursor[0:3], b', W')
+            self.assertEqual(cursor[-1:3], b'o, W')
+            self.assertEqual(cursor.minimal, -5)
+            self.assertEqual(cursor.maximal, -1)
+
+            self.assertEqual(cursor[-20:100], b'Hello, World!')
+            self.assertEqual(cursor[100:10], b'')
+            self.assertEqual(cursor[100:110], b'')
+
+        cursor = editor.createWriteCursor()
+        with cursor.activate():
+            cursor[0] = b'h'
+            self.assertEqual(editor.readAll(), b'hello, World!')
+
+            cursor[0:5] = b'World'
+            self.assertEqual(editor.readAll(), b'World, World!')
+
+            cursor[-4:3] = b'?'
+            self.assertEqual(editor.readAll(), b'?ld, World!')
+
+            for ch in b'?ld, World!':
+                self.assertEqual(cursor.get()[0], ch)
+
+            cursor.position = 0
+            cursor[0:len(editor)] = b''
+            self.assertEqual(editor.readAll(), b'')
+
+            for ch in 'Hello, World!':
+                cursor.put(bytes(ch, encoding='ascii'))
+
+            self.assertEqual(editor.readAll(), b'Hello, World!')
+
+    def test4(self):
+        lock = utils.ReadWriteLock()
+
+        lock.acquireRead()
+        lock.acquireWrite()
+
+        lock.releaseWrite()
+        lock.releaseRead()
+
+        lock.acquireWrite()
+        lock.acquireRead()
+
+        lock.releaseRead()
+        lock.releaseWrite()
+
+        lock.acquireRead()
+        locked = False
+
+        def another_thread():
+            nonlocal locked
+
+            lock.acquireRead()
+            locked = True
+            lock.releaseRead()
+
+        threading.Thread(target=another_thread).start()
+        time.sleep(1)
+        self.assertTrue(locked)
+
+        locked = False
+        # still locked for read by main thread
+
+        def another_thread2():
+            nonlocal locked
+
+            lock.acquireWrite()
+            locked = True
+            lock.releaseWrite()
+
+        threading.Thread(target=another_thread2).start()
+        time.sleep(1)
+        self.assertFalse(locked)
+        lock.releaseRead()
+        time.sleep(1)
+        self.assertTrue(locked)
+
+        lock.acquireRead()
+
+        def another_thread3():
+            nonlocal locked
+
+            lock.acquireRead()
+            lock.acquireWrite()
+            locked = True
+            lock.releaseWrite()
+            lock.releaseRead()
+
+        locked = False
+        threading.Thread(target=another_thread3).start()
+        time.sleep(1)
+        self.assertFalse(locked)
+        lock.releaseRead()
+        time.sleep(1)
+        self.assertTrue(locked)

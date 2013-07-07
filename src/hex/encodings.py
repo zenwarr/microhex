@@ -98,7 +98,7 @@ class SingleByteEncodingCodec(QtProxyCodec):
         return 1
 
     def decodeCharacter(self, editor, position):
-        data = editor.readAtEnd(position, 1)
+        data = editor.read(position, 1)
         return self._qcodec.toUnicode(data)
 
     def encodeString(self, text):
@@ -126,7 +126,7 @@ class Utf16Codec(QtProxyCodec):
     def findCharacterStart(self, editor, position):
         import hex.valuecodecs as valuecodecs
 
-        word = editor.readAtEnd(position, 2)
+        word = editor.read(position, 2)
         if len(word) != 2:
             raise PartialCharacterError()
 
@@ -152,7 +152,7 @@ class Utf16Codec(QtProxyCodec):
             return 2
 
     def decodeCharacter(self, editor, position):
-        data = editor.readAtEnd(self.findCharacterStart(editor, position), self.getCharacterSize(editor, position))
+        data = editor.read(self.findCharacterStart(editor, position), self.getCharacterSize(editor, position))
         decoded = self._qcodec.toUnicode(data)
         return decoded
 
@@ -189,7 +189,7 @@ class Utf32Codec(QtProxyCodec):
         return 4
 
     def decodeCharacter(self, editor, position):
-        data = editor.readAtEnd(position, 4)
+        data = editor.read(position, 4)
         if len(data) != 4:
             raise PartialCharacterError()
         return self._qcodec.toUnicode(data)

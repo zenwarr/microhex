@@ -61,7 +61,7 @@ class HexColumnModel(hexwidget.ColumnModel):
             if editor_position >= len(self.editor):
                 return ('.' if role == Qt.DisplayRole else '0') * self._cellTextSize
             else:
-                editor_data = self.editor.readAtEnd(editor_position, self.valuecodec.dataSize)
+                editor_data = self.editor.read(editor_position, self.valuecodec.dataSize)
                 try:
                     decoded = self.valuecodec.decode(editor_data)
                 except struct.error:

@@ -91,10 +91,10 @@ class CharColumnModel(hexwidget.ColumnModel):
             if is_virtual:
                 return bytes()
             try:
-                return self.editor.readAtEnd(self.codec.findCharacterStart(self.editor, position),
+                return self.editor.read(self.codec.findCharacterStart(self.editor, position),
                                          self.codec.getCharacterSize(self.editor, position))
             except encodings.EncodingError:
-                return self.editor.readAtEnd(position, 1)
+                return self.editor.read(position, 1)
         elif role in (Qt.DisplayRole, Qt.EditRole):
             if is_virtual:
                 return '.' if role == Qt.DisplayRole else ''

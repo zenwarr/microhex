@@ -1,5 +1,6 @@
 import copy
 import threading
+import contextlib
 from PyQt4.QtCore import pyqtSignal, QObject
 import hex.utils as utils
 
@@ -199,7 +200,7 @@ class Editor(QObject):
     def __init__(self, device):
         QObject.__init__(self)
         self._device = device
-        self._lock = threading.RLock()
+        self._lock = utils.ReadWriteLock()
         self._totalLength = 0
         self._currentUndoAction = None
         self._disableUndo = False
@@ -253,13 +254,13 @@ class Editor(QObject):
     def readOnly(self, new_read_only):
         self._readOnly = new_read_only
 
-    def read(self, position, length):
+    def readExact(self, position, length):
         """Read :length: bytes starting from byte with index :position:
         Always returns byte array with :length: elements.
         Raises OutOfBoundsError if :position: is not valid or there are less than :length: bytes available.
         """
 
-        with self.lock:
+        with self.lock.read:
             if position < 0 or length < 0 or position + length > len(self):
                 raise OutOfBoundsError()
             spans, left_offset, right_offset = self.spansInRange(position, length)
@@ -270,23 +271,24 @@ class Editor(QObject):
                 result += spans[span_index].read(pos, size)
             return result
 
-    def readAtEnd(self, position, length):
-        """Reads data at :position:, but unlike Editor.read, does not fails when no :length: bytes can be read. It
-        reads as much data as possible but maximal :length: bytes. Still fails if :position: is invalid
-        or :length: < 0.
+    def read(self, position, length):
+        """Reads data at :position:, but unlike Editor.readExact, does not fail when no :length: bytes can be read. It
+        reads as much data as possible but maximal :length: bytes.
         """
 
-        with self.lock:
-            if position < 0 or length < 0 or position >= len(self):
+        with self.lock.read:
+            if position < 0 or length < 0:
                 raise OutOfBoundsError()
-            if position + length > len(self):
+            if position >= len(self):
+                return b''
+            elif position + length > len(self):
                 length = len(self) - position
-            return self.read(position, length)
+            return self.readExact(position, length)
 
     def readAll(self):
         """Read all data from editor. Can raise MemoryError, of course."""
 
-        with self.lock:
+        with self.lock.read:
             result = bytes()
             for span in self.spans:
                 result += span.read(0, len(span))
@@ -295,14 +297,14 @@ class Editor(QObject):
     @property
     def spans(self):
         """Copy of list of all spans in editor"""
-        with self.lock:
+        with self.lock.read:
             return copy.deepcopy(self._spans)
 
     def spanAtPosition(self, position):
         """Get span that holds byte at :position:.
         """
 
-        with self.lock:
+        with self.lock.read:
             span_index = self._findSpanIndex(position)[0]
             return self._spans[span_index] if span_index >= 0 else None
 
@@ -313,7 +315,7 @@ class Editor(QObject):
         First span in returned list always holds byte at :position: and last span holds byte at :position: + :length: - 1
         """
 
-        with self.lock:
+        with self.lock.read:
             if position < 0 or length < 0 or position + length > len(self):
                 raise OutOfBoundsError()
 
@@ -331,7 +333,7 @@ class Editor(QObject):
         Returns list of spans.
         """
 
-        with self.lock:
+        with self.lock.write:
             if position < 0 or length < 0 or position + length > len(self):
                 raise OutOfBoundsError()
 
@@ -356,67 +358,67 @@ class Editor(QObject):
         Raises OutOfBoundsError is :position: is negative.
         """
 
-        if self._readOnly:
-            raise ReadOnlyError()
+        with self.lock.write:
+            if self._readOnly:
+                raise ReadOnlyError()
 
-        if position != 0 and self._freezeSize:
-            raise FreezeSizeError()
+            if position != 0 and self._freezeSize:
+                raise FreezeSizeError()
 
-        old_length = self._totalLength
-        self._insertSpans(position, spans, fill_pattern, undo)
+            old_length = self._totalLength
+            self._insertSpans(position, spans, fill_pattern, undo)
 
-        if self._canQuickSave:
-            if position < old_length or any(isinstance(span, DeviceSpan) and span._device is self._device for span in spans):
-                self._canQuickSave = False
+            if self._canQuickSave:
+                if position < old_length or any(isinstance(span, DeviceSpan) and span._device is self._device for span in spans):
+                    self._canQuickSave = False
 
-        if old_length != self._totalLength:
-            self.resized.emit(self._totalLength)
-            self.dataChanged.emit(min(old_length, position), -1)
+            if old_length != self._totalLength:
+                self.resized.emit(self._totalLength)
+                self.dataChanged.emit(min(old_length, position), -1)
 
     def _insertSpans(self, position, spans, fill_pattern=DefaultFillPattern, undo=False):
-        with self.lock:
-            if position < 0 or (fill_pattern is None and position > self._totalLength):
-                raise OutOfBoundsError()
+        if position < 0 or (fill_pattern is None and position > self._totalLength):
+            raise OutOfBoundsError()
 
-            if not spans:
-                return
+        if not spans:
+            return
 
-            if position < self._totalLength:
-                self.splitSpans(position)
-                span_index = self._findSpanIndex(position)[0]
-            elif position == self._totalLength:
-                span_index = len(self._spans)
-            else:
-                spans = [FillSpan(self, copy.deepcopy(fill_pattern), position - self._totalLength)] + spans
-                position = self._totalLength
-                span_index = len(self._spans)
+        if position < self._totalLength:
+            self.splitSpans(position)
+            span_index = self._findSpanIndex(position)[0]
+        elif position == self._totalLength:
+            span_index = len(self._spans)
+        else:
+            spans = [FillSpan(self, copy.deepcopy(fill_pattern), position - self._totalLength)] + spans
+            position = self._totalLength
+            span_index = len(self._spans)
 
-            insertion_length = 0
-            for span in spans:
-                cloned_span = span.clone(self)
-                if not undo:
-                    cloned_span.savepoint = -1
-
-                self._spans.insert(span_index, cloned_span)
-                span_index += 1
-                insertion_length += len(cloned_span)
-
-            self._totalLength += insertion_length
-
+        insertion_length = 0
+        for span in spans:
+            cloned_span = span.clone(self)
             if not undo:
-                self.addAction(InsertAction(self, position, spans, insertion_length))
-            self._incrementAtomicOperationIndex(-1 if undo else 1)
+                cloned_span.savepoint = -1
+
+            self._spans.insert(span_index, cloned_span)
+            span_index += 1
+            insertion_length += len(cloned_span)
+
+        self._totalLength += insertion_length
+
+        if not undo:
+            self.addAction(InsertAction(self, position, spans, insertion_length))
+        self._incrementAtomicOperationIndex(-1 if undo else 1)
 
     def appendSpan(self, span):
         """Shorthand method for Editor.insertSpan
         """
-        with self.lock:
+        with self.lock.write:
             self.insertSpan(self._totalLength, span)
 
     def appendSpans(self, spans):
         """Shorthand method for Editor.insertSpans
         """
-        with self.lock:
+        with self.lock.write:
             self.insertSpans(self._totalLength, spans)
 
     def writeSpan(self, position, span, fill_pattern=DefaultFillPattern):
@@ -431,35 +433,36 @@ class Editor(QObject):
         if :position: > self.length. Raises OutOfBoundsError if position < 0.
         """
 
-        if self._readOnly:
-            raise ReadOnlyError()
+        with self.lock.write:
+            if self._readOnly:
+                raise ReadOnlyError()
 
-        if position < 0:
-            raise OutOfBoundsError()
+            if position < 0:
+                raise OutOfBoundsError()
 
-        old_length = self._totalLength
-        write_length = self._calculateSpansLength(spans)
-        old_can_quick_save = self._canQuickSave
+            old_length = self._totalLength
+            write_length = self._calculateSpansLength(spans)
+            old_can_quick_save = self._canQuickSave
 
-        if self._freezeSize and position + write_length > self._totalLength:
-            raise FreezeSizeError()
+            if self._freezeSize and position + write_length > self._totalLength:
+                raise FreezeSizeError()
 
-        try:
-            self.beginComplexAction(utils.tr('writing {0} bytes at position {1}').format(write_length, position))
-            if position < self._totalLength:
-                self._remove(position, write_length)
-            self._insertSpans(position, spans, fill_pattern)
-        finally:
-            self.endComplexAction()
+            try:
+                self.beginComplexAction(utils.tr('writing {0} bytes at position {1}').format(write_length, position))
+                if position < self._totalLength:
+                    self._remove(position, write_length)
+                self._insertSpans(position, spans, fill_pattern)
+            finally:
+                self.endComplexAction()
 
-        if old_can_quick_save:
-            self._canQuickSave = not any(isinstance(span, DeviceSpan) and span._device is self._device for span in spans)
+            if old_can_quick_save:
+                self._canQuickSave = not any(isinstance(span, DeviceSpan) and span._device is self._device for span in spans)
 
-        if self._totalLength != old_length:
-            self.resized.emit(self._totalLength)
-            self.dataChanged.emit(min(position, old_length), -1)
-        else:
-            self.dataChanged.emit(position, write_length)
+            if self._totalLength != old_length:
+                self.resized.emit(self._totalLength)
+                self.dataChanged.emit(min(position, old_length), -1)
+            else:
+                self.dataChanged.emit(position, write_length)
 
     def _remove(self, position, length, undo=False):
         if position < 0:
@@ -486,37 +489,41 @@ class Editor(QObject):
         Raises OutOfBoundsError if position is negative or :position: >= self.length.
         """
 
-        if self._readOnly:
-            raise ReadOnlyError()
-        if self._freezeSize and length != 0:
-            raise FreezeSizeError()
+        with self.lock.write:
+            if self._readOnly:
+                raise ReadOnlyError()
+            if self._freezeSize and length != 0:
+                raise FreezeSizeError()
 
-        old_length = self._totalLength
+            old_length = self._totalLength
 
-        self._remove(position, length, undo)
+            self._remove(position, length, undo)
 
-        if self._canQuickSave and position + length < old_length:
-            self._canQuickSave = False
+            if self._canQuickSave and position + length < old_length:
+                self._canQuickSave = False
 
-        self.resized.emit(len(self))
-        self.dataChanged.emit(position, -1)
+            self.resized.emit(len(self))
+            self.dataChanged.emit(position, -1)
 
     @property
     def isModified(self):
-        return self._currentAtomicOperationIndex != self._savepoint
+        with self.lock.read:
+            return self._currentAtomicOperationIndex != self._savepoint
 
     @isModified.setter
     def isModified(self, new_modified):
-        if self.isModified != new_modified:
-            self._incrementAtomicOperationIndex()
+        with self.lock.write:
+            if self.isModified != new_modified:
+                self._incrementAtomicOperationIndex()
 
     def isRangeModified(self, position, length=1):
-        # if not self._modified:
-        #     return False
-        return any(s.savepoint != self._savepoint for s in self.spansInRange(position, length)[0])
+        with self.lock.read:
+            if not self.isModified:
+                return False
+            return any(s.savepoint != self._savepoint for s in self.spansInRange(position, length)[0])
 
     def __len__(self):
-        with self.lock:
+        with self.lock.read:
             return self._totalLength
 
     def _findSpanIndex(self, position):
@@ -554,7 +561,7 @@ class Editor(QObject):
         return result
 
     def clear(self):
-        with self.lock:
+        with self.lock.write:
             if self._spans:
                 self._spans = []
                 self._totalLength = 0
@@ -563,75 +570,84 @@ class Editor(QObject):
 
     def bytesRange(self, range_start, range_end):
         """Allows iterating over bytes in given range"""
-        for position in range(range_start, range_end):
-            try:
-                yield self.read(position, 1)
-            except OutOfBoundsError:
-                break
+        with self.lock.read:
+            for position in range(range_start, range_end):
+                try:
+                    yield self.read(position, 1)
+                except OutOfBoundsError:
+                    break
 
     def addAction(self, action):
-        if not self._disableUndo:
-            old_can_undo = self.canUndo()
-            self._currentUndoAction.addAction(action)
-            if old_can_undo != self.canUndo():
-                self.canUndoChanged.emit(self.canUndo())
+        with self.lock.write:
+            if not self._disableUndo:
+                old_can_undo = self.canUndo()
+                self._currentUndoAction.addAction(action)
+                if old_can_undo != self.canUndo():
+                    self.canUndoChanged.emit(self.canUndo())
 
     def beginComplexAction(self, title=''):
-        if not self._disableUndo:
-            complex_action = ComplexAction(self, title)
-            self._currentUndoAction.addAction(complex_action)
-            self._currentUndoAction = complex_action
+        with self.lock.write:
+            if not self._disableUndo:
+                complex_action = ComplexAction(self, title)
+                self._currentUndoAction.addAction(complex_action)
+                self._currentUndoAction = complex_action
 
     def endComplexAction(self):
-        if not self._disableUndo:
-            if self._currentUndoAction.parent is None:
-                raise ValueError('cannot end complex action while one is not started')
-            self._currentUndoAction = self._currentUndoAction.parent
+        with self.lock.write:
+            if not self._disableUndo:
+                if self._currentUndoAction.parent is None:
+                    raise ValueError('cannot end complex action while one is not started')
+                self._currentUndoAction = self._currentUndoAction.parent
 
     def undo(self):
-        old_can_undo = self.canUndo()
-        old_can_redo = self.canRedo()
-        try:
-            self._disableUndo = True
-            self._currentUndoAction.undoStep()
-        finally:
-            self._disableUndo = False
-        if old_can_undo != self.canUndo():
-            self.canUndoChanged.emit(self.canUndo())
-        if old_can_redo != self.canRedo():
-            self.canRedoChanged.emit(self.canRedo())
+        with self.lock.write:
+            old_can_undo = self.canUndo()
+            old_can_redo = self.canRedo()
+            try:
+                self._disableUndo = True
+                self._currentUndoAction.undoStep()
+            finally:
+                self._disableUndo = False
+            if old_can_undo != self.canUndo():
+                self.canUndoChanged.emit(self.canUndo())
+            if old_can_redo != self.canRedo():
+                self.canRedoChanged.emit(self.canRedo())
 
     def redo(self, branch=None):
-        old_can_undo = self.canUndo()
-        old_can_redo = self.canRedo()
-        try:
-            self._disableUndo = True
-            self._currentUndoAction.redoStep(branch)
-        finally:
-            self._disableUndo = False
-        if old_can_undo != self.canUndo():
-            self.canUndoChanged.emit(self.canUndo())
-        if old_can_redo != self.canRedo():
-            self.canRedoChanged.emit(self.canRedo())
+        with self.lock.write:
+            old_can_undo = self.canUndo()
+            old_can_redo = self.canRedo()
+            try:
+                self._disableUndo = True
+                self._currentUndoAction.redoStep(branch)
+            finally:
+                self._disableUndo = False
+            if old_can_undo != self.canUndo():
+                self.canUndoChanged.emit(self.canUndo())
+            if old_can_redo != self.canRedo():
+                self.canRedoChanged.emit(self.canRedo())
 
     def canUndo(self):
-        return self._currentUndoAction.canUndo()
+        with self.lock.read:
+            return self._currentUndoAction.canUndo()
 
     def canRedo(self):
-        return self._currentUndoAction.canRedo()
+        with self.lock.read:
+            return self._currentUndoAction.canRedo()
 
     def alternativeBranches(self):
-        return self._currentUndoAction.alternativeBranches()
+        with self.lock.read:
+            return self._currentUndoAction.alternativeBranches()
 
     @property
     def canQuickSave(self):
-        with self.lock:
+        with self.lock.read:
             return self._canQuickSave
 
     def save(self, device=None, switch_device=False):
         """Completely writes all editor data into given device.
         """
-        with self.lock:
+        with self.lock.write:
             if device is None:
                 if not self.isModified:
                     return
@@ -651,30 +667,35 @@ class Editor(QObject):
             else:
                 saver.complete()
                 if device is self._device or switch_device:
-                    self.setSavepoint()
+                    self._setSavepoint()
 
                 if switch_device:
                     for span in self._spans:
                         if isinstance(span, DeviceSpan) and span._device is self._device:
                             span._device = device
-                    self.setSavepoint()
+                    self._setSavepoint()
 
                     self._device = device
                     self.urlChanged.emit(self.url)
 
-    def setSavepoint(self):
-        with self.lock:
-            if self._savepoint != self._currentAtomicOperationIndex:
-                self._savepoint = self._currentAtomicOperationIndex
-                for span in self._spans:
-                    span.savepoint = self._savepoint
-                self.isModifiedChanged.emit(self.isModified)
+    def _setSavepoint(self):
+        if self._savepoint != self._currentAtomicOperationIndex:
+            self._savepoint = self._currentAtomicOperationIndex
+            for span in self._spans:
+                span.savepoint = self._savepoint
+            self.isModifiedChanged.emit(self.isModified)
 
     def _incrementAtomicOperationIndex(self, increment=1):
         was_modified = self.isModified
         self._currentAtomicOperationIndex += increment
         if was_modified != self.isModified:
             self.isModifiedChanged.emit(self.isModified)
+
+    def createReadCursor(self, initial_position=0):
+        return EditorCursor(self, initial_position, read_only=True)
+
+    def createWriteCursor(self, initial_position=0):
+        return EditorCursor(self, initial_position, read_only=False)
 
 
 class AbstractUndoAction(object):
@@ -797,4 +818,154 @@ class ComplexAction(AbstractUndoAction):
     @property
     def wasModified(self):
         return bool(self.currentStep >= 0 and self.subActions[self.currentStep]._wasModified)
+
+
+class AbstractCursor(object):
+    def __init__(self):
+        self._length = -1
+        self._pos = 0
+        self._activationCount = 0
+
+    @property
+    def minimal(self):
+        return -self._pos
+
+    @property
+    def maximal(self):
+        if self._length < 0:
+            return -1
+        else:
+            return self._length - self._pos - 1
+
+    @property
+    def position(self):
+        return self._pos
+
+    @position.setter
+    def position(self, new_pos):
+        if new_pos != self._pos:
+            if self._pos < self.minimal:
+                self._pos = self.minimal
+            elif self.maximal >= 0 and self._pos > self.maximal:
+                self._pos = self.maximal
+            else:
+                self._pos = new_pos
+
+    @property
+    def readOnly(self):
+        raise NotImplementedError()
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            return self.read(index.start, index.stop)
+        else:
+            return self.read(index, index + 1)
+
+    def _adjustSlice(self, start, stop):
+        return max(start, self.minimal), (min(stop, self.maximal + 1) if self.maximal >= 0 else stop)
+
+    def read(self, start, stop):
+        if not self.isActive:
+            raise CursorInactiveError()
+        start, stop = self._adjustSlice(start, stop)
+        if start >= stop:
+            return b''
+        return self._read(start, stop)
+
+    def _read(self, start, stop):
+        raise NotImplementedError()
+
+    def __setitem__(self, index, value):
+        if isinstance(index, slice):
+            self.write(index.start, index.stop, value)
+        else:
+            self.write(index, index + 1, value)
+
+    def write(self, start, stop, value):
+        if not self.isActive:
+            raise CursorInactiveError()
+        if self.readOnly:
+            raise ReadOnlyError()
+        start, stop = self._adjustSlice(start, stop)
+        if start > stop:
+            return
+        return self._write(start, stop, value)
+
+    def _write(self, start, stop, value):
+        raise NotImplementedError()
+
+    def _toOffset(self, value):
+        return self._pos + value
+
+    @contextlib.contextmanager
+    def activate(self):
+        self._activate()
+        try:
+            yield
+        finally:
+            self._deactivate()
+
+    @property
+    def isActive(self):
+        return self._activationCount > 0
+
+    def _activate(self):
+        self._activationCount += 1
+
+    def _deactivate(self):
+        self._activationCount -= 1
+
+    def get(self, length=1):
+        data = self[0:length]
+        self._pos += len(data)
+        return data
+
+    def put(self, data):
+        self[0:0] = data
+        self._pos += len(data)
+
+
+class CursorInactiveError(IOError):
+    pass
+
+
+class EditorCursor(AbstractCursor):
+    def __init__(self, editor, position, read_only):
+        AbstractCursor.__init__(self)
+        self._editor = editor
+        self._readOnly = read_only
+        self._pos = position
+        self._spanIndex = -1
+
+    @property
+    def readOnly(self):
+        return self._readOnly
+
+    def _read(self, start, stop):
+        return self._editor.read(self._toOffset(start), stop - start)
+
+    def _write(self, start, stop, value):
+        if stop - start == len(value):
+            self._editor.writeSpan(self._toOffset(start), DataSpan(self._editor, value))
+        else:
+            self._editor.beginComplexAction()
+            try:
+                self._editor.remove(self._toOffset(start), stop - start)
+                self._editor.insertSpan(self._toOffset(start), DataSpan(self._editor, value))
+            finally:
+                self._editor.endComplexAction()
+
+    def _activate(self):
+        if self._readOnly:
+            self._editor.lock.acquireRead()
+        else:
+            self._editor.lock.acquireWrite()
+        AbstractCursor._activate(self)
+
+    def _deactivate(self):
+        if self._readOnly:
+            self._editor.lock.releaseRead()
+        else:
+            self._editor.lock.releaseWrite()
+        AbstractCursor._deactivate(self)
 

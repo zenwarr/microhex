@@ -225,14 +225,14 @@ class ColumnModel(AbstractModel):
     def editor(self, new_editor):
         if self._editor is not new_editor:
             if self._editor is not None:
-                with self._editor.lock:
+                with self._editor.lock.read:
                     self._editor.dataChanged.disconnect(self.onEditorDataChanged)
                     self._editor.resized.disconnect(self.onEditorDataResized)
                 self._editor = None
 
             self._editor = new_editor
             if new_editor is not None:
-                with new_editor.lock:
+                with new_editor.lock.read:
                     new_editor.dataChanged.connect(self.onEditorDataChanged, Qt.QueuedConnection)
                     new_editor.resized.connect(self.onEditorDataResized, Qt.QueuedConnection)
 
