@@ -21,6 +21,10 @@ class HexColumnModel(hexwidget.ColumnModel):
         self.columnsOnRow = columns_on_row
         self.reset()
 
+    @property
+    def regularCellDataSize(self):
+        return self.valuecodec.dataSize
+
     def reset(self):
         self._rowCount = 0
         self._bytesOnRow = self.columnsOnRow * self.valuecodec.dataSize
@@ -114,11 +118,11 @@ class HexColumnModel(hexwidget.ColumnModel):
     def bytesOnRow(self):
         return self._bytesOnRow
 
-    def onEditorDataChanged(self, start, length):
+    def _onEditorDataChanged(self, start, length):
         length = length if length >= 0 else len(self.editor) - start
         self.dataChanged.emit(self.indexFromPosition(start), self.indexFromPosition(start + length - 1))
 
-    def onEditorDataResized(self, new_size):
+    def _onEditorDataResized(self, new_size):
         self._updateRowCount()
         self.dataResized.emit(self.lastRealIndex)
 

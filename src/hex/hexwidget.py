@@ -108,6 +108,26 @@ class ModelIndex(object):
             return NotImplemented
         return self.__gt__(other) or self.__eq__(other)
 
+    def __add__(self, value):
+        if not isinstance(value, int):
+            return NotImplemented
+        elif not self.valid:
+            return ModelIndex()
+        elif value == 0:
+            return self
+        else:
+            return self.model.incrementedIndex(self, value)
+
+    def __sub__(self, value):
+        if isinstance(value, int):
+            return self.__add__(-value)
+        elif isinstance(value, ModelIndex):
+            if not (self.valid and value.valid and value.model is self.model):
+                raise ValueError()
+            return self.model.subtractIndexes(self, value)
+        else:
+            return NotImplemented
+
     @property
     def next(self):
         if not self.valid:
@@ -193,10 +213,19 @@ class AbstractModel(QObject):
     def setIndexData(self, index, value, role=Qt.EditRole):
         return False
 
+    def incrementedIndex(self, index, value):
+        return NotImplemented
+
+    def subtractIndexes(self, left, right):
+        return NotImplemented
+
 
 class ColumnModel(AbstractModel):
     dataChanged = pyqtSignal(ModelIndex, ModelIndex)  # first argument is first changed index, second is last one
     dataResized = pyqtSignal(ModelIndex)  # argument is new last real index
+    indexesInserted = pyqtSignal(ModelIndex, int)  # first argument is first inserted index
+    indexesRemoved = pyqtSignal(ModelIndex, int)  # first argument is index BEFORE which indexes was removed, or
+                                                  # ModelIndex is indexes was removed from model beginning
     modelReset = pyqtSignal()  # emitted when model is totally resetted
     headerDataChanged = pyqtSignal()
 
@@ -226,15 +255,19 @@ class ColumnModel(AbstractModel):
         if self._editor is not new_editor:
             if self._editor is not None:
                 with self._editor.lock.read:
-                    self._editor.dataChanged.disconnect(self.onEditorDataChanged)
-                    self._editor.resized.disconnect(self.onEditorDataResized)
+                    self._editor.dataChanged.disconnect(self._onEditorDataChanged)
+                    self._editor.resized.disconnect(self._onEditorDataResized)
+                    self._editor.bytesInserted.disconnect(self._onEditorBytesInserted)
+                    self._editor.bytesRemoved.disconnect(self._onEditorBytesRemoved)
                 self._editor = None
 
             self._editor = new_editor
             if new_editor is not None:
                 with new_editor.lock.read:
-                    new_editor.dataChanged.connect(self.onEditorDataChanged, Qt.QueuedConnection)
-                    new_editor.resized.connect(self.onEditorDataResized, Qt.QueuedConnection)
+                    new_editor.dataChanged.connect(self._onEditorDataChanged, Qt.QueuedConnection)
+                    new_editor.resized.connect(self._onEditorDataResized, Qt.QueuedConnection)
+                    new_editor.bytesInserted.connect(self._onEditorBytesInserted, Qt.QueuedConnection)
+                    new_editor.bytesRemoved.connect(self._onEditorBytesRemoved, Qt.QueuedConnection)
 
     @property
     def isInfinite(self):
@@ -265,11 +298,25 @@ class ColumnModel(AbstractModel):
             row -= 1
         return index
 
-    def onEditorDataChanged(self, start, length):
+    def _onEditorDataChanged(self, start, length):
         pass
 
-    def onEditorDataResized(self, new_size):
+    def _onEditorDataResized(self, new_size):
         pass
+
+    def _onEditorBytesInserted(self, position, length):
+        if self.regular and hasattr(self, 'regularCellDataSize'):
+            start_index = self.indexFromPosition(position)
+            if start_index:
+                self.indexesInserted.emit(start_index, length // self.regularCellDataSize)
+
+    def _onEditorBytesRemoved(self, position, length):
+        if self.regular and hasattr(self, 'regularCellDataSize'):
+            if position == 0:
+                start_index = ModelIndex()
+            else:
+                start_index = self.indexFromPosition(position - 1)
+            self.indexesRemoved.emit(start_index, length // self.regularCellDataSize)
 
     @property
     def preferSpaced(self):
@@ -315,6 +362,24 @@ class ColumnModel(AbstractModel):
         """Validator is used to check values entered by user while editing column data. If createValidator returns
         None, all values will be considered valid."""
         return None
+
+    def incrementedIndex(self, index, value):
+        if self.regular and hasattr(self, 'regularCellDataSize'):
+            if not index or index.model is not self:
+                return ModelIndex()
+            elif value == 0:
+                return index
+            pos = self.indexData(index, self.EditorPositionRole) + value * self.regularCellDataSize
+            return self.indexFromPosition(pos)
+        return NotImplemented
+
+    def subtractIndexes(self, left, right):
+        if self.regular and hasattr(self, 'regularCellDataSize'):
+            l = min(left, right)
+            r = max(left, right)
+            diff = (r.data(self.EditorPositionRole) - l.data(self.EditorPositionRole)) // self.regularCellDataSize
+            return diff if left > right else -diff
+        return NotImplemented
 
 
 def index_range(start_index, end_index, include_last=False):
@@ -992,10 +1057,10 @@ class Column(QObject):
                 painter.drawRect(caret_rect)
 
     def paintSelection(self, paint_data, is_leading, selection):
-        if selection is not None and len(selection) > 0:
+        if selection:
             painter = paint_data.painter
-            for sel_polygon in self.polygonsForRange(self.dataModel.indexFromPosition(selection.start),
-                                        self.dataModel.indexFromPosition(selection.start + len(selection) - 1)):
+            for sel_polygon in self.polygonsForRange(self.dataModel.indexFromPosition(selection.startPosition),
+                                        self.dataModel.indexFromPosition(selection.startPosition + selection.size - 1)):
                 painter.setBrush(self._theme.selectionBackgroundColor)
                 painter.setPen(QPen(QBrush(self._theme.selectionBorderColor), 2.0))
                 painter.drawPolygon(sel_polygon)
@@ -1247,6 +1312,7 @@ class HexWidget(QWidget):
         self._selectStartColumn = None
         self._selectStartIndex = None
         self._scrollTimer = None
+        self._hasSelection = False
 
         self._editMode = False
         self._cursorVisible = False
@@ -1823,25 +1889,21 @@ class HexWidget(QWidget):
 
                 if not old_index.virtual and not new_index.virtual:
                     # create selection between stored position and current caret position
-                    sel = self.selectionBetweenIndexes(new_index, self._selectStartIndex)
-                    self.selections = [sel]
+                    sel_range = self.selectionBetweenIndexes(new_index, self._selectStartIndex)
+                    self.selectionRanges = [sel_range]
             else:
                 self._selectStartIndex = None
                 self._selectStartColumn = None
 
     def selectionBetweenIndexes(self, first, second):
         if not first or not second:
-            return Selection()
+            return SelectionRange(self)
 
         first_index = min(first, second)
         last_index = max(first, second)
 
-        sel_start = first_index.data(ColumnModel.EditorPositionRole)
-        sel_end = last_index.data(ColumnModel.EditorPositionRole) + last_index.data(ColumnModel.DataSizeRole)
-        if sel_end > len(self.editor) and len(self.editor):
-            sel_end = len(self.editor)
-
-        return Selection(sel_start, sel_end - sel_start)
+        return SelectionRange(self, first_index, last_index - first_index, SelectionRange.UnitCells,
+                              SelectionRange.BoundToData, first_index.model)
 
     def columnIndex(self, column):
         index = 0
@@ -1920,7 +1982,7 @@ class HexWidget(QWidget):
                         selections = [self.selectionBetweenIndexes(self._selectStartIndex, hover_index)]
 
                     if selections != self._selections:
-                        self.selections = selections
+                        self.selectionRanges = selections
 
             self._stopScrollTimer()
 
@@ -2001,17 +2063,47 @@ class HexWidget(QWidget):
         return False
 
     @property
-    def selections(self):
+    def selectionRanges(self):
         return self._selections
 
-    @selections.setter
-    def selections(self, new_selections):
+    @selectionRanges.setter
+    def selectionRanges(self, new_selections):
         if self._selections != new_selections:
-            old_has_selection = self.hasSelection
-            self._selections = new_selections
-            if old_has_selection != self.hasSelection:
-                self.hasSelectionChanged.emit(self.hasSelection)
+            self.clearSelection()
+            for sel in new_selections:
+                self.addSelectionRange(sel)
+
+    def clearSelection(self):
+        while self._selections:
+            self.removeSelectionRange(self._selections[0])
+
+    def removeSelectionRange(self, selection):
+        sel_index = self._selections.index(selection)
+        selection.resized.disconnect(self._onSelectionUpdated)
+        selection.moved.disconnect(self._onSelectionUpdated)
+        del self._selections[sel_index]
+
+        self._checkHasSelectionChanged()
+        self.view.update()
+
+    def addSelectionRange(self, selection):
+        if selection not in self._selections:
+            selection.resized.connect(self._onSelectionUpdated)
+            selection.moved.connect(self._onSelectionUpdated)
+            self._selections.append(selection)
+
+            self._checkHasSelectionChanged()
             self.view.update()
+
+    def _onSelectionUpdated(self):
+        self._checkHasSelectionChanged()
+        self.view.update()
+
+    def _checkHasSelectionChanged(self):
+        has_selection = self.hasSelection
+        if has_selection != self._hasSelection:
+            self._hasSelection = has_selection
+            self.hasSelectionChanged.emit(has_selection)
 
     @property
     def editMode(self):
@@ -2038,19 +2130,18 @@ class HexWidget(QWidget):
             self._cursorTimer = None
             self.view.update()
 
-    def clearSelection(self):
-        self.selections = []
-
     def selectAll(self):
         if self.editor is not None:
-            self.selections = [Selection(0, len(self._editor))]
+            sel_range = SelectionRange(self, self._leadingColumn.dataModel.firstIndex, ModelIndex(),
+                                   SelectionRange.UnitCells, SelectionRange.BoundToData)
+            self.selectionRanges = [sel_range]
 
     def copy(self):
         if len(self._selections) == 1:
             from hex.clipboard import Clipboard
 
             clb = Clipboard()
-            clb.copy(self.editor, self._selections[0].start, self._selections[0].length)
+            clb.copy(self.editor, self._selections[0].startPosition, self._selections[0].size)
 
     def paste(self):
         from hex.clipboard import Clipboard
@@ -2087,7 +2178,7 @@ class HexWidget(QWidget):
             self._editor.beginComplexAction()
             try:
                 for selection in self._selections:
-                    self._editor.remove(selection.start, selection.length)
+                    self._editor.remove(selection.startPosition, selection.size)
             finally:
                 self._editor.endComplexAction()
 
@@ -2176,12 +2267,11 @@ class HexWidget(QWidget):
 
     def removeSelected(self):
         for selection in self._selections:
-            self.editor.remove(selection.start, selection.length)
-        self.selections = []
+            self.editor.remove(selection.startPosition, selection.size)
 
     def fillSelected(self, pattern):
         for selection in self._selections:
-            self.editor.writeSpan(selection.start, FillSpan(self.editor, pattern, selection.length))
+            self.editor.writeSpan(selection.startPosition, FillSpan(self.editor, pattern, selection.size))
         self.view.update()
 
     def removeActiveColumn(self):
@@ -2205,7 +2295,7 @@ class HexWidget(QWidget):
 
     @property
     def hasSelection(self):
-        return bool(self._selections)
+        return bool(self._selections) and any(bool(sel) for sel in self._selections)
 
     @property
     def readOnly(self):
@@ -2237,27 +2327,138 @@ class HexWidget(QWidget):
                 self.scrollToLeadingColumnRow(new_first_row)
 
 
-class Selection(object):
-    def __init__(self, start=0, length=0):
-        self.start = start
-        self.length = length
+class DataRange(QObject):
+    """DataRange can be based on bytes or on cells. When based on bytes, size of range always remains the same, and
+    when based on cells, size is automatically adjusted when column data is changed to always represent data occupied
+    by given number of cells.
+    Also DataRange can be bound to data or to positions. When bound to positions, range always will start at given position
+    despite editor data modifications. When bound to data, inserting or removing data before range start shifts range
+    start position; removing data inside range leads to collapsing range size.
+    """
 
-    def __len__(self):
-        return self.length
+    UnitBytes, UnitCells = range(2)
+    BoundToData, BoundToPosition = range(2)
+
+    moved = pyqtSignal(object, object)
+    resized = pyqtSignal(int, int)
+
+    def __init__(self, hexwidget, start=-1, length=0, unit=UnitBytes, bound_to=BoundToData, model=None):
+        """When unit == UnitBytes, start should be editor position (int), if unit == UnitCells, start should be ModelIndex
+        """
+        QObject.__init__(self)
+        self._hexWidget = hexwidget
+        self._start = start
+        self._length = length
+        self._unit = unit
+        self._boundTo = bound_to
+        self._model = model
+        self._size = self._getSize()
+
+        if bound_to == self.BoundToData:
+            if unit == self.UnitBytes:
+                self._hexWidget.editor.bytesInserted.connect(self._onInserted)
+                self._hexWidget.editor.bytesRemoved.connect(self._onRemoved)
+            else:
+                self._start.model.indexesInserted.connect(self._onInserted)
+                self._start.model.indexesRemoved.connect(self._onRemoved)
+
+        if unit == self.UnitCells:
+            self._start.model.dataChanged.connect(self._onIndexesDataChanged)
+
+    @property
+    def start(self):
+        return self._start
+
+    @start.setter
+    def start(self, new_start):
+        if self._start != new_start:
+            old_start = self._start
+            self._start = new_start
+            self.moved.emit(new_start, old_start)
+
+    @property
+    def startPosition(self):
+        if not self.valid:
+            return -1
+        elif self._unit == self.UnitBytes:
+            return self._start
+        elif self._start:
+            return self._start.data(ColumnModel.EditorPositionRole)
+
+    @property
+    def length(self):
+        return self._length
+
+    @length.setter
+    def length(self, new_len):
+        if self._length != new_len:
+            old_size = self._size
+            self._length = new_len
+            self._size = self._getSize()
+            if self._size != old_size:
+                self.resized.emit(self._size, old_size)
+
+    @property
+    def size(self):
+        return self._size
+
+    @property
+    def valid(self):
+        return not ((self._unit == self.UnitCells and not self._start) or (self._unit == self.UnitBytes and self._start < 0))
+
+    def __bool__(self):
+        return self.valid and bool(self.length)
+
+    def _getSize(self):
+        if self._unit == self.UnitBytes and self._length >= 0:
+            return self._length
+        elif self._start:
+            last_index = self._start + self._length
+            if last_index:
+                last_pos = last_index.data(ColumnModel.EditorPositionRole) + last_index.data(ColumnModel.DataSizeRole)
+                return last_pos - self._start.data(ColumnModel.EditorPositionRole)
+            elif self._start:
+                return len(self._start.model.editor) - self._start.data(ColumnModel.EditorPositionRole)
+        return 0
+
+    def _onInserted(self, start, length):
+        if self._boundTo == self.BoundToData and self.valid:
+            if start < self._start:
+                self.start += length
+            elif self.start <= start < self.start + self.length:
+                self.length += length
+
+    def _onRemoved(self, start, length):
+        if self._boundTo == self.BoundToData and self.valid:
+            if not start or start < self.start:
+                new_start = self.start - length
+                if self._unit == self.UnitBytes:
+                    self.start = max(0, new_start)
+                else:
+                    self._start = self._model.firstIndex if not new_start else new_start
+            elif self.start <= start < self.start + self.length:
+                self.length = max(0, self.length - length)
+
+    def _onIndexesDataChanged(self, first_index, last_index):
+        if self._boundTo == self.BoundToData and self._unit == self.UnitCells and self.valid and self.length > 0:
+            if not (first_index > self._start + self.length or last_index < self._start):
+                old_size = self._size
+                self._size = self._getSize()
+                if old_size != self._size:
+                    self.resized.emit(self._size, old_size)
 
     def __eq__(self, other):
-        if not isinstance(other, Selection):
+        if not isinstance(other, DataRange):
             return NotImplemented
-        return self.start == other.start and self.length == other.length
+        return (self._unit == other._unit and self._start == other._start and self._length == other._length and
+                    self._boundTo == other._boundTo)
 
     def __ne__(self, other):
-        if not isinstance(other, Selection):
+        if not isinstance(other, DataRange):
             return NotImplemented
-        return not self.__eq__(other)
+        return not self.__eq__(self, other)
 
 
-def _check_square_hit(square_center, square_size, point):
-    square_size = square_size / 2
-    if abs(square_center.x() - point.x()) <= square_size and abs(square_center.y() - point.y()) <= square_size:
-        return True
-    return False
+class SelectionRange(DataRange):
+    pass
+

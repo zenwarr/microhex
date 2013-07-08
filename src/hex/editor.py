@@ -191,6 +191,8 @@ class FillSpan(Span):
 
 class Editor(QObject):
     dataChanged = pyqtSignal(int, int)  # first argument is start position, second one - length
+    bytesInserted = pyqtSignal(int, int)
+    bytesRemoved = pyqtSignal(int, int)
     resized = pyqtSignal(int)
     canUndoChanged = pyqtSignal(bool)
     canRedoChanged = pyqtSignal(bool)
@@ -374,6 +376,7 @@ class Editor(QObject):
 
             if old_length != self._totalLength:
                 self.resized.emit(self._totalLength)
+                self.bytesInserted.emit(position, self._totalLength - old_length)
                 self.dataChanged.emit(min(old_length, position), -1)
 
     def _insertSpans(self, position, spans, fill_pattern=DefaultFillPattern, undo=False):
@@ -495,6 +498,9 @@ class Editor(QObject):
             if self._freezeSize and length != 0:
                 raise FreezeSizeError()
 
+            if length == 0:
+                return
+
             old_length = self._totalLength
 
             self._remove(position, length, undo)
@@ -503,6 +509,7 @@ class Editor(QObject):
                 self._canQuickSave = False
 
             self.resized.emit(len(self))
+            self.bytesRemoved.emit(position, length)
             self.dataChanged.emit(position, -1)
 
     @property

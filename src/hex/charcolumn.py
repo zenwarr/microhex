@@ -22,6 +22,10 @@ class CharColumnModel(hexwidget.ColumnModel):
         self._rowCount = 0
         self.reset()
 
+    @property
+    def regularCellDataSize(self):
+        return self.codec.unitSize
+
     def reset(self):
         # number of bytes on row should be multiplier of codec.unitSize
         if self.bytesOnRow % self.codec.unitSize:
@@ -166,11 +170,11 @@ class CharColumnModel(hexwidget.ColumnModel):
     def regular(self):
         return True
 
-    def onEditorDataChanged(self, start, length):
+    def _onEditorDataChanged(self, start, length):
         length = length if length >= 0 else len(self.editor) - start
         self.dataChanged.emit(self.indexFromPosition(start), self.indexFromPosition(start + length - 1))
 
-    def onEditorDataResized(self, new_size):
+    def _onEditorDataResized(self, new_size):
         self._updateRowCount()
         self.dataResized.emit(self.lastRealIndex)
 
