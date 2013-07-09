@@ -156,6 +156,10 @@ class ModelIndex(object):
 
         return prev_index
 
+    @property
+    def offset(self):
+        return self.model.indexOffset(self) if self else -1
+
 
 class AbstractModel(QObject):
     def __init__(self):
@@ -214,10 +218,24 @@ class AbstractModel(QObject):
         return False
 
     def incrementedIndex(self, index, value):
-        return NotImplemented
+        if index and index.model is self and index.offset >= 0:
+            if value == 0:
+                return index
+            return self.indexFromOffset(index.offset + value)
+        return ModelIndex()
 
     def subtractIndexes(self, left, right):
+        if left and right and left.model is self and right.model is self and left.offset >= 0 and right.offset >= 0:
+            left_offset = left.offset
+            right_offset = right.offset
+            return left_offset - right_offset
         return NotImplemented
+
+    def indexOffset(self, index):
+        raise NotImplementedError()
+
+    def indexFromOffset(self, offset):
+        raise NotImplementedError()
 
 
 class ColumnModel(AbstractModel):
@@ -363,23 +381,16 @@ class ColumnModel(AbstractModel):
         None, all values will be considered valid."""
         return None
 
-    def incrementedIndex(self, index, value):
+    def indexOffset(self, index):
         if self.regular and hasattr(self, 'regularCellDataSize'):
-            if not index or index.model is not self:
-                return ModelIndex()
-            elif value == 0:
-                return index
-            pos = self.indexData(index, self.EditorPositionRole) + value * self.regularCellDataSize
-            return self.indexFromPosition(pos)
-        return NotImplemented
+            if index and index.model is self:
+                return index.row * self.regularColumnCount + index.column
+        return -1
 
-    def subtractIndexes(self, left, right):
-        if self.regular and hasattr(self, 'regularCellDataSize'):
-            l = min(left, right)
-            r = max(left, right)
-            diff = (r.data(self.EditorPositionRole) - l.data(self.EditorPositionRole)) // self.regularCellDataSize
-            return diff if left > right else -diff
-        return NotImplemented
+    def indexFromOffset(self, offset):
+        if self.regular:
+            return self.indexFromPosition(self.regularCellDataSize * offset)
+        return ModelIndex()
 
 
 def index_range(start_index, end_index, include_last=False):
@@ -656,6 +667,8 @@ class TextDocumentBackend(ColumnDocumentBackend):
                 cursor.endEditBlock()
 
             self.documentUpdated.emit()
+        else:
+            self._column._renderDocumentData()
 
     @property
     def _documentBlockFormat(self):
@@ -957,9 +970,9 @@ class Column(QObject):
             rects[j - 1].moveBottom(rects[j - 1].bottom() + space / 2)
             rects[j].moveTop(rects[j].top() - space / 2)
 
-    def polygonsForRange(self, first_index, last_index):
+    def polygonsForRange(self, first_index, last_index, join_lines):
         """Return tuple of polygons covering range of indexes from first_index until last_index (last_index is also
-        included). Result tuple can include up to 2 polygons."""
+        included)."""
 
         first_index = self.frameModel.toSourceIndex(first_index)
         last_index = self.frameModel.toSourceIndex(last_index)
@@ -990,7 +1003,8 @@ class Column(QObject):
             if first_index.row == last_index.row:
                 return QPolygonF(QRectF(QPointF(r1.left(), row1_rect.top()), QPointF(r2.right(), row2_rect.bottom()))),
             elif first_index.row + 1 == last_index.row and r1.left() > r2.right():
-                self._alignRectangles((rect1, rect2))
+                if join_lines:
+                    self._alignRectangles((rect1, rect2))
                 return QPolygonF(rect1), QPolygonF(rect2)
             else:
                 rects = []
@@ -998,18 +1012,21 @@ class Column(QObject):
                     rects.append(self.rectForRow(row_index - self._firstVisibleRow))
 
                 rects = [rect1] + rects + [rect2]
-                self._alignRectangles(rects)
+                if join_lines:
+                    self._alignRectangles(rects)
 
-                polygon = QPolygonF()
-                for rect in rects:
-                    polygon.append(rect.topLeft())
-                    polygon.append(rect.bottomLeft())
+                    polygon = QPolygonF()
+                    for rect in rects:
+                        polygon.append(rect.topLeft())
+                        polygon.append(rect.bottomLeft())
 
-                for rect in reversed(rects):
-                    polygon.append(rect.bottomRight())
-                    polygon.append(rect.topRight())
+                    for rect in reversed(rects):
+                        polygon.append(rect.bottomRight())
+                        polygon.append(rect.topRight())
 
-                return polygon,
+                    return polygon,
+                else:
+                    return [QPolygonF(rect) for rect in rects]
 
     def indexFromPoint(self, point):
         point = _translate(point, -self.documentOrigin.x(), -self.documentOrigin.y())
@@ -1059,11 +1076,24 @@ class Column(QObject):
     def paintSelection(self, paint_data, is_leading, selection):
         if selection:
             painter = paint_data.painter
+            painter.setBrush(self._theme.selectionBackgroundColor)
+            painter.setPen(QPen(QBrush(self._theme.selectionBorderColor), 2.0))
             for sel_polygon in self.polygonsForRange(self.dataModel.indexFromPosition(selection.startPosition),
-                                        self.dataModel.indexFromPosition(selection.startPosition + selection.size - 1)):
-                painter.setBrush(self._theme.selectionBackgroundColor)
-                painter.setPen(QPen(QBrush(self._theme.selectionBorderColor), 2.0))
+                                        self.dataModel.indexFromPosition(selection.startPosition + selection.size - 1),
+                                        join_lines=True):
                 painter.drawPolygon(sel_polygon)
+
+    def paintHighlight(self, paint_data, is_leading, hl_range):
+        if hl_range and hl_range.backgroundColor is not None:
+            painter = paint_data.painter
+            back_color = hl_range.backgroundColor
+            back_color.setAlpha(100)
+            painter.setBrush(back_color)
+            painter.setPen(QPen(back_color))
+            for polygon in self.polygonsForRange(self.dataModel.indexFromPosition(hl_range.startPosition),
+                                                 self.dataModel.indexFromPosition(hl_range.startPosition + hl_range.size - 1),
+                                                 join_lines=False):
+                painter.drawPolygon(polygon)
 
     class HeaderItemData(object):
         def __init__(self):
@@ -1151,7 +1181,7 @@ class Column(QObject):
                     for css_class in cell_classes:
                         index_html = '<span class="{0}">{1}</span>'.format(css_class, prepared_text)
                 else:
-                    index_html = '<span>{0}</span>'.format(prepared_text)
+                    index_html = prepared_text
 
                 row_data.html += index_html
                 row_data.text += index_text
@@ -1159,7 +1189,7 @@ class Column(QObject):
 
             if self.spaced and column_index + 1 < column_count:
                 row_data.text += ' '
-                row_data.html += '<span> </span>'
+                row_data.html += '&nbsp;'
 
             row_data.items.append(index_data)
 
@@ -1349,6 +1379,8 @@ class HexWidget(QWidget):
         address_bar = AddressColumnModel(hex_column)
         self.appendColumn(address_bar)
         self.appendColumn(hex_column)
+
+        self.appendColumn(CharColumnModel(self.editor, encodings.getCodec('ISO 8859-1'), self.font()))
         self.appendColumn(CharColumnModel(self.editor, encodings.getCodec('UTF-16le'), self.font()))
         self.leadingColumn = self._columns[1]
 
@@ -1903,7 +1935,7 @@ class HexWidget(QWidget):
         last_index = max(first, second)
 
         return SelectionRange(self, first_index, last_index - first_index, SelectionRange.UnitCells,
-                              SelectionRange.BoundToData, first_index.model)
+                              SelectionRange.BoundToData)
 
     def columnIndex(self, column):
         index = 0
@@ -1961,7 +1993,7 @@ class HexWidget(QWidget):
             mouse_pos = self._widgetToAbsolute(event.posF())
 
             column = self.columnFromPoint(mouse_pos)
-            if column is not None:
+            if column is not None and column is self._selectStartColumn:
                 hover_index = column.indexFromPoint(self._absoluteToColumn(column, mouse_pos))
                 if hover_index and hover_index > column.dataModel.lastRealIndex:
                     hover_index = column.dataModel.lastRealIndex
@@ -2010,7 +2042,7 @@ class HexWidget(QWidget):
         self._stopScrollTimer()
         self._scrollTimer = QTimer()
         self._scrollTimer.timeout.connect(lambda: self.scroll(increment))
-        self._scrollTimer.start(200)
+        self._scrollTimer.start(50)
         self.scroll(increment)
 
     def _stopScrollTimer(self):
@@ -2081,6 +2113,7 @@ class HexWidget(QWidget):
         sel_index = self._selections.index(selection)
         selection.resized.disconnect(self._onSelectionUpdated)
         selection.moved.disconnect(self._onSelectionUpdated)
+        selection.updated.disconnect(self._onSelectionUpdated)
         del self._selections[sel_index]
 
         self._checkHasSelectionChanged()
@@ -2090,6 +2123,7 @@ class HexWidget(QWidget):
         if selection not in self._selections:
             selection.resized.connect(self._onSelectionUpdated)
             selection.moved.connect(self._onSelectionUpdated)
+            selection.updated.connect(self._onSelectionUpdated)
             self._selections.append(selection)
 
             self._checkHasSelectionChanged()
@@ -2341,17 +2375,18 @@ class DataRange(QObject):
 
     moved = pyqtSignal(object, object)
     resized = pyqtSignal(int, int)
+    updated = pyqtSignal()
 
-    def __init__(self, hexwidget, start=-1, length=0, unit=UnitBytes, bound_to=BoundToData, model=None):
+    def __init__(self, hexwidget, start=-1, length=0, unit=UnitBytes, bound_to=BoundToData):
         """When unit == UnitBytes, start should be editor position (int), if unit == UnitCells, start should be ModelIndex
         """
         QObject.__init__(self)
         self._hexWidget = hexwidget
-        self._start = start
+        self._start = start.offset if unit == self.UnitCells else start
         self._length = length
         self._unit = unit
         self._boundTo = bound_to
-        self._model = model
+        self._model = start.model if unit == self.UnitCells else None
         self._size = self._getSize()
 
         if bound_to == self.BoundToData:
@@ -2359,21 +2394,21 @@ class DataRange(QObject):
                 self._hexWidget.editor.bytesInserted.connect(self._onInserted)
                 self._hexWidget.editor.bytesRemoved.connect(self._onRemoved)
             else:
-                self._start.model.indexesInserted.connect(self._onInserted)
-                self._start.model.indexesRemoved.connect(self._onRemoved)
+                self._model.indexesInserted.connect(self._onInserted)
+                self._model.indexesRemoved.connect(self._onRemoved)
 
         if unit == self.UnitCells:
-            self._start.model.dataChanged.connect(self._onIndexesDataChanged)
+            self._model.dataChanged.connect(self._onIndexesDataChanged)
 
     @property
     def start(self):
-        return self._start
+        return self._model.indexFromOffset(self._start)
 
     @start.setter
     def start(self, new_start):
-        if self._start != new_start:
-            old_start = self._start
-            self._start = new_start
+        if self.start != new_start:
+            old_start = self.start
+            self._start = new_start.offset if self._unit == self.UnitCells else new_start
             self.moved.emit(new_start, old_start)
 
     @property
@@ -2382,8 +2417,9 @@ class DataRange(QObject):
             return -1
         elif self._unit == self.UnitBytes:
             return self._start
-        elif self._start:
-            return self._start.data(ColumnModel.EditorPositionRole)
+        else:
+            pos = self.start.data(ColumnModel.EditorPositionRole)
+            return pos if pos is not None else -1
 
     @property
     def length(self):
@@ -2404,44 +2440,59 @@ class DataRange(QObject):
 
     @property
     def valid(self):
-        return not ((self._unit == self.UnitCells and not self._start) or (self._unit == self.UnitBytes and self._start < 0))
+        return self._start >= 0
 
     def __bool__(self):
         return self.valid and bool(self.length)
 
     def _getSize(self):
-        if self._unit == self.UnitBytes and self._length >= 0:
+        if not self.valid:
+            return 0
+        elif self._unit == self.UnitBytes:
             return self._length
-        elif self._start:
-            last_index = self._start + self._length
-            if last_index:
+        else:
+            first_index = self._model.indexFromOffset(self._start)
+            last_index = self._model.indexFromOffset(self._start + self._length)
+            if first_index:
                 last_pos = last_index.data(ColumnModel.EditorPositionRole) + last_index.data(ColumnModel.DataSizeRole)
-                return last_pos - self._start.data(ColumnModel.EditorPositionRole)
-            elif self._start:
-                return len(self._start.model.editor) - self._start.data(ColumnModel.EditorPositionRole)
-        return 0
+                return last_pos - first_index.data(ColumnModel.EditorPositionRole)
+            else:
+                return len(self._model.editor) - first_index.data(ColumnModel.EditorPositionRole)
 
     def _onInserted(self, start, length):
         if self._boundTo == self.BoundToData and self.valid:
-            if start < self._start:
+            assert(bool(start) and length >= 0)
+            if start <= self.start:
+                # inserted before range start, shift it right
                 self.start += length
-            elif self.start <= start < self.start + self.length:
+            elif self.start < start < self.start + self.length:
+                # inserted inside range, expand it
                 self.length += length
 
     def _onRemoved(self, start, length):
         if self._boundTo == self.BoundToData and self.valid:
-            if not start or start < self.start:
-                new_start = self.start - length
-                if self._unit == self.UnitBytes:
-                    self.start = max(0, new_start)
-                else:
-                    self._start = self._model.firstIndex if not new_start else new_start
-            elif self.start <= start < self.start + self.length:
-                self.length = max(0, self.length - length)
+            # if unit == UnitCells, start can be invalid ModelIndex (in cases where indexes removed
+            # from beginning of model), otherwise it is index BEFORE which indexes was removed.
+            if self._unit == self.UnitCells:
+                start = 0 if not start else start.offset + 1
+
+            if start < self._start:
+                # removed before range begin
+                old_start = self.start
+                self._start = max(start, self._start - length)
+                if old_start != self.start:
+                    self.moved.emit(self.start, old_start)
+                if start + length > self._start:
+                    length_dec = length + start - self._start
+                    self.length = max(0, self._length - length_dec)
+            elif self._start <= start < self._start + self._length:
+                left = start - self._start
+                right = max(0, (self._start + self._length) - (start + length))
+                self.length = left + right
 
     def _onIndexesDataChanged(self, first_index, last_index):
         if self._boundTo == self.BoundToData and self._unit == self.UnitCells and self.valid and self.length > 0:
-            if not (first_index > self._start + self.length or last_index < self._start):
+            if not (first_index > self.start + self.length or last_index < self.start):
                 old_size = self._size
                 self._size = self._getSize()
                 if old_size != self._size:
@@ -2461,4 +2512,20 @@ class DataRange(QObject):
 
 class SelectionRange(DataRange):
     pass
+
+
+class HighlightedRange(DataRange):
+    def __init__(self, hexwidget, start=-1, length=0, unit=DataRange.UnitBytes, bound_to=DataRange.BoundToData):
+        DataRange.__init__(self, hexwidget, start, length, unit, bound_to)
+        self._backgroundColor = None
+
+    @property
+    def backgroundColor(self):
+        return self._backgroundColor
+
+    @backgroundColor.setter
+    def backgroundColor(self, new_color):
+        if self._backgroundColor != new_color:
+            self._backgroundColor = new_color
+            self.updated.emit()
 

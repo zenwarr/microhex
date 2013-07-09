@@ -1,4 +1,4 @@
-from PyQt4.QtCore import QFileInfo, Qt, QByteArray, QObject, pyqtSignal, QUrl
+from PyQt4.QtCore import QFileInfo, Qt, QByteArray, QObject, pyqtSignal, QUrl, QSize
 from PyQt4.QtGui import QMainWindow, QTabWidget, QFileDialog, QKeySequence, QMdiSubWindow, QApplication, QProgressBar, \
                         QWidget, QVBoxLayout, QFileIconProvider, QApplication, QIcon, QDialog, QAction, QIcon, QLabel, \
                         QMessageBox
@@ -20,6 +20,15 @@ def forActiveWidget(fn):
 
 globalSettings = settings.globalSettings()
 globalQuickSettings = settings.globalQuickSettings()
+
+
+def ficon(icon_name):
+    icon = QIcon.fromTheme(icon_name)
+    if icon.isNull():
+        icon = QIcon()
+        icon.addFile(':/main/images/' + icon_name + '16.png', QSize(16, 16))
+        icon.addFile(':/main/images/' + icon_name + '32.png', QSize(32, 32))
+    return icon
 
 
 class MainWindow(QMainWindow):
@@ -74,47 +83,47 @@ class MainWindow(QMainWindow):
                 self.openFileWithOptionsDialog(file_to_load, load_options)
 
     def createActions(self):
-        self.actionCreateDocument = QAction(QIcon.fromTheme('document-new'), utils.tr('Create...'), None)
+        self.actionCreateDocument = QAction(ficon('document-new'), utils.tr('Create...'), None)
         self.actionCreateDocument.setShortcut(QKeySequence('Ctrl+N'))
         self.actionCreateDocument.triggered.connect(self.newDocument)
 
-        self.actionOpenFile = QAction(QIcon.fromTheme('document-open'), utils.tr('Open file...'), None)
+        self.actionOpenFile = QAction(ficon('document-open'), utils.tr('Open file...'), None)
         self.actionOpenFile.setShortcut(QKeySequence('Ctrl+O'))
         self.actionOpenFile.triggered.connect(self.openFileDialog)
 
-        self.actionSave = ObservingAction(QIcon.fromTheme('document-save'), utils.tr('Save'),
+        self.actionSave = ObservingAction(ficon('document-save'), utils.tr('Save'),
                                           PropertyObserver(self, 'activeSubWidget.hexWidget.isModified'))
         self.actionSave.setShortcut(QKeySequence('Ctrl+S'))
         self.actionSave.triggered.connect(self.save)
 
-        self.actionSaveAs = ObservingAction(QIcon(), utils.tr('Save as...'),
+        self.actionSaveAs = ObservingAction(ficon('document-save-as'), utils.tr('Save as...'),
                                             PropertyObserver(self, 'activeSubWidget.hexWidget'))
         self.actionSaveAs.setShortcut(QKeySequence('Ctrl+Shift+S'))
         self.actionSaveAs.triggered.connect(self.saveAs)
 
-        self.actionCloseTab = ObservingAction(QIcon(), utils.tr('Close'), PropertyObserver(self, 'activeSubWidget'))
+        self.actionCloseTab = ObservingAction(ficon('document-close'), utils.tr('Close'), PropertyObserver(self, 'activeSubWidget'))
         self.actionCloseTab.setShortcut(QKeySequence('Ctrl+W'))
         self.actionCloseTab.triggered.connect(self.closeActiveTab)
         
-        self.actionExit = QAction(QIcon.fromTheme('application-exit'), utils.tr('Exit'), None)
+        self.actionExit = QAction(ficon('application-exit'), utils.tr('Exit'), None)
         self.actionExit.triggered.connect(self.close)
 
-        self.actionUndo = ObservingAction(QIcon.fromTheme('edit-undo'), utils.tr('Undo'),
+        self.actionUndo = ObservingAction(ficon('edit-undo'), utils.tr('Undo'),
                                           PropertyObserver(self, 'activeSubWidget.hexWidget.canUndo'))
         self.actionUndo.setShortcut(QKeySequence('Ctrl+Z'))
         self.actionUndo.triggered.connect(self.undo)
 
-        self.actionRedo = ObservingAction(QIcon.fromTheme('edit-redo'), utils.tr('Redo'),
+        self.actionRedo = ObservingAction(ficon('edit-redo'), utils.tr('Redo'),
                                           PropertyObserver(self, 'activeSubWidget.hexWidget.canRedo'))
         self.actionRedo.setShortcut(QKeySequence('Ctrl+Y'))
         self.actionRedo.triggered.connect(self.redo)
 
-        self.actionCopy = ObservingAction(QIcon.fromTheme('edit-copy'), utils.tr('Copy'),
+        self.actionCopy = ObservingAction(ficon('edit-copy'), utils.tr('Copy'),
                                           PropertyObserver(self, 'activeSubWidget.hexWidget'))
         self.actionCopy.setShortcut(QKeySequence('Ctrl+C'))
         self.actionCopy.triggered.connect(self.copy)
 
-        self.actionPaste = ObservingAction(QIcon.fromTheme('edit-paste'), utils.tr('Paste'),
+        self.actionPaste = ObservingAction(ficon('edit-paste'), utils.tr('Paste'),
                                            PropertyObserver(self, 'activeSubWidget.hexWidget'))
         self.actionPaste.setShortcut(QKeySequence('Ctrl+V'))
         self.actionPaste.triggered.connect(self.paste)
@@ -124,7 +133,7 @@ class MainWindow(QMainWindow):
         self.actionClearSelection.setShortcut(QKeySequence('Ctrl+D'))
         self.actionClearSelection.triggered.connect(self.clearSelection)
 
-        self.actionSelectAll = ObservingAction(QIcon.fromTheme('edit-select-all'), utils.tr('Select all'),
+        self.actionSelectAll = ObservingAction(ficon('edit-select-all'), utils.tr('Select all'),
                                                PropertyObserver(self, 'activeSubWidget.hexWidget'))
         self.actionSelectAll.setShortcut(QKeySequence('Ctrl+A'))
         self.actionSelectAll.triggered.connect(self.selectAll)
@@ -135,7 +144,7 @@ class MainWindow(QMainWindow):
         self.actionInsertMode.setShortcut(QKeySequence('Ins'))
         self.actionInsertMode.triggered.connect(self.setInsertMode)
 
-        self.actionRemoveSelected = ObservingAction(QIcon.fromTheme('edit-delete'), utils.tr('Remove selected'),
+        self.actionRemoveSelected = ObservingAction(ficon('edit-delete'), utils.tr('Remove selected'),
                                                     PropertyObserver(self, 'activeSubWidget.hexWidget.hasSelection'))
         self.actionRemoveSelected.setShortcut(QKeySequence('Del'))
         self.actionRemoveSelected.triggered.connect(self.removeSelected)
@@ -166,25 +175,25 @@ class MainWindow(QMainWindow):
                                                  PropertyObserver(self, 'activeSubWidget.hexWidget.leadingColumn'))
         self.actionAddAddress.triggered.connect(self.addAddressColumn)
 
-        self.actionShowSettings = QAction(QIcon(), utils.tr('Settings...'), None)
+        self.actionShowSettings = QAction(ficon('configure'), utils.tr('Settings...'), None)
         self.actionShowSettings.triggered.connect(self.showSettings)
 
-        self.actionAbout = QAction(QIcon.fromTheme('help-about'), utils.tr('About program...'), None)
+        self.actionAbout = QAction(ficon('help-about'), utils.tr('About program...'), None)
         self.actionAbout.triggered.connect(self.showAbout)
 
-        self.actionZoomIn = ObservingAction(QIcon.fromTheme('zoom-in'), utils.tr('Increase font'),
+        self.actionZoomIn = ObservingAction(ficon('zoom-in'), utils.tr('Increase font'),
                                             PropertyObserver(self, 'activeSubWidget.hexWidget'))
         self.actionZoomIn.triggered.connect(self.zoomIn)
 
-        self.actionZoomOut = ObservingAction(QIcon.fromTheme('zoom-out'), utils.tr('Decrease font'),
+        self.actionZoomOut = ObservingAction(ficon('zoom-out'), utils.tr('Decrease font'),
                                              PropertyObserver(self, 'activeSubWidget.hexWidget'))
         self.actionZoomOut.triggered.connect(self.zoomOut)
 
-        self.actionZoomReset = ObservingAction(QIcon.fromTheme('zoom-original'), utils.tr('Reset original font size'),
+        self.actionZoomReset = ObservingAction(ficon('zoom-original'), utils.tr('Reset original font size'),
                                              PropertyObserver(self, 'activeSubWidget.hexWidget'))
         self.actionZoomReset.triggered.connect(self.zoomReset)
 
-        self.actionGoto = ObservingAction(QIcon(), utils.tr('Goto...'),
+        self.actionGoto = ObservingAction(ficon('go-jump'), utils.tr('Goto...'),
                                           PropertyObserver(self, 'activeSubWidget.hexWidget'))
         self.actionGoto.setShortcut(QKeySequence('Ctrl+G'))
         self.actionGoto.triggered.connect(self.goto)
@@ -277,7 +286,6 @@ class MainWindow(QMainWindow):
         self.editToolBar.addAction(self.actionRedo)
         self.editToolBar.addAction(self.actionCopy)
         self.editToolBar.addAction(self.actionPaste)
-        self.editToolBar.addAction(self.actionInsertMode)
 
     def showEvent(self, event):
         if not self._inited:

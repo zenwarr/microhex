@@ -112,17 +112,11 @@ class AddressColumnModel(hexwidget.ColumnModel):
         self._updatePadding()
         self.modelReset.emit()
 
-    def incrementedIndex(self, index, value):
-        if index and index.model is self:
-            return self.index(index.row + value, 0)
-        return hexwidget.ModelIndex()
+    def indexOffset(self, index):
+        return index.row if index and index.model is self else -1
 
-    def subtractIndexes(self, left, right):
-        if left and right:
-            l = min(left, right)
-            r = max(left, right)
-            return r.row - l.row
-        return NotImplemented
+    def indexFromOffset(self, offset):
+        return self.index(offset, 0)
 
 
 class AddressColumnProvider(columnproviders.AbstractColumnProvider):

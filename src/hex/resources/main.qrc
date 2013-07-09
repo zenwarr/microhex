@@ -3,5 +3,41 @@
         <file>images/hex.png</file>
         <file>data/COPYING.html</file>
         <file>data/CREDITS.html</file>
+        <file>images/application-exit16.png</file>
+        <file>images/application-exit32.png</file>
+        <file>images/configure16.png</file>
+        <file>images/configure32.png</file>
+        <file>images/document-close16.png</file>
+        <file>images/document-close32.png</file>
+        <file>images/document-new16.png</file>
+        <file>images/document-new32.png</file>
+        <file>images/edit-delete16.png</file>
+        <file>images/edit-delete32.png</file>
+        <file>images/edit-paste16.png</file>
+        <file>images/edit-paste32.png</file>
+        <file>images/edit-redo16.png</file>
+        <file>images/edit-redo32.png</file>
+        <file>images/edit-select-all16.png</file>
+        <file>images/edit-select-all32.png</file>
+        <file>images/document-open16.png</file>
+        <file>images/document-open32.png</file>
+        <file>images/document-save-as16.png</file>
+        <file>images/document-save-as32.png</file>
+        <file>images/document-save16.png</file>
+        <file>images/document-save32.png</file>
+        <file>images/edit-copy16.png</file>
+        <file>images/edit-copy32.png</file>
+        <file>images/edit-undo16.png</file>
+        <file>images/edit-undo32.png</file>
+        <file>images/go-jump16.png</file>
+        <file>images/go-jump32.png</file>
+        <file>images/help-about16.png</file>
+        <file>images/help-about32.png</file>
+        <file>images/zoom-in16.png</file>
+        <file>images/zoom-in32.png</file>
+        <file>images/zoom-original16.png</file>
+        <file>images/zoom-original32.png</file>
+        <file>images/zoom-out16.png</file>
+        <file>images/zoom-out32.png</file>
     </qresource>
 </RCC>

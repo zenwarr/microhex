@@ -54,6 +54,6 @@ def getFontFromSetting(setting_data, default_font=None):
             if isinstance(font_data, str):
                 stored_font = QFont()
                 ok = stored_font.fromString(font_data)
-                if ok:
+                if ok and utils.isFontInstalled(stored_font.family()):
                     return stored_font
     return font

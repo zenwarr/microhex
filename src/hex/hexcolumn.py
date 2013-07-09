@@ -25,6 +25,10 @@ class HexColumnModel(hexwidget.ColumnModel):
     def regularCellDataSize(self):
         return self.valuecodec.dataSize
 
+    @property
+    def regularColumnCount(self):
+        return self.columnsOnRow
+
     def reset(self):
         self._rowCount = 0
         self._bytesOnRow = self.columnsOnRow * self.valuecodec.dataSize

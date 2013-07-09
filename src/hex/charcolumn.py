@@ -26,6 +26,10 @@ class CharColumnModel(hexwidget.ColumnModel):
     def regularCellDataSize(self):
         return self.codec.unitSize
 
+    @property
+    def regularColumnCount(self):
+        return self.bytesOnRow // self.codec.unitSize
+
     def reset(self):
         # number of bytes on row should be multiplier of codec.unitSize
         if self.bytesOnRow % self.codec.unitSize:
