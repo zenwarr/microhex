@@ -3,7 +3,7 @@ from PyQt4.QtGui import QColor, QFont, QFontMetricsF, QPolygonF, QWidget, QScrol
                         QPainter, QBrush, QPalette, QPen, QApplication, QRegion, QLineEdit, QValidator, \
                         QTextEdit, QTextOption, QSizePolicy, QStyle, QStyleOptionFrameV2, QTextCursor, QTextDocument, \
                         QTextBlockFormat, QPlainTextDocumentLayout, QAbstractTextDocumentLayout, QTextCharFormat, \
-                        QTextTableFormat, QRawFont, QKeyEvent, QFontDatabase, QMenu
+                        QTextTableFormat, QRawFont, QKeyEvent, QFontDatabase, QMenu, QToolTip
 import math
 import html
 from hex.valuecodecs import IntegerCodec
@@ -282,10 +282,11 @@ class ColumnModel(AbstractModel):
             self._editor = new_editor
             if new_editor is not None:
                 with new_editor.lock.read:
-                    new_editor.dataChanged.connect(self._onEditorDataChanged, Qt.QueuedConnection)
-                    new_editor.resized.connect(self._onEditorDataResized, Qt.QueuedConnection)
-                    new_editor.bytesInserted.connect(self._onEditorBytesInserted, Qt.QueuedConnection)
-                    new_editor.bytesRemoved.connect(self._onEditorBytesRemoved, Qt.QueuedConnection)
+                    conn_mode = Qt.DirectConnection if utils.testRun else Qt.QueuedConnection
+                    new_editor.dataChanged.connect(self._onEditorDataChanged, conn_mode)
+                    new_editor.resized.connect(self._onEditorDataResized, conn_mode)
+                    new_editor.bytesInserted.connect(self._onEditorBytesInserted, conn_mode)
+                    new_editor.bytesRemoved.connect(self._onEditorBytesRemoved, conn_mode)
 
     @property
     def isInfinite(self):
@@ -1258,6 +1259,22 @@ class Column(QObject):
         index = self.frameModel.toFrameIndex(index)
         return (bool(index) and index.row < self._fullVisibleRows) if full_visible else bool(index)
 
+    def isRangeVisible(self, data_range):
+        if not data_range:
+            return False
+
+        f = self.dataModel.indexFromPosition(data_range.startPosition)
+        first_visible = self.frameModel.toSourceIndex(self.frameModel.firstIndex)
+        if not f or not first_visible or f < first_visible:
+            return False
+
+        l = self.dataModel.indexFromPosition(data_range.startPosition + data_range.size)
+        last_visible = self.frameModel.toSourceIndex(self.frameModel.lastIndex)
+        if not l or not last_visible or l > last_visible:
+            return False
+
+        return True
+
     def createDocumentTemplate(self):
         document = QTextDocument()
         document.setDocumentMargin(0)
@@ -1343,6 +1360,7 @@ class HexWidget(QWidget):
         self._selectStartIndex = None
         self._scrollTimer = None
         self._hasSelection = False
+        self._bookmarks = []
 
         self._editMode = False
         self._cursorVisible = False
@@ -1384,9 +1402,10 @@ class HexWidget(QWidget):
         self.appendColumn(CharColumnModel(self.editor, encodings.getCodec('UTF-16le'), self.font()))
         self.leadingColumn = self._columns[1]
 
-        self.editor.canUndoChanged.connect(self.canUndoChanged, Qt.QueuedConnection)
-        self.editor.canRedoChanged.connect(self.canRedoChanged, Qt.QueuedConnection)
-        self.editor.isModifiedChanged.connect(self.isModifiedChanged, Qt.QueuedConnection)
+        conn_mode = Qt.DirectConnection if utils.testRun else Qt.QueuedConnection
+        self.editor.canUndoChanged.connect(self.canUndoChanged, conn_mode)
+        self.editor.canRedoChanged.connect(self.canRedoChanged, conn_mode)
+        self.editor.isModifiedChanged.connect(self.isModifiedChanged, conn_mode)
 
         globalSettings.settingChanged.connect(self._onSettingChanged)
 
@@ -1510,6 +1529,9 @@ class HexWidget(QWidget):
 
         painter.setClipRect(self._absoluteToWidget(column.geometry))
         painter.translate(self._absoluteToWidget(column.geometry.topLeft()))
+
+        for bookmark in self._bookmarks:
+            column.paintHighlight(pd, self._leadingColumn is column, bookmark)
 
         column.paint(pd, self._leadingColumn is column)
 
@@ -1934,7 +1956,7 @@ class HexWidget(QWidget):
         first_index = min(first, second)
         last_index = max(first, second)
 
-        return SelectionRange(self, first_index, last_index - first_index, SelectionRange.UnitCells,
+        return SelectionRange(self, first_index, last_index - first_index + 1, SelectionRange.UnitCells,
                               SelectionRange.BoundToData)
 
     def columnIndex(self, column):
@@ -2075,6 +2097,29 @@ class HexWidget(QWidget):
             dlg = columnproviders.ConfigureColumnDialog(self, self, self._leadingColumn.dataModel)
             dlg.exec_()
 
+    def _toolTip(self, event):
+        pos = self._widgetToAbsolute(QPointF(event.pos()))
+        column = self.columnFromPoint(pos)
+        if column is not None:
+            index = column.indexFromPoint(self._absoluteToColumn(column, pos))
+            if index:
+                bookmarks = self.bookmarksAtIndex(index)
+                tooltip_text = ''
+                for bookmark in bookmarks:
+                    if tooltip_text:
+                        tooltip_text += '\n\n'
+                    tooltip_text += utils.tr('Bookmark: {0}').format(bookmark.name)
+
+                if tooltip_text:
+                    QToolTip.showText(event.globalPos(), tooltip_text, self)
+
+    def bookmarksAtIndex(self, index):
+        if index:
+            index_range = DataRange(self, index, 1, DataRange.UnitCells, DataRange.BoundToPosition)
+            result = [bookmark for bookmark in self._bookmarks if bookmark.intersectsWith(index_range)]
+            return result
+        return []
+
     _eventHandlers = {
         QEvent.Paint: _paint,
         QEvent.Wheel: _wheel,
@@ -2084,7 +2129,8 @@ class HexWidget(QWidget):
         QEvent.MouseButtonRelease: _mouseRelease,
         QEvent.MouseMove: _mouseMove,
         QEvent.MouseButtonDblClick: _mouseDoubleClick,
-        QEvent.ContextMenu: _contextMenu
+        QEvent.ContextMenu: _contextMenu,
+        QEvent.ToolTip: _toolTip
     }
 
     def eventFilter(self, obj, event):
@@ -2111,8 +2157,6 @@ class HexWidget(QWidget):
 
     def removeSelectionRange(self, selection):
         sel_index = self._selections.index(selection)
-        selection.resized.disconnect(self._onSelectionUpdated)
-        selection.moved.disconnect(self._onSelectionUpdated)
         selection.updated.disconnect(self._onSelectionUpdated)
         del self._selections[sel_index]
 
@@ -2121,8 +2165,6 @@ class HexWidget(QWidget):
 
     def addSelectionRange(self, selection):
         if selection not in self._selections:
-            selection.resized.connect(self._onSelectionUpdated)
-            selection.moved.connect(self._onSelectionUpdated)
             selection.updated.connect(self._onSelectionUpdated)
             self._selections.append(selection)
 
@@ -2166,7 +2208,7 @@ class HexWidget(QWidget):
 
     def selectAll(self):
         if self.editor is not None:
-            sel_range = SelectionRange(self, self._leadingColumn.dataModel.firstIndex, ModelIndex(),
+            sel_range = SelectionRange(self, self._leadingColumn.dataModel.firstIndex, len(self._editor),
                                    SelectionRange.UnitCells, SelectionRange.BoundToData)
             self.selectionRanges = [sel_range]
 
@@ -2360,6 +2402,33 @@ class HexWidget(QWidget):
                 new_first_row = caret_index.row - int(self._leadingColumn.fullVisibleRows // 2) + 1
                 self.scrollToLeadingColumnRow(new_first_row)
 
+    @property
+    def bookmarks(self):
+        return self._bookmarks
+
+    def addBookmark(self, bookmark):
+        if bookmark is not None and bookmark not in self._bookmarks:
+            self._bookmarks.append(bookmark)
+            self._bookmarks.sort(key=lambda x: x.size, reverse=True)
+            bookmark.updated.connect(self._updateBookmark)
+            self.view.update()
+
+    def removeBookmark(self, bookmark):
+        bookmark_index = self._bookmarks.index(bookmark)
+        bookmark.updated.disconnect(self._updateBookmark)
+        del self._bookmarks[bookmark_index]
+        self.view.update()
+
+    def _updateBookmark(self):
+        self.view.update()
+
+    def isRangeDataVisible(self, data_range):
+        return any(c.isRangeVisible(data_range) for c in self._columns)
+
+    @property
+    def theme(self):
+        return self._theme
+
 
 class DataRange(QObject):
     """DataRange can be based on bytes or on cells. When based on bytes, size of range always remains the same, and
@@ -2400,13 +2469,17 @@ class DataRange(QObject):
         if unit == self.UnitCells:
             self._model.dataChanged.connect(self._onIndexesDataChanged)
 
+        self.moved.connect(self.updated)
+        self.resized.connect(self.updated)
+
     @property
     def start(self):
-        return self._model.indexFromOffset(self._start)
+        return self._model.indexFromOffset(self._start) if self._unit == self.UnitCells else self._start
 
     @start.setter
     def start(self, new_start):
         if self.start != new_start:
+            old_pos = self._start
             old_start = self.start
             self._start = new_start.offset if self._unit == self.UnitCells else new_start
             self.moved.emit(new_start, old_start)
@@ -2442,6 +2515,14 @@ class DataRange(QObject):
     def valid(self):
         return self._start >= 0
 
+    @property
+    def unit(self):
+        return self._unit
+
+    @property
+    def boundTo(self):
+        return self._boundTo
+
     def __bool__(self):
         return self.valid and bool(self.length)
 
@@ -2452,12 +2533,13 @@ class DataRange(QObject):
             return self._length
         else:
             first_index = self._model.indexFromOffset(self._start)
-            last_index = self._model.indexFromOffset(self._start + self._length)
-            if first_index:
+            last_index = self._model.indexFromOffset(self._start + self._length - 1)
+            if last_index:
                 last_pos = last_index.data(ColumnModel.EditorPositionRole) + last_index.data(ColumnModel.DataSizeRole)
                 return last_pos - first_index.data(ColumnModel.EditorPositionRole)
-            else:
+            elif first_index:
                 return len(self._model.editor) - first_index.data(ColumnModel.EditorPositionRole)
+        return 0
 
     def _onInserted(self, start, length):
         if self._boundTo == self.BoundToData and self.valid:
@@ -2509,6 +2591,14 @@ class DataRange(QObject):
             return NotImplemented
         return not self.__eq__(self, other)
 
+    def intersectsWith(self, another_range):
+        return not (another_range.startPosition >= self.startPosition + self.size or
+                    another_range.startPosition + another_range.size <= self.startPosition)
+
+    def contains(self, another_range):
+        return (another_range.startPosition >= self.startPosition and another_range.startPosition + another_range.size
+                        < self.startPosition + self.size)
+
 
 class SelectionRange(DataRange):
     pass
@@ -2529,3 +2619,22 @@ class HighlightedRange(DataRange):
             self._backgroundColor = new_color
             self.updated.emit()
 
+
+class BookmarkedRange(HighlightedRange):
+    def __init__(self, hexwidget, start=-1, length=0, unit=DataRange.UnitBytes, bound_to=DataRange.BoundToData):
+        HighlightedRange.__init__(self, hexwidget, start, length, unit, bound_to)
+        self._name = ''
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, new_name):
+        if self._name != new_name:
+            self._name = new_name
+            self.updated.emit()
+
+    @property
+    def innerLevel(self):
+        return self.name.count('.')

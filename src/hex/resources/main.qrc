@@ -39,5 +39,7 @@
         <file>images/zoom-original32.png</file>
         <file>images/zoom-out16.png</file>
         <file>images/zoom-out32.png</file>
+        <file>images/bookmark-new16.png</file>
+        <file>images/bookmark-new32.png</file>
     </qresource>
 </RCC>

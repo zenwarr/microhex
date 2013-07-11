@@ -33,6 +33,7 @@ class Application(QApplication):
         # hidden option --test, should not be visible in argument list...
         if '--test' in self.arguments():
             try:
+                utils.testRun = True
                 from hex.test import runTests
                 runTests()
             except ImportError:

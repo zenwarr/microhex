@@ -198,6 +198,14 @@ class MainWindow(QMainWindow):
         self.actionGoto.setShortcut(QKeySequence('Ctrl+G'))
         self.actionGoto.triggered.connect(self.goto)
 
+        self.actionAddBookmark = ObservingAction(ficon('bookmark-new'), utils.tr('Add bookmark...'),
+                                                 PropertyObserver(self, 'activeSubWidget.hexWidget'))
+        self.actionAddBookmark.triggered.connect(self.addBookmark)
+
+        self.actionRemoveBookmark = ObservingAction(QIcon(), utils.tr('Remove bookmark'),
+                                                    PropertyObserver(self, 'activeSubWidget.hexWidget'))
+        self.actionRemoveBookmark.triggered.connect(self.removeBookmark)
+
     def buildMenus(self):
         menubar = self.menuBar()
         self.fileMenu = menubar.addMenu(utils.tr('File'))
@@ -227,6 +235,9 @@ class MainWindow(QMainWindow):
         self.editMenu.addAction(self.actionFillZeros)
         self.editMenu.addSeparator()
         self.editMenu.addAction(self.actionGoto)
+        self.editMenu.addSeparator()
+        self.editMenu.addAction(self.actionAddBookmark)
+        self.editMenu.addAction(self.actionRemoveBookmark)
 
         self.viewMenu = menubar.addMenu(utils.tr('View'))
         self.viewMenu.addAction(self.actionShowHeader)
@@ -511,6 +522,25 @@ class MainWindow(QMainWindow):
         dlg = GotoDialog(self, self.activeSubWidget.hexWidget)
         if dlg.exec_() == QDialog.Accepted:
             self.activeSubWidget.hexWidget.goto(dlg.address)
+
+    @forActiveWidget
+    def addBookmark(self):
+        from hex.addbookmarkdialog import AddBookmarkDialog
+
+        dlg = AddBookmarkDialog(self, self.activeSubWidget.hexWidget)
+        if dlg.exec_() == QDialog.Accepted:
+            bookmark = dlg.createBookmark()
+            if bookmark is not None:
+                self.activeSubWidget.hexWidget.addBookmark(bookmark)
+
+    @forActiveWidget
+    def removeBookmark(self):
+        hexWidget = self.activeSubWidget.hexWidget
+        bookmarks = hexWidget.bookmarksAtIndex(hexWidget.caretIndex(hexWidget.leadingColumn))
+        if bookmarks:
+            # select innermost (by name) bookmark and remove it
+            bookmarks.sort(key=lambda x: x.innerLevel, reverse=True)
+            hexWidget.removeBookmark(bookmarks[0])
 
 
 class PropertyObserver(QObject):

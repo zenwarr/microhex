@@ -1,11 +1,13 @@
 from PyQt4.QtCore import QCoreApplication, QByteArray
-from PyQt4.QtGui import QDialog, QFontDatabase
+from PyQt4.QtGui import QDialog, QFontDatabase, QColor
 import os
 import threading
 import contextlib
+import random
 
 
 applicationPath = ''
+testRun = False
 
 
 def first(iterable, default=None):
@@ -253,3 +255,8 @@ class ReadWriteLock(object):
             yield
         finally:
             self.releaseWrite()
+
+
+def generateRandomColor():
+    random.seed()
+    return QColor(random.randint(0, 256), random.randint(0, 256), random.randint(0, 256))
