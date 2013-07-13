@@ -1412,6 +1412,7 @@ class HexWidget(QWidget):
         self.editor.canUndoChanged.connect(self.canUndoChanged, conn_mode)
         self.editor.canRedoChanged.connect(self.canRedoChanged, conn_mode)
         self.editor.isModifiedChanged.connect(self.isModifiedChanged, conn_mode)
+        self.editor.urlChanged.connect(self.urlChanged, conn_mode)
 
         globalSettings.settingChanged.connect(self._onSettingChanged)
 

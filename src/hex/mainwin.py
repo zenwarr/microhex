@@ -85,7 +85,7 @@ class MainWindow(QMainWindow):
         self.actionOpenFile.triggered.connect(self.openFileDialog)
 
         self.actionSave = ObservingAction(getIcon('document-save'), utils.tr('Save'),
-                                          PropertyObserver(self, 'activeSubWidget.hexWidget.isModified'))
+                                          PropertyObserver(self, 'activeSubWidget.hexWidget'))
         self.actionSave.setShortcut(QKeySequence('Ctrl+S'))
         self.actionSave.triggered.connect(self.save)
 
@@ -367,7 +367,7 @@ class MainWindow(QMainWindow):
             self.activeSubWidget.hexWidget.save(save_device, switch_to_device=True)
 
     def newDocument(self):
-        e = editor.Editor(devices.deviceFromBytes(QByteArray()))
+        e = editor.Editor(devices.NullDevice())
         self._addTab(HexSubWindow(self, e, utils.tr('New document')))
 
     def _addTab(self, subWidget):
@@ -502,7 +502,10 @@ class MainWindow(QMainWindow):
 
     @forActiveWidget
     def save(self):
-        self.activeSubWidget.hexWidget.save()
+        if isinstance(self.activeSubWidget.hexWidget.editor.device, devices.NullDevice):
+            self.saveAs()
+        else:
+            self.activeSubWidget.hexWidget.save()
 
     @forActiveWidget
     def zoomIn(self):

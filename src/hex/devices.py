@@ -26,7 +26,7 @@ class AbstractDevice(QObject):
     def __init__(self, url=None, options=None):
         QObject.__init__(self)
         self.lock = threading.RLock()
-        self._url = url or QUrl()
+        self._url = QUrl(url)
         self._cache = bytes()
         self._cacheStart = 0
         self._cacheSize = 1024 * 1024
@@ -43,6 +43,8 @@ class AbstractDevice(QObject):
 
     @property
     def readOnly(self):
+        if hasattr(self.options, 'readOnly'):
+            return self.options.readOnly
         raise NotImplementedError()
 
     def read(self, position, length):
@@ -92,10 +94,9 @@ class AbstractDevice(QObject):
             self._cache = []
         return bytes_written
 
-    def createSaver(self, editor, write_device):
-        """Create saver to save data from this device to :write_device:
-        """
-        return StandardSaver(self, write_device)
+    def createSaver(self, editor, read_device):
+        """Create saver to save data from :read_device: to this device."""
+        return StandardSaver(read_device, self)
 
     @property
     def url(self):
@@ -107,6 +108,28 @@ class AbstractDevice(QObject):
 
         from hex.editor import Editor
         self._editor = Editor(self)
+
+
+class NullDevice(AbstractDevice):
+    def __init__(self):
+        AbstractDevice.__init__(self, 'microhex:null')
+
+    def __len__(self):
+        return 0
+
+    def _read(self, position, length):
+        return b''
+
+    @property
+    def fixedSize(self):
+        return False
+
+    @property
+    def readOnly(self):
+        return False
+
+    def _write(self, position, data):
+        return len(data)
 
 
 class StandardSaver(object):
@@ -222,11 +245,11 @@ class FileDevice(QtProxyDevice):
             raise IOError(utils.tr('failed to resize file {0} to size {1}').format(self.url.toString(),
                                                                                    utils.formatSize(new_size)))
 
-    def createSaver(self, editor, write_device):
-        if editor is not None and editor.canQuickSave and isinstance(write_device, FileDevice):
-            return QuickFileSaver(editor, self, write_device)
+    def createSaver(self, editor, read_device):
+        if editor.canQuickSave:
+            return QuickFileSaver(editor, read_device, self)
         else:
-            return FileSaver(self, write_device)
+            return FileSaver(read_device, self)
 
 
 class FileSaver(StandardSaver):

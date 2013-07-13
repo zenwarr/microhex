@@ -663,7 +663,7 @@ class Editor(QObject):
             if device is None:
                 raise ValueError('device is None')
 
-            saver = self.device.createSaver(self, device)
+            saver = device.createSaver(self, self.device)
             saver.begin()
             try:
                 for span in self._spans:
@@ -683,6 +683,7 @@ class Editor(QObject):
                     self._setSavepoint()
 
                     self._device = device
+                    print(self.url.toString())
                     self.urlChanged.emit(self.url)
 
     def _setSavepoint(self):
