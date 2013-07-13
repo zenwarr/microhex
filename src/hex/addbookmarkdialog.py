@@ -4,6 +4,8 @@ from PyQt4.QtGui import QColor, QPixmap, QIcon, QColorDialog, QDialogButtonBox, 
 import hex.utils as utils
 import hex.hexwidget as hexwidget
 from hex.forms.ui_addbookmarkdialog import Ui_AddBookmarkDialog
+import hex.settings as settings
+import hex.appsettings as appsettings
 
 
 currentBookmarkIndex = 1
@@ -21,6 +23,7 @@ class AddBookmarkDialog(utils.Dialog):
         self.ui = Ui_AddBookmarkDialog()
         self.ui.setupUi(self)
         self._canCreateBookmark = True
+        self._isColorChoosen = False
 
         self._groupMark = QButtonGroup()
         self._groupMark.addButton(self.ui.btnMarkCaret)
@@ -39,18 +42,18 @@ class AddBookmarkDialog(utils.Dialog):
 
         self.ui.btnMarkCaret.toggled.connect(self._updateOk)
         self.ui.btnMarkSelection.toggled.connect(self._updateOk)
+        self.ui.btnMarkCaret.toggled.connect(self._updateColor)
+        self.ui.btnMarkSelection.toggled.connect(self._updateColor)
 
         self.ui.btnSelectColor.clicked.connect(self._selectBookmarkColor)
 
         self._updateOk()
 
-        bookmark_range = None
         bookmark_name = ''
         if self._canCreateBookmark:
             bookmark_range = self.createBookmark()
             # find existing bookmarks that contain this one
             c_bookmarks = [b for b in self.hexWidget.bookmarks if b.contains(bookmark_range)]
-            i_bookmarks = [b for b in self.hexWidget.bookmarks if b.intersectsWith(bookmark_range)]
 
             if c_bookmarks:
                 c_bookmark = min(c_bookmarks, key=lambda x: x.size)
@@ -63,15 +66,7 @@ class AddBookmarkDialog(utils.Dialog):
             self.ui.txtName.setText(bookmark_name)
             self.ui.txtName.selectAll()
 
-        if bookmark_range:
-            for i in range(100):
-                bookmark_color = utils.generateRandomColor()
-                if (all(colorsDistance(bookmark_color, b.backgroundColor) >= 10 for b in i_bookmarks) and
-                        colorsDistance(bookmark_color, self.hexWidget.theme.backgroundColor) >= 10):
-                    break
-
-            self._bookmarkColor = bookmark_color
-        self._updateColorButton()
+        self._updateColor()
 
     def _updateColorButton(self):
         pixmap = QPixmap(32, 32)
@@ -86,6 +81,26 @@ class AddBookmarkDialog(utils.Dialog):
             enabled = self.hexWidget.hasSelection
         self.ui.buttonBox.button(QDialogButtonBox.Ok).setEnabled(enabled)
         self._canCreateBookmark = enabled
+
+    def _updateColor(self):
+        if self._canCreateBookmark and not self._isColorChoosen:
+            bookmark_range = self.createBookmark()
+
+            i_bookmarks = [b for b in self.hexWidget.bookmarks if b.intersectsWith(bookmark_range)]
+            distance = settings.globalSettings()[appsettings.HexWidget_RandomColorDistance]
+            used_colors = [b.backgroundColor for b in i_bookmarks] + [self.hexWidget.theme.backgroundColor,
+                                                                      self.hexWidget.theme.textColor]
+            for i in range(100):
+                bookmark_color = utils.generateRandomColor()
+                if all(colorsDistance(bookmark_color, color) >= distance for color in used_colors):
+                    break
+            else:
+                # we have not found acceptable color... Let's just find color that is not equal to existing.
+                while bookmark_color not in used_colors:
+                    bookmark_color = utils.generateRandomColor()
+
+            self._bookmarkColor = bookmark_color
+        self._updateColorButton()
 
     def _selectBookmarkColor(self):
         color = QColorDialog.getColor(self._bookmarkColor, self, utils.tr('Select color for bookmark'))

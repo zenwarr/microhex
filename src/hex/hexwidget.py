@@ -1088,7 +1088,7 @@ class Column(QObject):
         if hl_range and hl_range.backgroundColor is not None:
             painter = paint_data.painter
             back_color = hl_range.backgroundColor
-            back_color.setAlpha(100)
+            back_color.setAlpha(settings.globalSettings()[appsettings.HexWidget_HighlightAlpha])
             painter.setBrush(back_color)
             painter.setPen(QPen(back_color))
             for polygon in self.polygonsForRange(self.dataModel.indexFromPosition(hl_range.startPosition),

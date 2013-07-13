@@ -259,4 +259,4 @@ class ReadWriteLock(object):
 
 def generateRandomColor():
     random.seed()
-    return QColor(random.randint(0, 256), random.randint(0, 256), random.randint(0, 256))
+    return QColor(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
