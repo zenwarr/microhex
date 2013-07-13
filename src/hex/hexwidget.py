@@ -2063,12 +2063,6 @@ class HexWidget(QWidget):
                             selections = []
 
                     if selections is None:
-                        if self._selectStartColumn.selectionProxy is not None:
-                            proxy = self._selectStartColumn.selectionProxy
-                            first_index = proxy.translateIndex(self._selectStartIndex)
-                            last_index = proxy.translateIndex(hover_index)
-                        else:
-                            first_index, last_index = self._selectStartIndex, hover_index
                         sel = self.selectionBetweenIndexes(self._selectStartIndex, hover_index)
                         if self._selectStartColumn.selectionProxy is not None:
                             proxy = self._selectStartColumn.selectionProxy
