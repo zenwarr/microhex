@@ -2432,10 +2432,7 @@ class HexWidget(QWidget):
     def goto(self, position):
         if self._leadingColumn is not None:
             self.caretPosition = position
-            caret_index = self.caretIndex(self._leadingColumn)
-            if caret_index:
-                new_first_row = caret_index.row - int(self._leadingColumn.fullVisibleRows // 2) + 1
-                self.scrollToLeadingColumnRow(new_first_row)
+            self.makeIndexVisible(self.caretIndex(self._leadingColumn), self.MethodShowCenter)
 
     @property
     def bookmarks(self):
