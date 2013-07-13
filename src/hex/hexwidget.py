@@ -820,6 +820,7 @@ class Column(QObject):
         self._headerHeight = 0
         self._headerData = []
         self._validator = self.dataModel.createValidator()
+        self.selectionProxy = None
 
         self._spaced = self.dataModel.preferSpaced
         self._cache = []
@@ -1299,6 +1300,9 @@ class Column(QObject):
     def rectForRow(self, row_index):
         return self._documentBackend.rectForRow(row_index).translated(self.documentOrigin)
 
+    def translateIndex(self, index):
+        return self.dataModel.indexFromPosition(index.data(ColumnModel.EditorPositionRole))
+
 
 def _translate(x, dx, dy=0):
     if isinstance(dx, (QPoint, QPointF)):
@@ -1401,8 +1405,8 @@ class HexWidget(QWidget):
         hex_column = HexColumnModel(self.editor, IntegerCodec(IntegerCodec.Format8Bit, False),
                                          IntegerFormatter(16, padding=2))
         address_bar = AddressColumnModel(hex_column)
-        self.appendColumn(address_bar)
         self.appendColumn(hex_column)
+        self.insertColumn(address_bar, 0)
 
         self.appendColumn(CharColumnModel(self.editor, encodings.getCodec('ISO 8859-1'), self.font()))
         self.appendColumn(CharColumnModel(self.editor, encodings.getCodec('UTF-16le'), self.font()))
@@ -1490,7 +1494,10 @@ class HexWidget(QWidget):
             if self._leadingColumn is None:
                 self._leadingColumn = column
             else:
-                column.scrollToFirstRow(self._leadingColumn.firstVisibleRow)
+                self.syncColumnsFrames(self.caretIndex(self._leadingColumn).row)
+
+            if hasattr(model, 'linkedModel'):
+                column.selectionProxy = self.columnFromModel(model.linkedModel)
 
             self.view.update()
 
@@ -1498,7 +1505,10 @@ class HexWidget(QWidget):
         self.insertColumn(model)
 
     def columnFromIndex(self, index):
-        return utils.first(cd for cd in self._columns if cd.dataModel is index.model or cd.frameModel is index.model)
+        return self.columnFromModel(index.model)
+
+    def columnFromModel(self, model):
+        return utils.first(cd for cd in self._columns if cd.frameModel is model or cd.dataModel is model)
 
     def _columnToAbsolute(self, column, d):
         if column is None:
@@ -2053,7 +2063,18 @@ class HexWidget(QWidget):
                             selections = []
 
                     if selections is None:
-                        selections = [self.selectionBetweenIndexes(self._selectStartIndex, hover_index)]
+                        if self._selectStartColumn.selectionProxy is not None:
+                            proxy = self._selectStartColumn.selectionProxy
+                            first_index = proxy.translateIndex(self._selectStartIndex)
+                            last_index = proxy.translateIndex(hover_index)
+                        else:
+                            first_index, last_index = self._selectStartIndex, hover_index
+                        sel = self.selectionBetweenIndexes(self._selectStartIndex, hover_index)
+                        if self._selectStartColumn.selectionProxy is not None:
+                            proxy = self._selectStartColumn.selectionProxy
+                            sel = self.selectionBetweenIndexes(proxy.dataModel.indexFromPosition(sel.startPosition),
+                                                               proxy.dataModel.indexFromPosition(sel.startPosition + sel.size - 1))
+                        selections = [sel]
 
                     if selections != self._selections:
                         self.selectionRanges = selections
