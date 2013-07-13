@@ -1,5 +1,5 @@
-from PyQt4.QtCore import QCoreApplication, QByteArray
-from PyQt4.QtGui import QDialog, QFontDatabase, QColor
+from PyQt4.QtCore import QCoreApplication, QByteArray, QSize
+from PyQt4.QtGui import QDialog, QFontDatabase, QColor, QIcon
 import os
 import threading
 import contextlib
@@ -260,3 +260,12 @@ class ReadWriteLock(object):
 def generateRandomColor():
     random.seed()
     return QColor(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+
+
+def getIcon(icon_name):
+    icon = QIcon.fromTheme(icon_name)
+    if icon.isNull():
+        icon = QIcon()
+        icon.addFile(':/main/images/' + icon_name + '16.png', QSize(16, 16))
+        icon.addFile(':/main/images/' + icon_name + '32.png', QSize(32, 32))
+    return icon

@@ -1,4 +1,5 @@
-from PyQt4.QtCore import pyqtSignal, QObject, Qt, QPointF, QRectF, QPoint, QSizeF, QEvent, QTimer, QLineF, QUrl
+from PyQt4.QtCore import pyqtSignal, QObject, Qt, QPointF, QRectF, QPoint, QSizeF, QEvent, QTimer, QLineF, QUrl, \
+                        QEasingCurve, QSequentialAnimationGroup, pyqtProperty, QPropertyAnimation
 from PyQt4.QtGui import QColor, QFont, QFontMetricsF, QPolygonF, QWidget, QScrollBar, QVBoxLayout, QHBoxLayout, \
                         QPainter, QBrush, QPalette, QPen, QApplication, QRegion, QLineEdit, QValidator, \
                         QTextEdit, QTextOption, QSizePolicy, QStyle, QStyleOptionFrameV2, QTextCursor, QTextDocument, \
@@ -6,6 +7,7 @@ from PyQt4.QtGui import QColor, QFont, QFontMetricsF, QPolygonF, QWidget, QScrol
                         QTextTableFormat, QRawFont, QKeyEvent, QFontDatabase, QMenu, QToolTip
 import math
 import html
+import weakref
 from hex.valuecodecs import IntegerCodec
 from hex.formatters import IntegerFormatter
 from hex.editor import DataSpan, FillSpan
@@ -1084,11 +1086,12 @@ class Column(QObject):
                                         join_lines=True):
                 painter.drawPolygon(sel_polygon)
 
-    def paintHighlight(self, paint_data, is_leading, hl_range):
+    def paintHighlight(self, paint_data, is_leading, hl_range, ignore_alpha):
         if hl_range and hl_range.backgroundColor is not None:
             painter = paint_data.painter
             back_color = hl_range.backgroundColor
-            back_color.setAlpha(settings.globalSettings()[appsettings.HexWidget_HighlightAlpha])
+            if ignore_alpha:
+                back_color.setAlpha(settings.globalSettings()[appsettings.HexWidget_HighlightAlpha])
             painter.setBrush(back_color)
             painter.setPen(QPen(back_color))
             for polygon in self.polygonsForRange(self.dataModel.indexFromPosition(hl_range.startPosition),
@@ -1319,6 +1322,8 @@ class HexWidget(QWidget):
     showHeaderChanged = pyqtSignal(bool)
     urlChanged = pyqtSignal(object)
 
+    MethodShowBottom, MethodShowTop, MethodShowCenter = range(3)
+
     def __init__(self, parent, editor):
         from hex.floatscrollbar import LargeScrollBar
 
@@ -1361,6 +1366,7 @@ class HexWidget(QWidget):
         self._scrollTimer = None
         self._hasSelection = False
         self._bookmarks = []
+        self._emphasizeRange = None
 
         self._editMode = False
         self._cursorVisible = False
@@ -1531,7 +1537,10 @@ class HexWidget(QWidget):
         painter.translate(self._absoluteToWidget(column.geometry.topLeft()))
 
         for bookmark in self._bookmarks:
-            column.paintHighlight(pd, self._leadingColumn is column, bookmark)
+            column.paintHighlight(pd, self._leadingColumn is column, bookmark, True)
+
+        if self._leadingColumn is not None and self._emphasizeRange is not None:
+            column.paintHighlight(pd, self._leadingColumn is column, self._emphasizeRange, False)
 
         column.paint(pd, self._leadingColumn is column)
 
@@ -1866,16 +1875,14 @@ class HexWidget(QWidget):
             return
 
         caret_index = self.caretIndex(self._leadingColumn)
+        if caret_index.row < new_caret_index.row:
+            method = self.MethodShowBottom
+        elif caret_index.row > new_caret_index.row:
+            method = self.MethodShowTop
+        else:
+            method = self.MethodShowCenter
 
-        # make caret position full-visible (even if caret is not moved)
-        if not self.isIndexVisible(new_caret_index, True):
-            if caret_index.row < new_caret_index.row:
-                new_first_row = new_caret_index.row - self.leadingColumn.fullVisibleRows + 1
-            elif caret_index.row > new_caret_index.row:
-                new_first_row = new_caret_index.row
-            else:
-                new_first_row = new_caret_index.row - int(self.leadingColumn.fullVisibleRows // 2) + 1
-            self.scrollToLeadingColumnRow(new_first_row, correct=True)
+        self.makeIndexVisible(new_caret_index, method)
 
         if new_caret_index != caret_index:
             self.caretPosition = new_caret_index.data(ColumnModel.EditorPositionRole)
@@ -1948,6 +1955,18 @@ class HexWidget(QWidget):
             else:
                 self._selectStartIndex = None
                 self._selectStartColumn = None
+
+    def makeIndexVisible(self, index, method=MethodShowCenter):
+        # make caret position full-visible (even if caret is not moved)
+        if not self.isIndexVisible(index, True):
+            if method == self.MethodShowBottom:
+                new_first_row = index.row - self.leadingColumn.fullVisibleRows + 1
+            elif method == self.MethodShowTop:
+                new_first_row = index.row
+            else:
+                new_first_row = index.row - int(self.leadingColumn.fullVisibleRows // 2) + 1
+
+            self.scrollToLeadingColumnRow(new_first_row, correct=True)
 
     def selectionBetweenIndexes(self, first, second):
         if not first or not second:
@@ -2429,6 +2448,29 @@ class HexWidget(QWidget):
     def theme(self):
         return self._theme
 
+    def emphasize(self, emp_range):
+        if self._emphasizeRange is not None:
+            self._removeEmphasize(self._emphasizeRange)
+
+        self._emphasizeRange = emp_range
+        self._emphasizeRange.updated.connect(self.view.update)
+        self._emphasizeRange.finished.connect(self._onEmphasizeFinished)
+
+        # make emphasized range visible
+        index = self._leadingColumn.dataModel.indexFromPosition(emp_range.startPosition)
+        if index:
+            self.makeIndexVisible(index, self.MethodShowTop)
+
+        self._emphasizeRange.emphasize()
+
+    def _onEmphasizeFinished(self):
+        self._removeEmphasize(self.sender())
+
+    def _removeEmphasize(self, emp_range):
+        self._emphasizeRange = None
+        emp_range.updated.disconnect(self.view.update)
+        emp_range.finished.disconnect(self._onEmphasizeFinished)
+
 
 class DataRange(QObject):
     """DataRange can be based on bytes or on cells. When based on bytes, size of range always remains the same, and
@@ -2638,3 +2680,47 @@ class BookmarkedRange(HighlightedRange):
     @property
     def innerLevel(self):
         return self.name.count('.')
+
+
+class EmphasizedRange(HighlightedRange):
+    finished = pyqtSignal()
+
+    def alpha(self):
+        return self._backgroundColor.alpha()
+
+    def setAlpha(self, alpha):
+        if alpha > 255:
+            alpha = 255
+        elif alpha < 0:
+            alpha = 0
+        self._backgroundColor.setAlpha(alpha)
+        self.updated.emit()
+
+    alpha = pyqtProperty('int', alpha, setAlpha)
+
+    def __init__(self, hexwidget, start=-1, length=0, unit=DataRange.UnitBytes, bound_to=DataRange.BoundToData):
+        HighlightedRange.__init__(self, hexwidget, start, length, unit, bound_to)
+        self._backgroundColor = QColor(Qt.red)
+
+        self._animation = QSequentialAnimationGroup(self)
+        animation1 = QPropertyAnimation(self, 'alpha', self)
+        animation1.setStartValue(0)
+        animation1.setEndValue(255)
+        animation1.setDuration(600)
+        animation1.setEasingCurve(QEasingCurve(QEasingCurve.Linear))
+        self._animation.addAnimation(animation1)
+        animation2 = QPropertyAnimation(self, 'alpha', self)
+        animation2.setStartValue(255)
+        animation2.setEndValue(0)
+        animation2.setDuration(600)
+        animation2.setEasingCurve(QEasingCurve(QEasingCurve.Linear))
+        animation2.setDirection(QPropertyAnimation.Backward)
+        self._animation.addAnimation(animation2)
+        self._animation.finished.connect(self.finished)
+
+    def emphasize(self):
+        self._animation.start()
+
+    @property
+    def backgroundColor(self):
+        return self._backgroundColor

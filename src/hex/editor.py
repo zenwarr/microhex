@@ -866,7 +866,8 @@ class AbstractCursor(object):
         if isinstance(index, slice):
             return self.read(index.start, index.stop)
         else:
-            return self.read(index, index + 1)
+            d = self.read(index, index + 1)
+            return d[0] if len(d) == 1 else d
 
     def _adjustSlice(self, start, stop):
         return max(start, self.minimal), (min(stop, self.maximal + 1) if self.maximal >= 0 else stop)
@@ -886,7 +887,11 @@ class AbstractCursor(object):
         if isinstance(index, slice):
             self.write(index.start, index.stop, value)
         else:
-            self.write(index, index + 1, value)
+            if isinstance(value, int):
+                d = value.to_bytes(1, byteorder='big')
+            else:
+                d = bytes(value)
+            self.write(index, index + 1, d)
 
     def write(self, start, stop, value):
         if not self.isActive:

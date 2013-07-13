@@ -236,32 +236,32 @@
         <translation>Будет загружено {0}</translation>
     </message>
     <message>
-        <location filename="main.py" line="28"/>
+        <location filename="main.py" line="30"/>
         <source>failed to load settings: {0}</source>
         <translation>не удалось загрузить настройки: {0}</translation>
     </message>
     <message>
-        <location filename="main.py" line="81"/>
+        <location filename="main.py" line="83"/>
         <source>failed to save settings: {0}</source>
         <translation>не удалось сохранить настройки: {0}</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="211"/>
+        <location filename="mainwin.py" line="209"/>
         <source>File</source>
         <translation>Файл</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="90"/>
+        <location filename="mainwin.py" line="83"/>
         <source>Open file...</source>
         <translation>Открыть файл...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="104"/>
+        <location filename="mainwin.py" line="97"/>
         <source>Close</source>
         <translation>Закрыть</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="108"/>
+        <location filename="mainwin.py" line="101"/>
         <source>Exit</source>
         <translation>Выход</translation>
     </message>
@@ -271,32 +271,32 @@
         <translation>Правка</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="111"/>
+        <location filename="mainwin.py" line="104"/>
         <source>Undo</source>
         <translation>Отменить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="116"/>
+        <location filename="mainwin.py" line="109"/>
         <source>Redo</source>
         <translation>Повторить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="121"/>
+        <location filename="mainwin.py" line="114"/>
         <source>Copy</source>
         <translation>Копировать</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="126"/>
+        <location filename="mainwin.py" line="119"/>
         <source>Paste</source>
         <translation>Вставить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="131"/>
+        <location filename="mainwin.py" line="124"/>
         <source>Clear selection</source>
         <translation>Убрать выделение</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="136"/>
+        <location filename="mainwin.py" line="129"/>
         <source>Select all</source>
         <translation>Выделить все</translation>
     </message>
@@ -306,7 +306,7 @@
         <translation>Вид</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="156"/>
+        <location filename="mainwin.py" line="149"/>
         <source>Show header</source>
         <translation>Показывать заголовок</translation>
     </message>
@@ -316,7 +316,7 @@
         <translation>?</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="181"/>
+        <location filename="mainwin.py" line="174"/>
         <source>About program...</source>
         <translation>О программе...</translation>
     </message>
@@ -331,7 +331,7 @@
         <translation>Инструменты</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="178"/>
+        <location filename="mainwin.py" line="171"/>
         <source>Settings...</source>
         <translation>Настройки...</translation>
     </message>
@@ -376,17 +376,17 @@
         <translation>Вы действительно хотите сбросить настройки приложения? Это действие не может быть отменено</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="141"/>
+        <location filename="mainwin.py" line="134"/>
         <source>Insert mode</source>
         <translation>Режим вставки</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="147"/>
+        <location filename="mainwin.py" line="140"/>
         <source>Remove selected</source>
         <translation>Удалить выделенное</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="152"/>
+        <location filename="mainwin.py" line="145"/>
         <source>Fill selected with zeros</source>
         <translation>Заполнить выделенное нулями</translation>
     </message>
@@ -481,12 +481,12 @@
         <translation type="obsolete">Колонок в строке</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="162"/>
+        <location filename="mainwin.py" line="155"/>
         <source>Setup column...</source>
         <translation>Настроить колонку...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="166"/>
+        <location filename="mainwin.py" line="159"/>
         <source>Add column...</source>
         <translation>Добавить колонку...</translation>
     </message>
@@ -546,7 +546,7 @@
         <translation>Настроить колонку {0}</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="170"/>
+        <location filename="mainwin.py" line="163"/>
         <source>Remove column</source>
         <translation>Удалить колонку</translation>
     </message>
@@ -576,7 +576,7 @@
         <translation>Положение:</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="174"/>
+        <location filename="mainwin.py" line="167"/>
         <source>Add address bar to column...</source>
         <translation>Добавить панель адреса для колонки...</translation>
     </message>
@@ -616,7 +616,7 @@
         <translation>начальное состояние</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="86"/>
+        <location filename="mainwin.py" line="79"/>
         <source>Create...</source>
         <translation>Создать...</translation>
     </message>
@@ -671,7 +671,7 @@
         <translation>не удалось сохранить {0}: не все данные были записаны</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="99"/>
+        <location filename="mainwin.py" line="92"/>
         <source>Save as...</source>
         <translation>Сохранить как...</translation>
     </message>
@@ -686,42 +686,42 @@
         <translation>Редактор</translation>
     </message>
     <message>
-        <location filename="main.py" line="43"/>
+        <location filename="main.py" line="45"/>
         <source>Crossplatform hex-editing software</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="main.py" line="45"/>
+        <location filename="main.py" line="47"/>
         <source>show application version and exit</source>
         <translation>показать версию и выйти</translation>
     </message>
     <message>
-        <location filename="main.py" line="48"/>
+        <location filename="main.py" line="50"/>
         <source>reset application settings to defaults</source>
         <translation>сбросить настройки приложения на умолчания</translation>
     </message>
     <message>
-        <location filename="main.py" line="50"/>
+        <location filename="main.py" line="52"/>
         <source>load files in read-only mode</source>
         <translation>загрузить файлы только для чтения</translation>
     </message>
     <message>
-        <location filename="main.py" line="52"/>
+        <location filename="main.py" line="54"/>
         <source>freeze size of loaded documents</source>
         <translation>зафиксировать размер загруженных документов</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="184"/>
+        <location filename="mainwin.py" line="177"/>
         <source>Increase font</source>
         <translation>Увеличить шрифт</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="188"/>
+        <location filename="mainwin.py" line="181"/>
         <source>Decrease font</source>
         <translation>Уменьшить шрифт</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="192"/>
+        <location filename="mainwin.py" line="185"/>
         <source>Reset original font size</source>
         <translation>Восстановить исходный размер шрифта</translation>
     </message>
@@ -736,7 +736,7 @@
         <translation type="obsolete">без диалога параметров загрузки</translation>
     </message>
     <message>
-        <location filename="main.py" line="54"/>
+        <location filename="main.py" line="56"/>
         <source>do not invoke load options dialog</source>
         <translation>без диалога параметров загрузки</translation>
     </message>
@@ -746,34 +746,54 @@
         <translation>Общее</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="196"/>
+        <location filename="mainwin.py" line="189"/>
         <source>Goto...</source>
         <translation>Перейти к...</translation>
     </message>
     <message>
-        <location filename="addbookmarkdialog.py" line="62"/>
+        <location filename="addbookmarkdialog.py" line="65"/>
         <source>bookmark{0}</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="addbookmarkdialog.py" line="91"/>
+        <location filename="addbookmarkdialog.py" line="106"/>
         <source>Select color for bookmark</source>
         <translation>Выбор цвета для закладки</translation>
     </message>
     <message>
-        <location filename="hexwidget.py" line="2111"/>
+        <location filename="hexwidget.py" line="2130"/>
         <source>Bookmark: {0}</source>
         <translation>Закладка: {0}</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="201"/>
+        <location filename="mainwin.py" line="194"/>
         <source>Add bookmark...</source>
         <translation>Добавить закладку...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="205"/>
+        <location filename="mainwin.py" line="198"/>
         <source>Remove bookmark</source>
         <translation>Удалить закладку</translation>
+    </message>
+    <message>
+        <location filename="mainwin.py" line="202"/>
+        <source>Search...</source>
+        <translation>Найти...</translation>
+    </message>
+    <message>
+        <location filename="searchdialog.py" line="49"/>
+        <source>Search</source>
+        <translation>Поиск</translation>
+    </message>
+    <message>
+        <location filename="searchdialog.py" line="20"/>
+        <source>Enter hex values to search for:</source>
+        <translation>Введите шестнадцатиричные значения, которые нужно найти:</translation>
+    </message>
+    <message>
+        <location filename="searchdialog.py" line="49"/>
+        <source>Nothing had been found</source>
+        <translation>Ничего не нашлось</translation>
     </message>
 </context>
 </TS>

@@ -2,6 +2,8 @@ import locale
 import os
 import sys
 import argparse
+import gc
+from PyQt4.QtCore import QTimer
 from PyQt4.QtGui import QApplication
 import hex.settings as settings
 import hex.appsettings as appsettings
@@ -81,11 +83,23 @@ class Application(QApplication):
                 print(utils.tr('failed to save settings: {0}').format(err))
 
 
+class GarbageCollector(object):
+    def __init__(self):
+        gc.disable()
+        self.timer = QTimer()
+        self.timer.timeout.connect(self._doCollect)
+        self.timer.start(5000)
+
+    def _doCollect(self):
+        gc.collect()
+
+
 def main():
     locale.setlocale(locale.LC_ALL, '')
     os.chdir(os.path.expanduser('~'))
 
     app = Application()
+    collector = GarbageCollector()
     started = app.startUp()
     try:
         if started:
