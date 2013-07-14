@@ -32,19 +32,19 @@ class SearchDialog(utils.Dialog):
 
     def doSearch(self):
         self.searchButton.setEnabled(False)
-        matcher = matchers.BinaryMatcher(self.hexWidget.editor, self.hexInput.data)
-        matcher.newMatch.connect(self._onMatch, Qt.QueuedConnection)
-        matcher.completed.connect(self._onCompleted, Qt.QueuedConnection)
-        matcher.matchLimit = 1
-        threading.Thread(target=matcher.findMatches).start()
+        self.matcher = matchers.BinaryMatcher(self.hexWidget.editor, self.hexInput.data)
+        self.matcher.newMatch.connect(self._onMatch, Qt.QueuedConnection)
+        self.matcher.completed.connect(self._onCompleted, Qt.QueuedConnection)
+        self.matcher.matchLimit = 1
+        threading.Thread(target=self.matcher.findMatches).start()
 
     def _onMatch(self, match):
-        self.accept()
         self.hexWidget.emphasize(hexwidget.EmphasizedRange(self.hexWidget, match.position, match.length,
                                                         hexwidget.DataRange.UnitBytes))
         self.hexWidget.selectionRanges = [hexwidget.SelectionRange(self.hexWidget, match.position, match.length,
                                                               hexwidget.DataRange.UnitBytes)]
 
     def _onCompleted(self):
-        QMessageBox.information(self, utils.tr('Search'), utils.tr('Nothing had been found'))
+        if not self.matcher.allMatches:
+            QMessageBox.information(self, utils.tr('Search'), utils.tr('Nothing had been found'))
         self.accept()

@@ -482,7 +482,8 @@ class MainWindow(QMainWindow):
         import hex.columnproviders as columnproviders
         dlg = columnproviders.CreateColumnDialog(self, self.activeSubWidget.hexWidget)
         if dlg.exec_() == QDialog.Accepted:
-            self.activeSubWidget.hexWidget.appendColumn(dlg.createColumnModel())
+            hexWidget = self.activeSubWidget.hexWidget
+            hexWidget.insertColumn(dlg.createColumnModel(), hexWidget.columnIndex(hexWidget.leadingColumn) + 1)
 
     @forActiveWidget
     def removeColumn(self):

@@ -4,10 +4,9 @@ from PyQt4.QtGui import QColor, QFont, QFontMetricsF, QPolygonF, QWidget, QScrol
                         QPainter, QBrush, QPalette, QPen, QApplication, QRegion, QLineEdit, QValidator, \
                         QTextEdit, QTextOption, QSizePolicy, QStyle, QStyleOptionFrameV2, QTextCursor, QTextDocument, \
                         QTextBlockFormat, QPlainTextDocumentLayout, QAbstractTextDocumentLayout, QTextCharFormat, \
-                        QTextTableFormat, QRawFont, QKeyEvent, QFontDatabase, QMenu, QToolTip
+                        QTextTableFormat, QRawFont, QKeyEvent, QFontDatabase, QMenu, QToolTip, QPixmap, QIcon
 import math
 import html
-import weakref
 from hex.valuecodecs import IntegerCodec
 from hex.formatters import IntegerFormatter
 from hex.editor import DataSpan, FillSpan
@@ -16,6 +15,7 @@ import hex.encodings as encodings
 import hex.utils as utils
 import hex.settings as settings
 import hex.appsettings as appsettings
+import hex.resources.qrc_main
 
 
 # Why we need to make different model/view classes? Why not to use existing ones?
@@ -1371,6 +1371,9 @@ class HexWidget(QWidget):
         self._hasSelection = False
         self._bookmarks = []
         self._emphasizeRange = None
+        self._draggingColumn = None
+        self._columnInsertIndex = -1
+        self._columnInsertIcon = utils.getIcon('arrow-up')
 
         self._editMode = False
         self._cursorVisible = False
@@ -1504,6 +1507,16 @@ class HexWidget(QWidget):
     def appendColumn(self, model):
         self.insertColumn(model)
 
+    def moveColumn(self, column, index):
+        column_index = self.columnIndex(column)
+        if column_index >= 0 and index != column_index:
+            self._columns.insert(index, column)
+            if column_index > index:
+                del self._columns[column_index + 1]
+            else:
+                del self._columns[column_index]
+            self._updateColumnsGeometry()
+
     def columnFromIndex(self, index):
         return self.columnFromModel(index.model)
 
@@ -1540,6 +1553,16 @@ class HexWidget(QWidget):
 
         self._paintCursor(pd)
         self._paintBorders(pd)
+
+        if self._columnInsertIndex >= 0:
+            # find position for icon
+            if self._columnInsertIndex < len(self._columns):
+                border_pos = self._columns[self._columnInsertIndex].geometry.left()
+            else:
+                border_pos = self._columns[-1].geometry.right()
+            border_pos -= 8
+
+            self._columnInsertIcon.paint(pd.painter, border_pos, self.headerHeight, 16, 16)
 
     def _paintColumn(self, pd, column):
         painter = pd.painter
@@ -2034,17 +2057,28 @@ class HexWidget(QWidget):
                             self._selectStartIndex = activated_index
                             self._selectStartColumn = column
                             self._mousePressPoint = mouse_pos
+                elif column.headerRect.contains(pos):
+                    # start dragging column
+                    self._draggingColumn = column
+                    self.setCursor(Qt.ClosedHandCursor)
 
     def _mouseRelease(self, event):
         self._selectStartIndex = None
         self._selectStartColumn = None
+        self.setCursor(Qt.ArrowCursor)
+        if self._draggingColumn is not None:
+            if self._columnInsertIndex >= 0:
+                self.moveColumn(self._draggingColumn, self._columnInsertIndex)
+
+            self._draggingColumn = None
+            self._columnInsertIndex = -1
+            self.view.update()
         self._stopScrollTimer()
 
     def _mouseMove(self, event):
+        mouse_pos = self._widgetToAbsolute(event.posF())
+        column = self.columnFromPoint(mouse_pos)
         if self._selectStartIndex:
-            mouse_pos = self._widgetToAbsolute(event.posF())
-
-            column = self.columnFromPoint(mouse_pos)
             if column is not None and column is self._selectStartColumn:
                 hover_index = column.indexFromPoint(self._absoluteToColumn(column, mouse_pos))
                 if hover_index and hover_index > column.dataModel.lastRealIndex:
@@ -2083,6 +2117,17 @@ class HexWidget(QWidget):
             overpos = min(overpos, 100)
             if overpos:
                 self._startScrollTimer(math.ceil(overpos / 20))
+        elif self._draggingColumn is not None:
+            threshold = 15
+            if column is None:
+                self._columnInsertIndex = len(self._columns)
+            else:
+                column_pos = self._absoluteToColumn(column, mouse_pos)
+                if column_pos.x() <= threshold:
+                    self._columnInsertIndex = self.columnIndex(column)
+                elif column.geometry.width() - column_pos.x() <= threshold:
+                    self._columnInsertIndex = self.columnIndex(column) + 1
+            self.view.update()
 
     def _mouseDoubleClick(self, event):
         if not self._editMode:
