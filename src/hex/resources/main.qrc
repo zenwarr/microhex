@@ -43,6 +43,7 @@
         <file>images/bookmark-new32.png</file>
         <file>images/edit-find16.png</file>
         <file>images/edit-find32.png</file>
-        <file>images/arrow-up-icon.png</file>
+        <file>images/arrow-up16.png</file>
+        <file>images/arrow-up32.png</file>
     </qresource>
 </RCC>

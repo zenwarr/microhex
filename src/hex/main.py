@@ -17,7 +17,7 @@ class Application(QApplication):
         self.setApplicationName('Microhex')
         self.setOrganizationName('zenwarr')
         self.setOrganizationDomain('http://github.org/zenwarr/hexedit')
-        self.setApplicationVersion('0.0.1 indev')
+        self.setApplicationVersion('0.0.2 indev')
 
         # initialize settings
         settings.defaultConfigure('microhex')
