@@ -11,3 +11,6 @@ After all requirements are met, go to "src" subdirectory of Microhex and run the
 
 Now you can run Microhex application with:
     python3 ./run.py
+
+On some system you will need to replace "python3" with "python" or another name, depending on Python
+configuration.

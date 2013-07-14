@@ -18,6 +18,8 @@ In actual version the following features are available:
 -   translation support (English and Russian translations are provided)
 -   hex view zooming (Ctrl+Wheel)
 -   hex view theming (not available via GUI yet)
+-   bookmarks
+-   search for binary values
 
 See INSTALL file to get instructions how to install and run application.
 
