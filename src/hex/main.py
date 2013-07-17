@@ -3,6 +3,7 @@ import os
 import sys
 import argparse
 import gc
+import threading
 from PyQt4.QtCore import QTimer
 from PyQt4.QtGui import QApplication
 import hex.settings as settings
@@ -22,6 +23,8 @@ class Application(QApplication):
         # initialize settings
         settings.defaultConfigure('microhex')
         appsettings.doRegister()
+
+        utils.guiThread = threading.current_thread()
 
         for s in (settings.globalSettings(), settings.globalQuickSettings()):
             try:

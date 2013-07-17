@@ -7,6 +7,7 @@ import random
 
 
 applicationPath = ''
+guiThread = None
 testRun = False
 
 

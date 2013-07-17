@@ -5,6 +5,8 @@ _is_registered = False
 
 
 App_Translation = 'app.translation'
+App_DefaultErrorPolicy = 'app.default_error_policy'
+App_PoolOperationLimit = 'app.pool_operation_limit'
 IntegerEdit_Uppercase = 'integeredit.uppercase'
 IntegerEdit_DefaultStyle = 'integeredit.default_style'
 Files_MaxMemoryLoadSize = 'files.max_memoryload_size'
@@ -29,6 +31,8 @@ def doRegister():
             (Files_MaxMemoryLoadSize, 1024 * 1024 * 10, int),
             (HexWidget_ShowHeader, True, bool),
             (App_Translation, '', str),
+            (App_DefaultErrorPolicy, 'ask', str),
+            (App_PoolOperationLimit, 10, int),
             (HexWidget_DefaultTheme, dict(), dict),
             (HexWidget_AlternatingRows, True, bool),
             (HexWidget_Font, ('Ubuntu Mono,13,-1,5,50,0,0,0,0,0',

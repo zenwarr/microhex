@@ -8,6 +8,7 @@ import hex.appsettings as appsettings
 import hex.utils as utils
 import hex.devices as devices
 import hex.editor as editor
+import hex.operations as operations
 import hex.resources.qrc_main
 
 
@@ -20,6 +21,7 @@ def forActiveWidget(fn):
 
 globalSettings = settings.globalSettings()
 globalQuickSettings = settings.globalQuickSettings()
+globalMainWindow = None
 
 
 class MainWindow(QMainWindow):
@@ -28,6 +30,9 @@ class MainWindow(QMainWindow):
     def __init__(self, files_to_load):
         QMainWindow.__init__(self)
         self._inited = False
+
+        global globalMainWindow
+        globalMainWindow = self
 
         self.setWindowTitle(QApplication.applicationName())
         self.setWindowIcon(QIcon(':/main/images/hex.png'))
@@ -204,6 +209,9 @@ class MainWindow(QMainWindow):
         self.actionSearch.setShortcut(QKeySequence('Ctrl+F'))
         self.actionSearch.triggered.connect(self.search)
 
+        self.actionShowOperationManager = QAction(QIcon(), utils.tr('Show operation manager...'), None)
+        self.actionShowOperationManager.triggered.connect(self.showOperationManager)
+
     def buildMenus(self):
         menubar = self.menuBar()
         self.fileMenu = menubar.addMenu(utils.tr('File'))
@@ -252,6 +260,8 @@ class MainWindow(QMainWindow):
         self.viewMenu.addAction(self.actionAddAddress)
 
         self.toolsMenu = menubar.addMenu(utils.tr('Tools'))
+        self.toolsMenu.addAction(self.actionShowOperationManager)
+        self.toolsMenu.addSeparator()
         self.toolsMenu.addAction(self.actionShowSettings)
 
         self.helpMenu = menubar.addMenu(utils.tr('?'))
@@ -280,7 +290,10 @@ class MainWindow(QMainWindow):
         self.insertModeObserver = PropertyObserver(self, 'activeSubWidget.hexWidget.insertMode', insertmode_to_text)
         self.insertModeObserver.valueChanged.connect(self.lblInsertMode.setText)
 
+        self.operationsInfoWidget = OperationsStatusBarWidget(self)
+
         statusbar = self.statusBar()
+        statusbar.addPermanentWidget(self.operationsInfoWidget)
         statusbar.addPermanentWidget(self.lblReadOnly)
         statusbar.addPermanentWidget(self.lblInsertMode)
 
@@ -304,6 +317,10 @@ class MainWindow(QMainWindow):
             self._inited = True
 
     def closeEvent(self, event):
+        if not operations.onApplicationShutdown(self):
+            event.ignore()
+            return
+
         while self.tabsWidget.count():
             if not self.closeTab(0):
                 event.ignore()
@@ -554,6 +571,9 @@ class MainWindow(QMainWindow):
         dlg = SearchDialog(self, self.activeSubWidget.hexWidget)
         dlg.exec_()
 
+    def showOperationManager(self):
+        operations.OperationsDialog(self).exec_()
+
 
 class PropertyObserver(QObject):
     valueChanged = pyqtSignal(object)
@@ -665,3 +685,12 @@ class HexSubWindow(QWidget):
 
     def _onUrlChanged(self):
         self.titleChanged.emit(self.title)
+
+
+class OperationsStatusBarWidget(operations.OperationsInfoWidget):
+    def __init__(self, parent=None):
+        operations.OperationsInfoWidget.__init__(self, parent)
+
+    def _setOperation(self, old_operation, new_operation):
+        operations.OperationsInfoWidget._setOperation(self, old_operation, new_operation)
+        self.setVisible(new_operation is not None)

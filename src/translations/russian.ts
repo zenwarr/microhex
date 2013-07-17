@@ -176,17 +176,17 @@
         <translation>ОК</translation>
     </message>
     <message>
-        <location filename="devices.py" line="159"/>
+        <location filename="devices.py" line="182"/>
         <source>failed to seek to position {0}</source>
         <translation>невозможно перейти к позиции {0}</translation>
     </message>
     <message>
-        <location filename="devices.py" line="197"/>
+        <location filename="devices.py" line="220"/>
         <source>file {0} does not exist</source>
         <translation>файл {0} не найден</translation>
     </message>
     <message>
-        <location filename="devices.py" line="199"/>
+        <location filename="devices.py" line="222"/>
         <source>cannot load file into memory that has size {0}</source>
         <translation>файл размера {0} невозможно загрузить в память</translation>
     </message>
@@ -206,12 +206,12 @@
         <translation>запись {0} байт по адресу {1}</translation>
     </message>
     <message>
-        <location filename="editor.py" line="727"/>
+        <location filename="editor.py" line="728"/>
         <source>insert {0} bytes from position {1}</source>
         <translation>вставка {0} байт по адресу {1}</translation>
     </message>
     <message>
-        <location filename="editor.py" line="746"/>
+        <location filename="editor.py" line="747"/>
         <source>remove {0} bytes from position {1}</source>
         <translation>удаление {0} байт по адресу {1}</translation>
     </message>
@@ -236,102 +236,102 @@
         <translation>Будет загружено {0}</translation>
     </message>
     <message>
-        <location filename="main.py" line="30"/>
+        <location filename="main.py" line="33"/>
         <source>failed to load settings: {0}</source>
         <translation>не удалось загрузить настройки: {0}</translation>
     </message>
     <message>
-        <location filename="main.py" line="83"/>
+        <location filename="main.py" line="86"/>
         <source>failed to save settings: {0}</source>
         <translation>не удалось сохранить настройки: {0}</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="209"/>
+        <location filename="mainwin.py" line="217"/>
         <source>File</source>
         <translation>Файл</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="83"/>
+        <location filename="mainwin.py" line="88"/>
         <source>Open file...</source>
         <translation>Открыть файл...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="97"/>
+        <location filename="mainwin.py" line="102"/>
         <source>Close</source>
         <translation>Закрыть</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="101"/>
+        <location filename="mainwin.py" line="106"/>
         <source>Exit</source>
         <translation>Выход</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="294"/>
+        <location filename="mainwin.py" line="307"/>
         <source>Edit</source>
         <translation>Правка</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="104"/>
+        <location filename="mainwin.py" line="109"/>
         <source>Undo</source>
         <translation>Отменить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="109"/>
+        <location filename="mainwin.py" line="114"/>
         <source>Redo</source>
         <translation>Повторить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="114"/>
+        <location filename="mainwin.py" line="119"/>
         <source>Copy</source>
         <translation>Копировать</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="119"/>
+        <location filename="mainwin.py" line="124"/>
         <source>Paste</source>
         <translation>Вставить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="124"/>
+        <location filename="mainwin.py" line="129"/>
         <source>Clear selection</source>
         <translation>Убрать выделение</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="129"/>
+        <location filename="mainwin.py" line="134"/>
         <source>Select all</source>
         <translation>Выделить все</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="242"/>
+        <location filename="mainwin.py" line="250"/>
         <source>View</source>
         <translation>Вид</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="149"/>
+        <location filename="mainwin.py" line="154"/>
         <source>Show header</source>
         <translation>Показывать заголовок</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="257"/>
+        <location filename="mainwin.py" line="267"/>
         <source>?</source>
         <translation>?</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="174"/>
+        <location filename="mainwin.py" line="179"/>
         <source>About program...</source>
         <translation>О программе...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="340"/>
+        <location filename="mainwin.py" line="358"/>
         <source>Open file</source>
         <translation>Открыть файл</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="254"/>
+        <location filename="mainwin.py" line="262"/>
         <source>Tools</source>
         <translation>Инструменты</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="171"/>
+        <location filename="mainwin.py" line="176"/>
         <source>Settings...</source>
         <translation>Настройки...</translation>
     </message>
@@ -376,17 +376,17 @@
         <translation>Вы действительно хотите сбросить настройки приложения? Это действие не может быть отменено</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="134"/>
+        <location filename="mainwin.py" line="139"/>
         <source>Insert mode</source>
         <translation>Режим вставки</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="140"/>
+        <location filename="mainwin.py" line="145"/>
         <source>Remove selected</source>
         <translation>Удалить выделенное</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="145"/>
+        <location filename="mainwin.py" line="150"/>
         <source>Fill selected with zeros</source>
         <translation>Заполнить выделенное нулями</translation>
     </message>
@@ -481,12 +481,12 @@
         <translation type="obsolete">Колонок в строке</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="155"/>
+        <location filename="mainwin.py" line="160"/>
         <source>Setup column...</source>
         <translation>Настроить колонку...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="159"/>
+        <location filename="mainwin.py" line="164"/>
         <source>Add column...</source>
         <translation>Добавить колонку...</translation>
     </message>
@@ -546,7 +546,7 @@
         <translation>Настроить колонку {0}</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="163"/>
+        <location filename="mainwin.py" line="168"/>
         <source>Remove column</source>
         <translation>Удалить колонку</translation>
     </message>
@@ -576,7 +576,7 @@
         <translation>Положение:</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="167"/>
+        <location filename="mainwin.py" line="172"/>
         <source>Add address bar to column...</source>
         <translation>Добавить панель адреса для колонки...</translation>
     </message>
@@ -586,27 +586,27 @@
         <translation>Добавить колонку адреса</translation>
     </message>
     <message>
-        <location filename="devices.py" line="247"/>
+        <location filename="devices.py" line="270"/>
         <source>failed to remove {0}</source>
         <translation>не удалось удалить {0}</translation>
     </message>
     <message>
-        <location filename="devices.py" line="251"/>
+        <location filename="devices.py" line="274"/>
         <source>failed to move {0} into {1}</source>
         <translation>не удалось переместить {0} в {1}</translation>
     </message>
     <message>
-        <location filename="devices.py" line="222"/>
+        <location filename="devices.py" line="245"/>
         <source>failed to resize file {0} to size {1}</source>
         <translation>не удалось изменить размер файла с {0} на {1}</translation>
     </message>
     <message>
-        <location filename="devices.py" line="363"/>
+        <location filename="devices.py" line="386"/>
         <source>unknown scheme for device URL: {0}</source>
         <translation>Неизвестный протокол URL: {0}</translation>
     </message>
     <message>
-        <location filename="devices.py" line="367"/>
+        <location filename="devices.py" line="390"/>
         <source>failed to load {0} bytes into memory: limit is {1}</source>
         <translation>не удалось загрузить {0} в память: ограничение составляет {1}</translation>
     </message>
@@ -616,67 +616,67 @@
         <translation>начальное состояние</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="79"/>
+        <location filename="mainwin.py" line="84"/>
         <source>Create...</source>
         <translation>Создать...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="325"/>
+        <location filename="mainwin.py" line="343"/>
         <source>Save</source>
         <translation>Сохранить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="265"/>
+        <location filename="mainwin.py" line="275"/>
         <source>Read-only</source>
         <translation>Только чтение</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="265"/>
+        <location filename="mainwin.py" line="275"/>
         <source>Read-write</source>
         <translation>Чтение и запись</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="276"/>
+        <location filename="mainwin.py" line="286"/>
         <source>Insert</source>
         <translation>Вставка</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="276"/>
+        <location filename="mainwin.py" line="286"/>
         <source>Overwrite</source>
         <translation>Перезапись</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="321"/>
+        <location filename="mainwin.py" line="339"/>
         <source>Close editor</source>
         <translation>Закрыть редактор</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="323"/>
+        <location filename="mainwin.py" line="341"/>
         <source>Document {0} has unsaved changed. Do you want to save it?</source>
         <translation>В документе {0} есть несохраненные изменения. Сохранить их?</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="326"/>
+        <location filename="mainwin.py" line="344"/>
         <source>Do not save</source>
         <translation>Не сохранять</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="370"/>
+        <location filename="mainwin.py" line="388"/>
         <source>New document</source>
         <translation>Новый документ</translation>
     </message>
     <message>
-        <location filename="devices.py" line="128"/>
+        <location filename="devices.py" line="151"/>
         <source>failed to write {0}: not all data was written</source>
         <translation>не удалось сохранить {0}: не все данные были записаны</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="92"/>
+        <location filename="mainwin.py" line="97"/>
         <source>Save as...</source>
         <translation>Сохранить как...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="361"/>
+        <location filename="mainwin.py" line="379"/>
         <source>Save file as</source>
         <translation>Сохранить файл как</translation>
     </message>
@@ -686,42 +686,42 @@
         <translation>Редактор</translation>
     </message>
     <message>
-        <location filename="main.py" line="45"/>
+        <location filename="main.py" line="48"/>
         <source>Crossplatform hex-editing software</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="main.py" line="47"/>
+        <location filename="main.py" line="50"/>
         <source>show application version and exit</source>
         <translation>показать версию и выйти</translation>
     </message>
     <message>
-        <location filename="main.py" line="50"/>
+        <location filename="main.py" line="53"/>
         <source>reset application settings to defaults</source>
         <translation>сбросить настройки приложения на умолчания</translation>
     </message>
     <message>
-        <location filename="main.py" line="52"/>
+        <location filename="main.py" line="55"/>
         <source>load files in read-only mode</source>
         <translation>загрузить файлы только для чтения</translation>
     </message>
     <message>
-        <location filename="main.py" line="54"/>
+        <location filename="main.py" line="57"/>
         <source>freeze size of loaded documents</source>
         <translation>зафиксировать размер загруженных документов</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="177"/>
+        <location filename="mainwin.py" line="182"/>
         <source>Increase font</source>
         <translation>Увеличить шрифт</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="181"/>
+        <location filename="mainwin.py" line="186"/>
         <source>Decrease font</source>
         <translation>Уменьшить шрифт</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="185"/>
+        <location filename="mainwin.py" line="190"/>
         <source>Reset original font size</source>
         <translation>Восстановить исходный размер шрифта</translation>
     </message>
@@ -736,17 +736,17 @@
         <translation type="obsolete">без диалога параметров загрузки</translation>
     </message>
     <message>
-        <location filename="main.py" line="56"/>
+        <location filename="main.py" line="59"/>
         <source>do not invoke load options dialog</source>
         <translation>без диалога параметров загрузки</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="288"/>
+        <location filename="mainwin.py" line="301"/>
         <source>General</source>
         <translation>Общее</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="189"/>
+        <location filename="mainwin.py" line="194"/>
         <source>Goto...</source>
         <translation>Перейти к...</translation>
     </message>
@@ -761,22 +761,22 @@
         <translation>Выбор цвета для закладки</translation>
     </message>
     <message>
-        <location filename="hexwidget.py" line="2130"/>
+        <location filename="hexwidget.py" line="2191"/>
         <source>Bookmark: {0}</source>
         <translation>Закладка: {0}</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="194"/>
+        <location filename="mainwin.py" line="199"/>
         <source>Add bookmark...</source>
         <translation>Добавить закладку...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="198"/>
+        <location filename="mainwin.py" line="203"/>
         <source>Remove bookmark</source>
         <translation>Удалить закладку</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="202"/>
+        <location filename="mainwin.py" line="207"/>
         <source>Search...</source>
         <translation>Найти...</translation>
     </message>
@@ -794,6 +794,180 @@
         <location filename="searchdialog.py" line="49"/>
         <source>Nothing had been found</source>
         <translation>Ничего не нашлось</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="25"/>
+        <source>Not started</source>
+        <translation>Не запущено</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="26"/>
+        <source>Waiting for start</source>
+        <translation>Ожидание запуска</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="27"/>
+        <source>Running</source>
+        <translation>Выполняется</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="28"/>
+        <source>Paused</source>
+        <translation>Приостановлено</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="29"/>
+        <source>Cancelled</source>
+        <translation>Отменено</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="30"/>
+        <source>Completed</source>
+        <translation>Завершено</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="31"/>
+        <source>Failed</source>
+        <translation>Ошибка</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="51"/>
+        <source>Unknown</source>
+        <translation>Неизвестно</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="650"/>
+        <source>During executing operation</source>
+        <translation>Во время выполнения операции</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="653"/>
+        <source>the following error occupied:</source>
+        <translation>произошла следующая ошибка:</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="653"/>
+        <source>&lt;/b&gt;&lt;br&gt;&lt;br&gt;Do you want to try to cancel this operation?</source>
+        <translation>&lt;/b&gt;&lt;br&lt;br&gt;Хотите отменить эту операцию?</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="715"/>
+        <source>Operation error</source>
+        <translation type="obsolete">Ошибка операции</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1054"/>
+        <source>Run</source>
+        <translation>Запустить</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1060"/>
+        <source>Pause</source>
+        <translation>Приостановить</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1066"/>
+        <source>Resume</source>
+        <translation>Возобновить</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1030"/>
+        <source>Cancel</source>
+        <translation type="obsolete">Отменить</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1440"/>
+        <source>There are {0} operations running in background. You should cancel them or wait for them to finish before exiting application. Currently the following operations are running or waiting to be started:
+
+{1}</source>
+        <translation>В данный момент в фоновом режиме выполняются {0} операции. Чтоб выйти из приложения, нужно либо отменить их, либо дождаться их завершения. Выполняются или ожидают выполнения следующие операции:
+
+{1}</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1446"/>
+        <source>Background operations are running</source>
+        <translation>Выполняются фоновые операции</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1449"/>
+        <source>Cancel all operations</source>
+        <translation>Отменить все операции</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1450"/>
+        <source>Wait for operations to be finished</source>
+        <translation>Подождать завершения</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1472"/>
+        <source>Failed to cancel operations</source>
+        <translation>Не удалось отметить операции</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1472"/>
+        <source>Not all operations was cancelled. Application will stay alive.</source>
+        <translation>Не все операции удалось отменить. Приложение останется запущенным.</translation>
+    </message>
+    <message>
+        <location filename="mainwin.py" line="212"/>
+        <source>Show operation manager...</source>
+        <translation>Показать менеджер операций...</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="215"/>
+        <source>&lt;unnamed operation&gt;</source>
+        <translation>&lt;безымянная операция&gt;</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="657"/>
+        <source>{0} operation error</source>
+        <translation>Ошибка операции {0}</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="660"/>
+        <source>Cancel operation</source>
+        <translation>Отметить операцию</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="662"/>
+        <source>Continue operation</source>
+        <translation>Продолжить операцию</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1113"/>
+        <source>Abort</source>
+        <translation>Прервать</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1290"/>
+        <source>Close dialog</source>
+        <translation>Закрыть диалог</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1347"/>
+        <source>Title</source>
+        <translation>Заголовок</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1347"/>
+        <source>Status</source>
+        <translation>Статус</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1347"/>
+        <source>Progress</source>
+        <translation>Выполнено</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1347"/>
+        <source>Progress text</source>
+        <translation>Выполнение</translation>
+    </message>
+    <message>
+        <location filename="operations.py" line="1391"/>
+        <source>Operation manager</source>
+        <translation>Менеджер операций</translation>
     </message>
 </context>
 </TS>

@@ -202,13 +202,13 @@ class TestEditor(unittest.TestCase):
 
         cursor = editor.createReadCursor()
         with cursor.activate():
-            self.assertEqual(cursor[0], b'H')
+            self.assertEqual(cursor[0], b'H'[0])
             self.assertEqual(cursor[0:2], b'He')
             self.assertEqual(cursor.minimal, 0)
             self.assertEqual(cursor.maximal, -1)
 
             cursor.position = 5
-            self.assertEqual(cursor[0], b',')
+            self.assertEqual(cursor[0], b','[0])
             self.assertEqual(cursor[0:3], b', W')
             self.assertEqual(cursor[-1:3], b'o, W')
             self.assertEqual(cursor.minimal, -5)

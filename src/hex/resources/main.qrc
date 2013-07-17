@@ -45,5 +45,15 @@
         <file>images/edit-find32.png</file>
         <file>images/arrow-up16.png</file>
         <file>images/arrow-up32.png</file>
+        <file>images/dialog-error16.png</file>
+        <file>images/dialog-error32.png</file>
+        <file>images/dialog-warning16.png</file>
+        <file>images/dialog-warning32.png</file>
+        <file>images/media-playback-pause16.png</file>
+        <file>images/media-playback-pause32.png</file>
+        <file>images/media-playback-start16.png</file>
+        <file>images/media-playback-start32.png</file>
+        <file>images/media-playback-stop16.png</file>
+        <file>images/media-playback-stop32.png</file>
     </qresource>
 </RCC>
