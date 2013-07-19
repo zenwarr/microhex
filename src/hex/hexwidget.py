@@ -1840,7 +1840,7 @@ class HexWidget(QWidget):
 
         # header border
         if self.showHeader:
-            painter.drawLine(self._absoluteToWidget(QLineF(0, self.headerHeight, self.view.width(), self.headerHeight)))
+            painter.drawLine(self._absoluteToWidget(QLineF(0, self.headerHeight, self._totalWidth, self.headerHeight)))
 
     def _wheel(self, event):
         if event.orientation() == Qt.Vertical:
