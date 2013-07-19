@@ -485,6 +485,8 @@ class RegularColumnModel(ColumnModel):
 
         if role == self.EditorPositionRole:
             return editor_position
+        elif role == self.DataSizeRole:
+            return self.regularCellDataSize
 
         if editor_position >= len(self.editor):
             return self.virtualIndexData(index, role)
@@ -556,16 +558,16 @@ class RegularColumnModel(ColumnModel):
         raise NotImplementedError()
 
     def _dataForNewIndex(self, input_text, before_index):
-        return b'\x00' * self.regularCellDataSize
+        raise NotImplementedError()
 
     def beginEditNewIndex(self, input_text, before_index):
         if not self.editor.readOnly and not self.editor.fixedSize:
-            data_to_insert, cursor_offset = self._dataForNewIndex(input_text, before_index)
+            data_to_insert, index_text, cursor_offset = self._dataForNewIndex(input_text, before_index)
             position = before_index.data(self.EditorPositionRole) if before_index else len(self.editor)
             if data_to_insert and position >= 0:
                 self.editor.insertSpan(position, DataSpan(self.editor, data_to_insert))
                 new_index = self.indexFromPosition(position)
-                self._editingIndexText = new_index.data(Qt.EditRole)
+                self._editingIndexText = index_text
                 self._editingIndexInserted = True
                 self._editingIndexModified = True
                 ColumnModel.beginEditIndex(self, new_index)
@@ -601,7 +603,7 @@ class RegularValueColumnModel(RegularColumnModel):
         if self.editingIndex:
             edited_index = self.editingIndex
             should_emit = True
-            if save and self._editingIndexText != self.editingIndex.data(Qt.EditRole):
+            if save:
                 position = self.indexData(self.editingIndex, self.EditorPositionRole)
                 if position is None or position < 0:
                     raise ValueError('invalid position for index resolved')
@@ -1011,7 +1013,7 @@ class TextDocumentBackend(ColumnDocumentBackend):
             line_char_index = char_position - block.position()
             for column in range(len(row_data.items)):
                 index_data = row_data.items[column]
-                if index_data.firstCharIndex + len(index_data.text) >= line_char_index:
+                if line_char_index < index_data.firstCharIndex + len(index_data.text):
                     return index_data.index, line_char_index - index_data.firstCharIndex
         return ModelIndex(), 0
 
@@ -1746,6 +1748,12 @@ class HexWidget(QWidget):
     def appendColumn(self, model):
         self.insertColumn(model)
 
+    def clearColumns(self):
+        self._columns = []
+        self._leadingColumn = None
+        self._updateColumnsGeometry()
+        self.view.update()
+
     def moveColumn(self, column, index):
         column_index = self.columnIndex(column)
         if column_index >= 0 and index != column_index:
@@ -2022,8 +2030,6 @@ class HexWidget(QWidget):
         elif event.key() == Qt.Key_F2:
             if not self.editMode:
                 self.beginEditIndex()
-        elif event.key() == Qt.Key_Delete:
-            self.deleteSelected()
         elif event.key() == Qt.Key_Escape:
             self.endEditIndex(save=False)
         elif event.key() in (Qt.Key_Return, Qt.Key_Enter):
@@ -2033,6 +2039,8 @@ class HexWidget(QWidget):
         elif event.key() == Qt.Key_Insert:
             self._insertMode = not self._insertMode
             self.insertModeChanged.emit(self._insertMode)
+        elif event.key() == Qt.Key_Delete and not self.editMode:
+            self.deleteSelected()
 
     def _textInputEvent(self, event):
         # input text into active cell
@@ -2045,15 +2053,20 @@ class HexWidget(QWidget):
 
             if event.key() == Qt.Key_Backspace:
                 if cursor_offset == 0:
-                    index_to_remove = index.previous
-                    if index_to_remove and not index_to_remove.virtual:
-                        self._leadingColumn.dataModel.removeIndex(index_to_remove)
-                        self._navigate(self.NavMethod_PrevCell)
-                        self._cursorOffset = 0
-                        return
+                    # this behavious can be unexpected sometimes...
+                    # index_to_remove = index.previous
+                    # if index_to_remove and not index_to_remove.virtual:
+                    #     self._leadingColumn.dataModel.removeIndex(index_to_remove)
+                    #     self._navigate(self.NavMethod_PrevCell)
+                    #     self._cursorOffset = 0
+                    #     return
+                    pass
                 elif self._cursorInsertMode:
                     index_text = original_index_text[:cursor_offset-1] + original_index_text[cursor_offset:]
                     nav_method = self.NavMethod_PrevCharacter
+            elif event.key() == Qt.Key_Delete:
+                if self._cursorInsertMode and cursor_offset < len(original_index_text):
+                    index_text = original_index_text[:cursor_offset] + original_index_text[cursor_offset+1:]
             elif event.text():
                 if cursor_offset == 0 and self._insertMode and not self._cursorInsertMode:
                     # when in insert mode, pressing character key when cursor is at beginning of cell inserts new cell
@@ -2394,7 +2407,7 @@ class HexWidget(QWidget):
                 if index.flags & ColumnModel.FlagEditable:
                     self.beginEditIndex()
                     offset = column.cursorPositionFromPoint(self._absoluteToColumn(column, mouse_pos))
-                    self.cursorOffset = max(offset, 0)
+                    self.cursorOffset = min(self._editingCellMaximalCursorOffset, max(offset, 0))
 
     def _startScrollTimer(self, increment):
         self._stopScrollTimer()
@@ -2524,6 +2537,10 @@ class HexWidget(QWidget):
     def editMode(self):
         return bool(self._editingIndex)
 
+    @property
+    def editingIndex(self):
+        return self._editingIndex
+
     def beginEditIndex(self, index=None):
         if index is None:
             index = self.caretIndex(self._leadingColumn)
@@ -2562,10 +2579,13 @@ class HexWidget(QWidget):
             self.view.update()
 
     def selectAll(self):
-        if self.editor is not None:
-            sel_range = SelectionRange(self, self._leadingColumn.dataModel.firstIndex, len(self._editor),
-                                   SelectionRange.UnitCells, SelectionRange.BoundToData)
-            self.selectionRanges = [sel_range]
+        if self.editor is not None and self._leadingColumn is not None:
+            first_index = self._leadingColumn.dataModel.firstIndex
+            last_index = self._leadingColumn.dataModel.lastRealIndex
+            if first_index and last_index:
+                sel_range = SelectionRange(self, first_index, last_index - first_index + 1,
+                                           SelectionRange.UnitCells, SelectionRange.BoundToData)
+                self.selectionRanges = [sel_range]
 
     def copy(self):
         if len(self._selections) == 1:
@@ -2786,9 +2806,10 @@ class HexWidget(QWidget):
         self._emphasizeRange.finished.connect(self._onEmphasizeFinished)
 
         # make emphasized range visible
-        index = self._leadingColumn.dataModel.indexFromPosition(emp_range.startPosition)
-        if index:
-            self.makeIndexVisible(index, self.MethodShowTop)
+        if self._leadingColumn is not None:
+            index = self._leadingColumn.dataModel.indexFromPosition(emp_range.startPosition)
+            if index:
+                self.makeIndexVisible(index, self.MethodShowTop)
 
         self._emphasizeRange.emphasize()
 

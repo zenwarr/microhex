@@ -30,8 +30,13 @@ class FloatColumnModel(hexwidget.RegularValueColumnModel):
         return d.strip() if (role == Qt.EditRole and d) else d
 
     def _dataForNewIndex(self, input_text, before_index):
+        import struct
         if self.createValidator().validate(input_text, len(input_text))[0] != QDoubleValidator.Invalid:
-            return input_text or '0', max(len(input_text), 1)
+            try:
+                text = input_text or '0'
+                return self.valuecodec.encode(self.formatter.parse(text)), text, max(len(input_text), 1)
+            except (ValueError, struct.error):
+                pass
         return None, -1
 
     @property
@@ -69,11 +74,11 @@ class FloatColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConf
 
         self.spnPrecision = QSpinBox(self)
         self.spnPrecision.setMinimum(0)
-        self.spnPrecision.setMaximum(10)
+        self.spnPrecision.setMaximum(12)
         if column is not None:
             self.spnPrecision.setValue(column.formatter.precision)
         else:
-            self.spnPrecision.setValue(4)
+            self.spnPrecision.setValue(6)
 
         self.spnColumnsOnRow = QSpinBox(self)
         self.spnColumnsOnRow.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)

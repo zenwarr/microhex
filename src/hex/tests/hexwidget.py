@@ -8,19 +8,24 @@ import hex.devices as devices
 import hex.valuecodecs as valuecodecs
 import hex.formatters as formatters
 import hex.encodings as encodings
-from PyQt4.QtGui import QFont
+from PyQt4.QtCore import Qt
+from PyQt4.QtGui import QFont, qApp
+from PyQt4.QtTest import QTest
 
 
 class TestHexWidget(unittest.TestCase):
     def test(self):
         ed = editor.Editor(devices.deviceFromBytes(b'1234567890' * 1000))
         hw = hexwidget.HexWidget(None, ed)
+        hw.clearColumns()
 
         hexColumnModel = hexcolumn.HexColumnModel(ed, valuecodecs.IntegerCodec(valuecodecs.IntegerCodec.Format16Bit),
                                                   formatters.IntegerFormatter(base=16))
         hw.appendColumn(hexColumnModel)
         charColumnModel = charcolumn.CharColumnModel(ed, encodings.getCodec('Windows-1251'), QFont())
         hw.appendColumn(charColumnModel)
+
+        self.assertEqual(hw.leadingColumn.dataModel, hexColumnModel)
 
         r = hexwidget.DataRange(hw, 10, 4, hexwidget.DataRange.UnitBytes)
         self.assertEqual(r.startPosition, 10)
@@ -42,5 +47,33 @@ class TestHexWidget(unittest.TestCase):
         ed.insertSpan(3, editor.FillSpan(ed, b'\x00', 5))
         self.assertEqual(r.startPosition, 15)
         self.assertEqual(r.size, 1)
+
+        ed.undo()
+
+        hw.caretPosition = 10
+        self.assertEqual(hw.caretPosition, 10)
+        self.assertEqual(hw.caretIndex(hw.leadingColumn), hexColumnModel.indexFromPosition(10))
+
+        index = hw.caretIndex(hw.leadingColumn)
+        self.assertEqual(index.data(hexwidget.ColumnModel.EditorDataRole), b'12')
+        self.assertEqual(index.data(Qt.DisplayRole), '3231')
+        self.assertEqual(index.data(Qt.EditRole), '3231')
+        self.assertEqual(index.data(hexwidget.ColumnModel.EditorPositionRole), 10)
+        self.assertEqual(index.data(hexwidget.ColumnModel.DataSizeRole), 2)
+
+        hw.beginEditIndex()
+        self.assertEqual(hw.editingIndex, index)
+        QTest.keyClick(hw.view, Qt.Key_Escape)
+        self.assertFalse(hw.editingIndex)
+        self.assertEqual(index.data(), '3231')
+
+        hw.beginEditIndex()
+        QTest.keyClicks(hw.view, 'f')
+        self.assertEqual(hw.editingIndex, hexColumnModel.indexFromPosition(10))
+        self.assertEqual(hw.editingIndex.data(), 'f00')  # new index with default value 0 inserted, and value f000, not
+                                                         # f00, because f000 does not fits into signed integer range
+        QTest.keyClick(hw.view, Qt.Key_Enter)
+        self.assertFalse(hw.editingIndex)
+        self.assertEqual(hexColumnModel.indexFromPosition(10).data(), 'f00')
 
         hw.deleteLater()

@@ -46,13 +46,14 @@ class IntegerFormatter(object):
                 current = (current - remainder) // self.base
 
             result = result[::-1]
-            if value < 0:
-                result = '-' + result
         else:
             result = '0'
 
         if self.padding > 0 and self.padding - self._decorationLength() - len(result) > 0:
             result = result.zfill(self.padding - self._decorationLength())
+
+        if value < 0:
+            result = '-' + result
 
         result = self._decorate(result)
 
@@ -154,7 +155,7 @@ def parseInteger(text):
 
 
 class FloatFormatter(object):
-    def __init__(self, precision=6):
+    def __init__(self, precision=12):
         self.precision = precision
         self.align = True
 

@@ -38,15 +38,42 @@ class HexColumnModel(hexwidget.RegularValueColumnModel):
     def createValidator(self):
         return HexColumnValidator(self.formatter, self.valuecodec)
 
+    def indexData(self, index, role=Qt.DisplayRole):
+        data = hexwidget.RegularValueColumnModel.indexData(self, index, role)
+        if data is not None:
+            if role == Qt.DisplayRole and index != self.editingIndex:
+                return ' ' * (self._cellTextSize - len(data)) + data
+            elif role == Qt.EditRole or (role == Qt.DisplayRole and index == self.editingIndex):
+                if self.valuecodec.signed and not data.startswith('-') and not data.startswith('+'):
+                    return '+' + data
+        return data
+
     def _dataForNewIndex(self, input_text, before_index):
-        text = input_text + '0' * (self.regularCellTextLength - len(input_text))
+        if input_text in ('-', '+'):
+            if self.valuecodec.signed:
+                text = input_text + self.formatter.format(0)
+                cursor_pos = 1
+            else:
+                return None, '', -1
+        else:
+            zero_count = self._cellTextSize - len(input_text)
+            while zero_count > 0:
+                text = ('+' * self.valuecodec.signed) + input_text + '0' * zero_count
+                if self.createValidator().validate(text, len(input_text) + self.valuecodec.signed)[0] != QValidator.Invalid:
+                    break
+                zero_count -= 1
+            else:
+                return None, '', -1
+            cursor_pos = len(input_text) + self.valuecodec.signed
+
         if self.createValidator().validate(text, len(input_text))[0] != QValidator.Invalid:
             import struct
             try:
-                return self.valuecodec.encode(self.formatter.parse(text)), len(input_text)
+                return self.valuecodec.encode(self.formatter.parse(text)), text, cursor_pos
             except (ValueError, struct.error):
                 pass
-        return None, -1
+
+        return None, '', -1
 
     @property
     def defaultCellInsertMode(self):
@@ -157,7 +184,11 @@ class HexColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConfig
         valuecodec = self._valueCodec
         formatter = formatters.IntegerFormatter()
         formatter.base = self.cmbBase.itemData(self.cmbBase.currentIndex())
-        formatter.padding = max(len(formatter.format(valuecodec.maximal)), len(formatter.format(valuecodec.minimal)))
+        maximal = formatter.format(valuecodec.maximal)
+        minimal = formatter.format(valuecodec.minimal)
+        if minimal.startswith('-'):
+            minimal = minimal[1:]
+        formatter.padding = max(len(maximal), len(minimal))
         return formatter
 
     def createColumnModel(self, hex_widget):
