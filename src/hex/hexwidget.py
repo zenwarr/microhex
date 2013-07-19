@@ -267,6 +267,7 @@ class ColumnModel(AbstractModel):
 
     def reset(self):
         self.modelReset.emit()
+        self.headerDataChanged.emit()
 
     @property
     def editor(self):
