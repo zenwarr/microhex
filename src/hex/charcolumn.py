@@ -20,6 +20,7 @@ class CharColumnModel(hexwidget.ColumnModel):
         self.bytesOnRow = bytes_on_row
         self._renderFont = QRawFont.fromFont(render_font)
         self._rowCount = 0
+        self._editingIndex = None
         self.reset()
 
     @property
@@ -89,30 +90,18 @@ class CharColumnModel(hexwidget.ColumnModel):
         if role == self.EditorPositionRole:
             return position
         elif role == self.DataSizeRole:
-            if is_virtual:
-                return self.codec.unitSize
-            try:
-                return self.codec.getCharacterSize(self.editor, position)
-            except encodings.EncodingError:
-                return 1
+            return self.codec.unitSize
         elif role == self.EditorDataRole:
-            if is_virtual:
-                return bytes()
-            try:
-                return self.editor.read(self.codec.findCharacterStart(self.editor, position),
-                                         self.codec.getCharacterSize(self.editor, position))
-            except encodings.EncodingError:
-                return self.editor.read(position, 1)
+            return bytes() if is_virtual else self.editor.read(position, self.codec.unitSize)
         elif role in (Qt.DisplayRole, Qt.EditRole):
             if is_virtual:
                 return '.' if role == Qt.DisplayRole else ''
             try:
-                character_start = self.codec.findCharacterStart(self.editor, position)
-                if character_start != position:
+                char_data = self.codec.getCharacterData(self.editor, position)
+                if char_data.startPosition != position:
                     return ' '
                 else:
-                    decoded = self.codec.decodeCharacter(self.editor, position)
-                    return decoded if role == Qt.EditRole else self._translateToVisualCharacter(decoded)
+                    return char_data.unicode if role == Qt.EditRole else self._translateToVisualCharacter(char_data.unicode)
             except encodings.EncodingError:
                 return '!' if role == Qt.DisplayRole else ''
         return None
@@ -125,9 +114,32 @@ class CharColumnModel(hexwidget.ColumnModel):
             flags |= self.FlagModified
         return flags
 
+    def beginEditIndex(self, index):
+        if index:
+            hexwidget.ColumnModel.beginEditIndex(self, index)
+            return True, False
+        return False, False
+
+    def beginEditNewIndex(self, input_text, before_index):
+        if not self.editor.fixedSize:
+            if input_text:
+                if self.createValidator().validate(input_text[0], 1)[0] == QValidator.Invalid:
+                    return hexwidget.ModelIndex(), -1, False
+                data_to_insert = self.codec.encodeString(input_text[0])
+            else:
+                data_to_insert = self.codec.encodeString('\x00')
+
+            position = self.indexData(before_index, self.EditorPositionRole)
+            self.editor.insertSpan(position, editor.DataSpan(self.editor, data_to_insert))
+
+            new_index = self.indexFromPosition(position)
+            hexwidget.ColumnModel.beginEditIndex(self, new_index)
+            return new_index, 1, False
+        return hexwidget.ModelIndex(), -1, False
+
     def setIndexData(self, index, value, role=Qt.EditRole):
-        if not index or index.model is not self:
-            raise ValueError('invalid index')
+        if not self.editingIndex or self.editingIndex != index or role != Qt.EditRole:
+            raise RuntimeError()
 
         if role == Qt.EditRole:
             position = self.indexData(index, self.EditorPositionRole)
@@ -140,9 +152,8 @@ class CharColumnModel(hexwidget.ColumnModel):
             if raw_data == current_data:
                 return
 
-            data_span = editor.DataSpan(self.editor, raw_data)
             if len(current_data) == len(raw_data):
-                self.editor.writeSpan(position, data_span)
+                self.editor.writeSpan(position, editor.DataSpan(self.editor, raw_data))
             else:
                 self.editor.beginComplexAction()
                 try:
@@ -152,6 +163,38 @@ class CharColumnModel(hexwidget.ColumnModel):
                     self.editor.endComplexAction()
         else:
             raise ValueError('data for given role is not writeable')
+
+    def nextEditableIndex(self, from_index):
+        if not from_index:
+            return hexwidget.ModelIndex()
+
+        position = self.indexData(from_index, self.EditorPositionRole)
+        try:
+            char_data = self.codec.getCharacterData(self.editor, position)
+        except encodings.EncodingError:
+            return from_index.next
+
+        if char_data.startPosition != position:
+            return from_index.next
+        else:
+            return self.indexFromPosition(position + char_data.bytesCount)
+
+    def previousEditableIndex(self, from_index):
+        if not from_index:
+            prev_char_byte = len(self.editor)
+        else:
+            position = self.codec.findCharacterStart(self.editor, from_index.data(self.EditorPositionRole))
+            if position <= 0:
+                return hexwidget.ModelIndex()
+            elif position != from_index.data(self.EditorPositionRole):
+                return from_index.previous
+            prev_char_byte = position - 1
+
+        try:
+            character_start = self.codec.findCharacterStart(self.editor, prev_char_byte)
+            return self.indexFromPosition(character_start)
+        except encodings.EncodingError:
+            return self.indexFromPosition(prev_char_byte)
 
     def _translateToVisualCharacter(self, text):
         import unicodedata
@@ -182,13 +225,6 @@ class CharColumnModel(hexwidget.ColumnModel):
         self._updateRowCount()
         self.dataResized.emit(self.lastRealIndex)
 
-    def defaultIndexData(self, before_index, role=Qt.EditRole):
-        if before_index:
-            if role == Qt.EditRole:
-                return '\x00'
-            elif role == self.EditorDataRole:
-                return self.codec.encodeString('\x00')
-
     def createValidator(self):
         return CharColumnValidator(self.codec)
 
@@ -198,10 +234,10 @@ class CharColumnValidator(QValidator):
         QValidator.__init__(self)
         self.codec = codec
 
-    def validate(self, text):
+    def validate(self, text, cursor_pos):
         if not text:
-            return self.Intermediate
-        return self.Acceptable if self.codec.canEncode(text) and len(text) == 1 else self.Invalid
+            return self.Intermediate, text, cursor_pos
+        return (self.Acceptable if self.codec.canEncode(text) and len(text) == 1 else self.Invalid), text, cursor_pos
 
 
 class CharColumnProvider(columnproviders.AbstractColumnProvider):

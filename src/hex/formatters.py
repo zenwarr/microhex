@@ -154,19 +154,17 @@ def parseInteger(text):
 
 
 class FloatFormatter(object):
-    def __init__(self, padding=0, precision=-1):
+    def __init__(self, precision=6):
         self.precision = precision
-        self.padding = padding
+        self.align = True
 
     def format(self, value):
-        if self.precision >= 0:
-            value = round(value, self.precision)
-
-        result = str(value)
-        if self.padding > 0 and len(result) < self.padding:
-            result = result.zfill(self.padding - len(result))
-
-        return result
+        format_spec = '{0:#' + (str(self.maximalWidth) if self.align else '0') + '.' + str(self.precision) + 'e}'
+        return format_spec.format(value)
 
     def parse(self, value):
         return float(value)
+
+    @property
+    def maximalWidth(self):
+        return 3 + self.precision + 2 + 3

@@ -1,7 +1,7 @@
 import copy
 import threading
 import contextlib
-from PyQt4.QtCore import pyqtSignal, QObject
+from PyQt4.QtCore import pyqtSignal, QObject, QByteArray
 import hex.utils as utils
 
 
@@ -72,7 +72,9 @@ class Span(object):
 class DataSpan(Span):
     def __init__(self, parent, data):
         Span.__init__(self, parent)
-        self.__data = data  # should be bytes object
+        if not isinstance(data, (bytes, QByteArray)):
+            raise TypeError()
+        self.__data = bytes(data)  # should be bytes object
 
     @property
     def length(self):
@@ -527,6 +529,10 @@ class Editor(QObject):
         with self.lock.read:
             if not self.isModified:
                 return False
+            if position >= self._totalLength:
+                return False
+            elif position + length >= self._totalLength:
+                length = self._totalLength - position
             return any(s.savepoint != self._savepoint for s in self.spansInRange(position, length)[0])
 
     def __len__(self):
@@ -683,7 +689,6 @@ class Editor(QObject):
                     self._setSavepoint()
 
                     self._device = device
-                    print(self.url.toString())
                     self.urlChanged.emit(self.url)
 
     def _setSavepoint(self):

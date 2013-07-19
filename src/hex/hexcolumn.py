@@ -6,151 +6,51 @@ import hex.columnproviders as columnproviders
 import hex.utils as utils
 import hex.valuecodecs as valuecodecs
 import hex.formatters as formatters
-import struct
 
 
-class HexColumnModel(hexwidget.ColumnModel):
+class HexColumnModel(hexwidget.RegularValueColumnModel):
     """Standart column for hex-editors. Displays data as numbers. This model is regular (has equal number of
     columns in each row, except last one) and infinite (supports virtual indexes).
     """
-
     def __init__(self, editor, valuecodec, formatter, columns_on_row=16):
-        hexwidget.ColumnModel.__init__(self, editor)
-        self.valuecodec = valuecodec
-        self.formatter = formatter
-        self.columnsOnRow = columns_on_row
-        self.reset()
+        self._cellTextSize = 0
+        hexwidget.RegularValueColumnModel.__init__(self, editor, valuecodec or valuecodecs.IntegerCodec(),
+                                                   formatter or formatters.IntegerFormatter(), columns_on_row)
+
+    def virtualIndexData(self, index, role=Qt.DisplayRole):
+        if role == Qt.EditRole:
+            return self.textForEditorData(b'\x00' * self.regularCellDataSize, index, Qt.EditRole)
+        return hexwidget.RegularValueColumnModel.virtualIndexData(self, index, role)
 
     @property
-    def regularCellDataSize(self):
-        return self.valuecodec.dataSize
-
-    @property
-    def regularColumnCount(self):
-        return self.columnsOnRow
+    def regularCellTextLength(self):
+        return self._cellTextSize
 
     def reset(self):
-        self._rowCount = 0
-        self._bytesOnRow = self.columnsOnRow * self.valuecodec.dataSize
         min_value, max_value = self.valuecodec.minimal, self.valuecodec.maximal
         self._cellTextSize = max(len(self.formatter.format(min_value)), len(self.formatter.format(max_value)))
-        self._updateRowCount()
-        hexwidget.ColumnModel.reset(self)
-
-    def rowCount(self):
-        return -1
-
-    def columnCount(self, row):
-        return self.columnsOnRow if row >= 0 else -1
-
-    def realRowCount(self):
-        return self._rowCount
-
-    def realColumnCount(self, row):
-        if row < 0:
-            return -1
-        elif row + 1 == self._rowCount:
-            count = (len(self.editor) % self.bytesOnRow) // self.valuecodec.dataSize
-            return count or self.columnsOnRow
-        elif row >= self._rowCount:
-            return 0
-        return self.columnsOnRow
-
-    def indexFromPosition(self, editor_position):
-        return self.index(int(editor_position // self.bytesOnRow),
-                          int(editor_position % self.bytesOnRow) // self.valuecodec.dataSize)
-
-    def indexData(self, index, role=Qt.DisplayRole):
-        if not index or self.editor is None:
-            return None
-        editor_position = self.bytesOnRow * index.row + self.valuecodec.dataSize * index.column
-
-        if role == Qt.DisplayRole or role == Qt.EditRole:
-            if editor_position >= len(self.editor):
-                return ('.' if role == Qt.DisplayRole else '0') * self._cellTextSize
-            else:
-                editor_data = self.editor.read(editor_position, self.valuecodec.dataSize)
-                try:
-                    decoded = self.valuecodec.decode(editor_data)
-                except struct.error:
-                    return '!' * self._cellTextSize
-                return self.formatter.format(decoded)
-        elif role == self.EditorDataRole:
-            if editor_position >= len(self.editor):
-                return bytes()
-            else:
-                return self.editor.read(editor_position, self.valuecodec.dataSize)
-        elif role == self.DataSizeRole:
-            return self.valuecodec.dataSize
-        elif role == self.EditorPositionRole:
-            return editor_position
-        return None
-
-    def setIndexData(self, index, value, role=Qt.EditRole):
-        if not index or index.model is not self:
-            raise ValueError('invalid index')
-
-        if role == Qt.EditRole:
-            position = self.indexData(index, self.EditorPositionRole)
-            if position is None or position < 0:
-                raise ValueError('invalid position for index resolved')
-
-            raw_data = self.valuecodec.encode(self.formatter.parse(value))
-            current_data = self.indexData(index, self.EditorDataRole)
-
-            if raw_data == current_data:
-                return
-
-            self.editor.writeSpan(position, editor.DataSpan(self.editor, raw_data))
-        else:
-            raise ValueError('data for given role is not writable')
-
-    def indexFlags(self, index):
-        flags = hexwidget.ColumnModel.FlagEditable
-        if index.row >= self._rowCount or (index.row == self._rowCount - 1 and index > self.lastRealIndex):
-            flags |= hexwidget.ColumnModel.FlagVirtual
-        elif self.editor is not None and self.editor.isRangeModified(index.data(self.EditorPositionRole),
-                                                                   index.data(self.DataSizeRole)):
-            flags |= hexwidget.ColumnModel.FlagModified
-        return flags
-
-    def headerData(self, section, role=Qt.DisplayRole):
-        if role == Qt.DisplayRole and 0 <= section < self.columnsOnRow:
-            return formatters.IntegerFormatter(base=16).format(section * self.valuecodec.dataSize)
-
-    @property
-    def bytesOnRow(self):
-        return self._bytesOnRow
-
-    def _onEditorDataChanged(self, start, length):
-        length = length if length >= 0 else len(self.editor) - start
-        self.dataChanged.emit(self.indexFromPosition(start), self.indexFromPosition(start + length - 1))
-
-    def _onEditorDataResized(self, new_size):
-        self._updateRowCount()
-        self.dataResized.emit(self.lastRealIndex)
+        hexwidget.RegularValueColumnModel.reset(self)
 
     @property
     def preferSpaced(self):
         return True
 
-    @property
-    def regular(self):
-        return True
-
-    def _updateRowCount(self):
-        self._rowCount = len(self.editor) // self.bytesOnRow + bool(len(self.editor) % self.bytesOnRow)
-
-    def defaultIndexData(self, before_index, role=Qt.EditRole):
-        if before_index:
-            data = b'\x00' * self.valuecodec.dataSize
-            if role == self.EditorDataRole:
-                return data
-            elif role == Qt.EditRole:
-                return self.formatter.format(self.valuecodec.decode(data))
-
     def createValidator(self):
         return HexColumnValidator(self.formatter, self.valuecodec)
+
+    def _dataForNewIndex(self, input_text, before_index):
+        text = input_text + '0' * (self.regularCellTextLength - len(input_text))
+        if self.createValidator().validate(text, len(input_text))[0] != QValidator.Invalid:
+            import struct
+            try:
+                return self.valuecodec.encode(self.formatter.parse(text)), len(input_text)
+            except (ValueError, struct.error):
+                pass
+        return None, -1
+
+    @property
+    def defaultCellInsertMode(self):
+        return False
 
 
 class HexColumnValidator(QValidator):
@@ -159,20 +59,20 @@ class HexColumnValidator(QValidator):
         self.formatter = formatter
         self.codec = codec
 
-    def validate(self, text):
+    def validate(self, text, cursor_pos):
         import struct
 
         if not text:
-            return self.Intermediate
+            return self.Intermediate, text, cursor_pos
 
         r1 = self.formatter.validate(text)
         if r1 == self.Acceptable:
             try:
                 self.codec.encode(self.formatter.parse(text))
-                return r1
+                return r1, text, cursor_pos
             except struct.error:
-                return self.Invalid
-        return r1
+                return self.Invalid, text, cursor_pos
+        return r1, text, cursor_pos
 
 
 class HexColumnProvider(columnproviders.AbstractColumnProvider):

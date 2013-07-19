@@ -201,17 +201,17 @@
         <translation>операция невозможна для редактора с зафиксированным размером</translation>
     </message>
     <message>
-        <location filename="editor.py" line="454"/>
+        <location filename="editor.py" line="456"/>
         <source>writing {0} bytes at position {1}</source>
         <translation>запись {0} байт по адресу {1}</translation>
     </message>
     <message>
-        <location filename="editor.py" line="728"/>
+        <location filename="editor.py" line="733"/>
         <source>insert {0} bytes from position {1}</source>
         <translation>вставка {0} байт по адресу {1}</translation>
     </message>
     <message>
-        <location filename="editor.py" line="747"/>
+        <location filename="editor.py" line="752"/>
         <source>remove {0} bytes from position {1}</source>
         <translation>удаление {0} байт по адресу {1}</translation>
     </message>
@@ -391,27 +391,27 @@
         <translation>Заполнить выделенное нулями</translation>
     </message>
     <message>
-        <location filename="charcolumn.py" line="210"/>
+        <location filename="charcolumn.py" line="246"/>
         <source>Character column</source>
         <translation>Колонка символов</translation>
     </message>
     <message>
-        <location filename="charcolumn.py" line="229"/>
+        <location filename="charcolumn.py" line="265"/>
         <source>Encoding:</source>
         <translation>Кодировка:</translation>
     </message>
     <message>
-        <location filename="charcolumn.py" line="241"/>
+        <location filename="charcolumn.py" line="277"/>
         <source>Bytes on row:</source>
         <translation>Байт в строке:</translation>
     </message>
     <message>
-        <location filename="columnproviders.py" line="57"/>
+        <location filename="columnproviders.py" line="58"/>
         <source>Add column</source>
         <translation>Добавить колонку</translation>
     </message>
     <message>
-        <location filename="columnproviders.py" line="110"/>
+        <location filename="columnproviders.py" line="111"/>
         <source>Name:</source>
         <translation>Имя:</translation>
     </message>
@@ -421,7 +421,7 @@
         <translation type="obsolete">Настроить колонку</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="181"/>
+        <location filename="hexcolumn.py" line="81"/>
         <source>Integer column</source>
         <translation>Колонка целых чисел</translation>
     </message>
@@ -441,12 +441,12 @@
         <translation type="obsolete">Порядок байт</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="211"/>
+        <location filename="hexcolumn.py" line="111"/>
         <source>Little endian</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="212"/>
+        <location filename="hexcolumn.py" line="112"/>
         <source>Big endian</source>
         <translation></translation>
     </message>
@@ -456,22 +456,22 @@
         <translation type="obsolete">Система счисления</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="229"/>
+        <location filename="hexcolumn.py" line="129"/>
         <source>Hex</source>
         <translation>Шестнадцатиричная</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="229"/>
+        <location filename="hexcolumn.py" line="129"/>
         <source>Dec</source>
         <translation>Десятичная</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="229"/>
+        <location filename="hexcolumn.py" line="129"/>
         <source>Oct</source>
         <translation>Восьмиричная</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="229"/>
+        <location filename="hexcolumn.py" line="129"/>
         <source>Bin</source>
         <translation>Двоичная</translation>
     </message>
@@ -516,32 +516,32 @@
         <translation>Учетверенное слово</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="200"/>
+        <location filename="hexcolumn.py" line="100"/>
         <source>Binary format:</source>
         <translation>Двоичный формат:</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="204"/>
+        <location filename="hexcolumn.py" line="104"/>
         <source>Signed values:</source>
         <translation>Со знаком:</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="210"/>
+        <location filename="hexcolumn.py" line="110"/>
         <source>Endianess:</source>
         <translation>Порядок байт:</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="228"/>
+        <location filename="hexcolumn.py" line="128"/>
         <source>Base:</source>
         <translation>Система счисления:</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="238"/>
+        <location filename="hexcolumn.py" line="138"/>
         <source>Columns on row:</source>
         <translation>Колонок в строке:</translation>
     </message>
     <message>
-        <location filename="columnproviders.py" line="105"/>
+        <location filename="columnproviders.py" line="106"/>
         <source>Setup column {0}</source>
         <translation>Настроить колонку {0}</translation>
     </message>
@@ -611,7 +611,7 @@
         <translation>не удалось загрузить {0} в память: ограничение составляет {1}</translation>
     </message>
     <message>
-        <location filename="editor.py" line="222"/>
+        <location filename="editor.py" line="224"/>
         <source>initial state</source>
         <translation>начальное состояние</translation>
     </message>
@@ -761,7 +761,7 @@
         <translation>Выбор цвета для закладки</translation>
     </message>
     <message>
-        <location filename="hexwidget.py" line="2191"/>
+        <location filename="hexwidget.py" line="2446"/>
         <source>Bookmark: {0}</source>
         <translation>Закладка: {0}</translation>
     </message>
@@ -968,6 +968,26 @@
         <location filename="operations.py" line="1391"/>
         <source>Operation manager</source>
         <translation>Менеджер операций</translation>
+    </message>
+    <message>
+        <location filename="floatcolumn.py" line="48"/>
+        <source>Floating point column</source>
+        <translation>Колонка чисел с плавающей точкой</translation>
+    </message>
+    <message>
+        <location filename="floatcolumn.py" line="90"/>
+        <source>Digits after point:</source>
+        <translation>Цифр после запятой:</translation>
+    </message>
+    <message>
+        <location filename="valuecodecs.py" line="63"/>
+        <source>32-bit float</source>
+        <translation>32-битное значение</translation>
+    </message>
+    <message>
+        <location filename="valuecodecs.py" line="64"/>
+        <source>64-bit float</source>
+        <translation>64-битное значение</translation>
     </message>
 </context>
 </TS>

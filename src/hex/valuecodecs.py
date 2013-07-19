@@ -36,7 +36,7 @@ class IntegerCodec(GenericCodec):
 
     @property
     def maximal(self):
-        return 255 ** self.dataSize
+        return 255 ** self.dataSize // (2 if self.signed else 1)
 
     @property
     def minimal(self):
@@ -60,16 +60,23 @@ class FloatCodec(GenericCodec):
     FormatDouble = 'd'
 
     _t = {
-        FormatFloat: 4,
-        FormatDouble: 8
+        FormatFloat: (4, utils.tr('32-bit float')),
+        FormatDouble: (8, utils.tr('64-bit float'))
     }
 
-    def __init__(self, binary_format, endianess=LittleEndian):
+    def __init__(self, binary_format=FormatFloat, endianess=LittleEndian):
         GenericCodec.__init__(self)
         self.binaryFormat = binary_format
         self.endianess = endianess
-        self.dataSize = self._t.get(binary_format)
 
     @property
     def formatString(self):
         return self.endianess + self.binaryFormat
+
+    @property
+    def dataSize(self):
+        return self._t.get(self.binaryFormat)[0]
+
+    @staticmethod
+    def formatName(fmt):
+        return FloatCodec._t.get(fmt)[1]

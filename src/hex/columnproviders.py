@@ -35,8 +35,9 @@ def availableProviders():
         from hex.hexcolumn import HexColumnProvider
         from hex.charcolumn import CharColumnProvider
         from hex.addresscolumn import AddressColumnProvider
+        from hex.floatcolumn import FloatColumnProvider
 
-        _providers = [HexColumnProvider(), CharColumnProvider(), AddressColumnProvider()]
+        _providers = [HexColumnProvider(), CharColumnProvider(), AddressColumnProvider(), FloatColumnProvider()]
 
     return _providers
 
