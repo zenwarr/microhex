@@ -1611,7 +1611,7 @@ class HexWidget(QWidget):
         self._cursorOffset = 0
         self._cursorTimer = None
         self._blockCursor = globalSettings[appsettings.HexWidget_BlockCursor]
-        self._insertMode = True
+        self._insertMode = False
         self._cursorInsertMode = False
 
         self._showHeader = globalSettings[appsettings.HexWidget_ShowHeader]

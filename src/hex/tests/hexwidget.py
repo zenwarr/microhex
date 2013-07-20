@@ -56,8 +56,8 @@ class TestHexWidget(unittest.TestCase):
 
         index = hw.caretIndex(hw.leadingColumn)
         self.assertEqual(index.data(hexwidget.ColumnModel.EditorDataRole), b'12')
-        self.assertEqual(index.data(Qt.DisplayRole), '3231')
-        self.assertEqual(index.data(Qt.EditRole), '3231')
+        self.assertEqual(index.data(Qt.DisplayRole), ' 3231')
+        self.assertEqual(index.data(Qt.EditRole), '+3231')
         self.assertEqual(index.data(hexwidget.ColumnModel.EditorPositionRole), 10)
         self.assertEqual(index.data(hexwidget.ColumnModel.DataSizeRole), 2)
 
@@ -65,15 +65,22 @@ class TestHexWidget(unittest.TestCase):
         self.assertEqual(hw.editingIndex, index)
         QTest.keyClick(hw.view, Qt.Key_Escape)
         self.assertFalse(hw.editingIndex)
-        self.assertEqual(index.data(), '3231')
+        self.assertEqual(index.data(), ' 3231')
 
         hw.beginEditIndex()
         QTest.keyClicks(hw.view, 'f')
         self.assertEqual(hw.editingIndex, hexColumnModel.indexFromPosition(10))
-        self.assertEqual(hw.editingIndex.data(), 'f00')  # new index with default value 0 inserted, and value f000, not
-                                                         # f00, because f000 does not fits into signed integer range
+        self.assertEqual(hw.editingIndex.data(), '+3231')  # index value will remain the same, because +f321 is invalid
         QTest.keyClick(hw.view, Qt.Key_Enter)
         self.assertFalse(hw.editingIndex)
-        self.assertEqual(hexColumnModel.indexFromPosition(10).data(), 'f00')
+        self.assertEqual(hexColumnModel.indexFromPosition(10).data(), ' 3231')
+
+        hw.beginEditIndex()
+        QTest.keyClicks(hw.view, '0')
+        self.assertEqual(hw.editingIndex, hexColumnModel.indexFromPosition(10))
+        self.assertEqual(hw.editingIndex.data(), '+0231')
+        QTest.keyClick(hw.view, Qt.Key_Enter)
+        self.assertFalse(hw.editingIndex)
+        self.assertEqual(hexColumnModel.indexFromPosition(10).data(), '  231') # no padding on column, btw)
 
         hw.deleteLater()
