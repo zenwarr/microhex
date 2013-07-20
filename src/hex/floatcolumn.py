@@ -4,7 +4,7 @@ import hex.formatters as formatters
 import hex.columnproviders as columnproviders
 import hex.utils as utils
 from PyQt4.QtCore import Qt
-from PyQt4.QtGui import QDoubleValidator, QWidget, QFormLayout, QSpinBox, QComboBox, QSizePolicy
+from PyQt4.QtGui import QDoubleValidator, QWidget, QFormLayout, QSpinBox, QComboBox, QSizePolicy, QValidator
 
 
 class FloatColumnModel(hexwidget.RegularValueColumnModel):
@@ -44,7 +44,17 @@ class FloatColumnModel(hexwidget.RegularValueColumnModel):
         return True
 
     def createValidator(self):
-        return QDoubleValidator()
+        return FloatColumnValidator()
+
+
+class FloatColumnValidator(QValidator):
+    def __init__(self):
+        QValidator.__init__(self)
+        self._qvalidator = QDoubleValidator()
+
+    def validate(self, text, cursor_pos, original_text=None):
+        status, text, new_cursor_pos = self._qvalidator.validate(text, cursor_pos)
+        return status, text, new_cursor_pos if new_cursor_pos != cursor_pos else None
 
 
 class FloatColumnProvider(columnproviders.AbstractColumnProvider):

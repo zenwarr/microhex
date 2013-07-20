@@ -86,11 +86,16 @@ class HexColumnValidator(QValidator):
         self.formatter = formatter
         self.codec = codec
 
-    def validate(self, text, cursor_pos):
+    def validate(self, text, cursor_pos, original_text=None):
         import struct
 
         if not text:
             return self.Intermediate, text, cursor_pos
+        elif self.codec.signed and original_text is not None and cursor_pos == 0 and text[0] not in '-+':
+            text = original_text[0] + text[0] + text[2:]
+            cursor_pos = 2
+        else:
+            cursor_pos = None
 
         r1 = self.formatter.validate(text)
         if r1 == self.Acceptable:

@@ -1049,7 +1049,6 @@ class Column(QObject):
         self._showHeader = True
         self._headerHeight = 0
         self._headerData = []
-        self._validator = self.dataModel.createValidator()
         self.selectionProxy = None
 
         self._spaced = self.dataModel.preferSpaced
@@ -2095,12 +2094,23 @@ class HexWidget(QWidget):
 
             if index_text is not None:
                 validator = self._leadingColumn.validator
-                if validator is not None and validator.validate(index_text, self._cursorOffset)[0] == QValidator.Invalid:
-                    return
+                new_cursor_offset = None
+                if validator is not None:
+                    status, text, new_cursor_offset = validator.validate(index_text, cursor_offset, original_index_text)
+                    if status == QValidator.Invalid:
+                        return
+                    if text is not None:
+                        index_text = text
+                    if new_cursor_offset is not None:
+                        if new_cursor_offset > self._editingCellMaximalCursorOffset:
+                            nav_method = self.NavMethod_NextCell
+                            new_cursor_offset = 0
 
                 index.setData(index_text, Qt.EditRole)
 
-                if nav_method is not None:
+                if new_cursor_offset is not None:
+                    self._cursorOffset = new_cursor_offset
+                elif nav_method is not None:
                     self._navigate(nav_method)
 
     (NavMethod_NextCell, NavMethod_PrevCell, NavMethod_RowStart, NavMethod_RowEnd, NavMethod_ScreenUp,

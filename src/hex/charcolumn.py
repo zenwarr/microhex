@@ -152,15 +152,17 @@ class CharColumnModel(hexwidget.ColumnModel):
             if raw_data == current_data:
                 return
 
-            if len(current_data) == len(raw_data):
-                self.editor.writeSpan(position, editor.DataSpan(self.editor, raw_data))
-            else:
-                self.editor.beginComplexAction()
-                try:
-                    self.editor.remove(position, len(current_data))
-                    self.editor.insertSpan(position, editor.DataSpan(self.editor, raw_data))
-                finally:
-                    self.editor.endComplexAction()
+            self.editor.writeSpan(position, editor.DataSpan(self.editor, raw_data))
+            #
+            # if len(current_data) == len(raw_data):
+            #     self.editor.writeSpan(position, editor.DataSpan(self.editor, raw_data))
+            # else:
+            #     self.editor.beginComplexAction()
+            #     try:
+            #         self.editor.remove(position, len(current_data))
+            #         self.editor.insertSpan(position, editor.DataSpan(self.editor, raw_data))
+            #     finally:
+            #         self.editor.endComplexAction()
         else:
             raise ValueError('data for given role is not writeable')
 
@@ -183,10 +185,13 @@ class CharColumnModel(hexwidget.ColumnModel):
         if not from_index:
             prev_char_byte = len(self.editor)
         else:
-            position = self.codec.findCharacterStart(self.editor, from_index.data(self.EditorPositionRole))
-            if position <= 0:
-                return hexwidget.ModelIndex()
-            elif position != from_index.data(self.EditorPositionRole):
+            try:
+                position = self.codec.findCharacterStart(self.editor, from_index.data(self.EditorPositionRole))
+                if position <= 0:
+                    return hexwidget.ModelIndex()
+                elif position != from_index.data(self.EditorPositionRole):
+                    return from_index.previous
+            except encodings.EncodingError:
                 return from_index.previous
             prev_char_byte = position - 1
 
@@ -234,10 +239,10 @@ class CharColumnValidator(QValidator):
         QValidator.__init__(self)
         self.codec = codec
 
-    def validate(self, text, cursor_pos):
+    def validate(self, text, cursor_pos, original_text=None):
         if not text:
-            return self.Intermediate, text, cursor_pos
-        return (self.Acceptable if self.codec.canEncode(text) and len(text) == 1 else self.Invalid), text, cursor_pos
+            return self.Intermediate, text, None
+        return (self.Acceptable if self.codec.canEncode(text) and len(text) == 1 else self.Invalid), text, None
 
 
 class CharColumnProvider(columnproviders.AbstractColumnProvider):
