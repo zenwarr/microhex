@@ -2388,8 +2388,10 @@ class HexWidget(QWidget):
                         sel = self.selectionBetweenIndexes(self._selectStartIndex, hover_index)
                         if self._selectStartColumn.selectionProxy is not None:
                             proxy = self._selectStartColumn.selectionProxy
-                            sel = self.selectionBetweenIndexes(proxy.dataModel.indexFromPosition(sel.startPosition),
-                                                               proxy.dataModel.indexFromPosition(sel.startPosition + sel.size - 1))
+                            selection_start = sel.startPosition
+                            selection_end = min(len(self.editor) - 1, selection_start + sel.size - 1)
+                            sel = self.selectionBetweenIndexes(proxy.dataModel.indexFromPosition(selection_start),
+                                                               proxy.dataModel.indexFromPosition(selection_end))
                         selections = [sel]
 
                     if selections != self._selections:
