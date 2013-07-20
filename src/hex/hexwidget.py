@@ -257,6 +257,7 @@ class ColumnModel(AbstractModel):
     FlagVirtual = 1
     FlagEditable = 2
     FlagModified = 4
+    FlagBroken = 8
 
     def __init__(self, editor=None):
         AbstractModel.__init__(self)
@@ -751,6 +752,7 @@ class Theme(object):
         self.cursorBackgroundColor = QColor(100, 60, 60, 100)
         self.cursorBorderColor = QColor(Qt.black)
         self.modifiedTextColor = QColor(Qt.red)
+        self.brokenTextColor = QColor(Qt.gray)
         self.headerBackgroundColor = self.backgroundColor
         self.headerTextColor = self.textColor
         self.headerInactiveTextColor = self.inactiveTextColor
@@ -1407,8 +1409,12 @@ class Column(QObject):
 
             if index_text is not None:
                 cell_classes = []
-                if index.flags & ColumnModel.FlagModified:
+
+                flags = index.flags
+                if flags & ColumnModel.FlagModified:
                     cell_classes.append('cell-mod')
+                if flags & ColumnModel.FlagBroken:
+                    cell_classes.append('cell-broken')
 
                 prepared_text = html.escape(index_text)
                 prepared_text = prepared_text.replace(' ', '&nbsp;')
@@ -1520,7 +1526,11 @@ class Column(QObject):
             .cell-mod {{
                 color: {mod_color};
             }}
-        """.format(mod_color=self._theme.modifiedTextColor.name()))
+
+            .cell-broken {{
+                color: {broken_color};
+            }}
+        """.format(mod_color=self._theme.modifiedTextColor.name(), broken_color=self._theme.brokenTextColor.name()))
 
         return document
 

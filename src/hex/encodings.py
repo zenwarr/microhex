@@ -114,6 +114,10 @@ class SingleByteEncodingCodec(QtProxyCodec):
         d.editor = editor
         d.bytesCount = 1
         d.editorData = data
+
+        if len(d.unicode) != 1:
+            raise EncodingError()
+
         return d
 
 
@@ -199,6 +203,9 @@ class Utf16Codec(QtProxyCodec):
             d.unicode = self._qcodec.toUnicode(raw_data)
             d.bytesCount = 2
 
+        if len(d.unicode) != 1:
+            raise EncodingError()
+
         return d
 
 
@@ -228,6 +235,8 @@ class Utf32Codec(QtProxyCodec):
         d.startPosition = position
         d.editorData = data
         d.unicode = self._qcodec.toUnicode(data)
+        if len(d.unicode) != 1:
+            raise EncodingError()
         d.bytesCount = 4
         return d
 

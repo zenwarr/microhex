@@ -110,8 +110,14 @@ class CharColumnModel(hexwidget.ColumnModel):
         flags = self.FlagEditable
         if not self.lastRealIndex or (index.row + 1 >= self.realRowCount() and index > self.lastRealIndex):
             flags |= self.FlagVirtual
-        elif self.editor.isRangeModified(index.data(self.EditorPositionRole), index.data(self.DataSizeRole)):
-            flags |= self.FlagModified
+        else:
+            if self.editor.isRangeModified(index.data(self.EditorPositionRole), index.data(self.DataSizeRole)):
+                flags |= self.FlagModified
+
+            try:
+                d = self.codec.getCharacterData(self.editor, index.data(self.EditorPositionRole))
+            except encodings.EncodingError:
+                flags |= self.FlagBroken
         return flags
 
     def beginEditIndex(self, index):
@@ -153,16 +159,6 @@ class CharColumnModel(hexwidget.ColumnModel):
                 return
 
             self.editor.writeSpan(position, editor.DataSpan(self.editor, raw_data))
-            #
-            # if len(current_data) == len(raw_data):
-            #     self.editor.writeSpan(position, editor.DataSpan(self.editor, raw_data))
-            # else:
-            #     self.editor.beginComplexAction()
-            #     try:
-            #         self.editor.remove(position, len(current_data))
-            #         self.editor.insertSpan(position, editor.DataSpan(self.editor, raw_data))
-            #     finally:
-            #         self.editor.endComplexAction()
         else:
             raise ValueError('data for given role is not writeable')
 
