@@ -368,7 +368,18 @@ class MainWindow(QMainWindow):
             self.openFile(filename, load_dialog.loadOptions)
 
     def openFile(self, filename, load_options=None):
-        e = editor.Editor(devices.deviceFromUrl(QUrl.fromLocalFile(filename), load_options))
+        try:
+            e = editor.Editor(devices.deviceFromUrl(QUrl.fromLocalFile(filename), load_options))
+        except Exception as err:
+            msgbox = QMessageBox(self)
+            msgbox.setWindowTitle(utils.tr('Error opening file'))
+            msgbox.setTextFormat(Qt.RichText)
+            msgbox.setText(utils.tr('Failed to open file<br><b>{0}</b><br>due to following error:<br><b>{1}</b>')
+                           .format(filename, err))
+            msgbox.addButton(QMessageBox.Ok)
+            msgbox.exec_()
+            return
+
         subWidget = HexSubWindow(self, e)
         self._addTab(subWidget)
 

@@ -170,7 +170,7 @@ class QtProxyDevice(AbstractDevice):
     def _ensureOpened(self):
         if self._qdevice is not None and not self._qdevice.isOpen():
             if not self._qdevice.open(QIODevice.ReadOnly if self.options.readOnly else QIODevice.ReadWrite):
-                raise IOError('failed to open {0}'.format(self.url.toString()))
+                raise IOError(self._qdevice.errorString())
 
     def __len__(self):
         self._ensureOpened()
@@ -179,7 +179,7 @@ class QtProxyDevice(AbstractDevice):
     def _read(self, position, length):
         self._ensureOpened()
         if not self._qdevice.seek(position):
-            raise IOError(utils.tr('failed to seek to position {0}').format(position))
+            raise IOError(utils.tr('failed to seek to position {0} ({1})').format(position, self._qdevice.errorString()))
         return self._qdevice.read(length)
 
     @property
@@ -267,12 +267,14 @@ class FileSaver(StandardSaver):
 
         # remove file we should move into
         if not self.originalWriteDevice.qdevice.remove():
-            raise IOError(utils.tr('failed to remove {0}').format(self.originalWriteDevice.name))
+            raise IOError(utils.tr('failed to remove {0}: {1}').format(self.originalWriteDevice.name,
+                                                                       self.originalWriteDevice.qdevice.errorString()))
 
         # and move (rename)
         if not self.writeDevice.qdevice.rename(self.originalWriteDevice.url.toLocalFile()):
-            raise IOError(utils.tr('failed to move {0} into {1}').format(self.writeDevice.name,
-                                                                         self.originalWriteDevice.name))
+            raise IOError(utils.tr('failed to move {0} into {1}: {2}').format(self.writeDevice.name,
+                                                                         self.originalWriteDevice.name,
+                                                                         self.writeDevice.errorString()))
 
 
 class QuickFileSaver(StandardSaver):
