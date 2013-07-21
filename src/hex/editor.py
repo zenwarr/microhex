@@ -124,12 +124,11 @@ class DeviceSpan(Span):
                 raise OutOfBoundsError()
             if self._device is None:
                 return bytes()
-            with self._device.lock:
-                device_length = self.length
-                if device_length >= 0:
-                    return self._device.read(self._deviceOffset + offset, size)
-                else:
-                    return bytes()
+            device_length = self.length
+            if device_length >= 0:
+                return self._device.read(self._deviceOffset + offset, size)
+            else:
+                return bytes()
 
     def split(self, offset):
         f, s = Span.split(self, offset)

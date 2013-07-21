@@ -1,4 +1,3 @@
-import threading
 import random
 import weakref
 import os
@@ -25,13 +24,12 @@ class AbstractDevice(QObject):
 
     def __init__(self, url=None, options=None):
         QObject.__init__(self)
-        self.lock = threading.RLock()
         self._url = QUrl(url)
         self._cache = bytes()
         self._cacheStart = 0
-        self._cacheSize = 1024 * 1024
-        self._cacheBoundary = 1024
-        self.editor = None
+        self._cacheLength = 0
+        self._cacheSize = 4
+        self._cacheBoundary = 4
         self.options = options
 
     def _read(self, position, length):
@@ -42,45 +40,46 @@ class AbstractDevice(QObject):
         raise NotImplementedError()
 
     @property
+    def length(self):
+        raise NotImplementedError()
+
+    @property
     def readOnly(self):
         if hasattr(self.options, 'readOnly'):
             return self.options.readOnly
         raise NotImplementedError()
 
     def read(self, position, length):
-        with self.lock:
-            if length < 0:
-                raise OutOfBoundsError()
-            elif length == 0 or position >= len(self):
-                return bytes()
+        if position < 0 or length < 0:
+            raise OutOfBoundsError()
+        elif not length:
+            return bytes()
 
-            if self._cacheStart <= position < self._cacheStart + len(self._cache):
-                # how many bytes we can read from cache?
-                cached_length = min(length, self._cacheStart + len(self._cache) - position)
-                cache_offset = position - self._cacheStart
-                # read cached data into first part
-                first_part = self._cache[cache_offset:cache_offset + cached_length]
-                if cached_length < length:
-                    # also read data that is out of cache
-                    return first_part + self._read(position + cached_length, length - cached_length)
-                else:
-                    return first_part
-            elif self._cacheSize > 0:
-                # cache miss - we should move cache
-                # it is best to choose position to force current pos to be in center of cache
-                ideal_start = max(0, position - self._cacheSize // 2)
-                ideal_start = ideal_start - ideal_start % self._cacheBoundary
-                if ideal_start + self._cacheSize <= position:
-                    ideal_start = position - position % self._cacheBoundary
-
-                new_cache = self._read(ideal_start, self._cacheSize)
-                self._cacheStart = ideal_start
-                self._cache = new_cache
-
-                # and try to read again...
-                return self.read(position, length)
+        cache_start = self._cacheStart
+        cache_end = cache_start + self._cacheLength
+        if cache_start <= position < cache_end:
+            cache_offset = position - cache_start
+            if length <= cache_end - position:
+                return self._cache[cache_offset:cache_offset + length]
             else:
-                return self._read(position, length)
+                return self._cache[cache_offset:cache_end] + self._read(cache_end, length - (cache_end - position))
+        elif self._cacheSize > 0:
+            # cache miss - we should move cache
+            # it is best to choose position to force current pos to be in center of cache
+            ideal_start = max(0, position - self._cacheSize // 2)
+            ideal_start = ideal_start - ideal_start % self._cacheBoundary
+            if ideal_start + self._cacheSize <= position:
+                ideal_start = position - position % self._cacheBoundary
+
+            new_cache = self._read(ideal_start, self._cacheSize)
+            self._cacheStart = ideal_start
+            self._cache = new_cache
+            self._cacheLength = len(self._cache)
+
+            # and try to read again...
+            return self.read(position, length)
+        else:
+            return self._read(position, length)
 
     def _write(self, position, data):
         raise NotImplementedError()
@@ -91,7 +90,8 @@ class AbstractDevice(QObject):
         bytes_written = self._write(position, data)
         # if data is written into cache frame, drop cache
         if utils.checkRangesIntersect(position, len(data), self._cacheStart, len(self._cache)):
-            self._cache = []
+            self._cache = b''
+            self._cacheLength = 0
         return bytes_written
 
     def createSaver(self, editor, read_device):
@@ -101,13 +101,6 @@ class AbstractDevice(QObject):
     @property
     def url(self):
         return self._url
-
-    def createEditor(self):
-        if self._editor is not None:
-            return self._editor
-
-        from hex.editor import Editor
-        self._editor = Editor(self)
 
 
 class NullDevice(AbstractDevice):
@@ -166,15 +159,27 @@ class QtProxyDevice(AbstractDevice):
     def __init__(self, qdevice, url=None, options=None):
         AbstractDevice.__init__(self, url, options)
         self._qdevice = qdevice
+        self._deviceOpened = qdevice.isOpen()
+        self._size = qdevice.size() if self._deviceOpened else 0
+        qdevice.aboutToClose.connect(self._onDeviceAboutToClose)
+
+    def _onDeviceAboutToClose(self):
+        self._deviceOpened = False
 
     def _ensureOpened(self):
-        if self._qdevice is not None and not self._qdevice.isOpen():
+        if not self._deviceOpened:
             if not self._qdevice.open(QIODevice.ReadOnly if self.options.readOnly else QIODevice.ReadWrite):
                 raise IOError(self._qdevice.errorString())
+            self._deviceOpened = True
+            self._size = self._qdevice.size()
+
+    @property
+    def length(self):
+        self._ensureOpened()
+        return self._size
 
     def __len__(self):
-        self._ensureOpened()
-        return self.qdevice.size() if self.qdevice is not None else 0
+        return self.length
 
     def _read(self, position, length):
         self._ensureOpened()
@@ -367,6 +372,8 @@ class BufferLoadOptions(object):
 
 
 def deviceFromUrl(url, options=None):
+    if isinstance(url, str):
+        url = QUrl(url)
     normalized_url_text = normalize_url(url).toString(QUrl.StripTrailingSlash)
 
     global _devices
