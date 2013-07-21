@@ -268,8 +268,6 @@ class Operation(QObject):
         with self.lock:
             if not command:
                 raise OperationError('invalid command')
-            if self._state.isFinished:
-                raise OperationError('operation already finished')
             if not self.onCommandReceived(command):
                 self._commandsQueue.put(command)
 
@@ -340,13 +338,10 @@ class Operation(QObject):
         """Get oldest command from queue, removing it. Arguments :block: and :timeout: has
         same meaning as Queue.get arguments with same name. If there are no commands in queue, returns None.
         """
-        with self.lock:
-            try:
-                if block and threading.current_thread() is self.opThread:
-                    raise OperationError('deadlock detected: waiting for command from same thread')
-                return self._commandsQueue.get(block, timeout)
-            except queue.Empty:
-                return None
+        try:
+            return self._commandsQueue.get(block, timeout)
+        except queue.Empty:
+            return None
 
     def _start(self):
         with self.lock:
@@ -358,18 +353,16 @@ class Operation(QObject):
         state will be OperationState.Failed, otherwise it will be set to OperationState.Completed.
         """
         with self.lock:
-            if self._state.isFinished:
-                raise OperationError('operation already finished')
-            self.setProgress(100)
-            self.setStatus(OperationState.Failed if self._state.errorCount > 0 else OperationState.Completed)
+            if not self._state.isFinished:
+                self.setProgress(100)
+                self.setStatus(OperationState.Failed if self._state.errorCount > 0 else OperationState.Completed)
 
     def _cancel(self):
         """Cancel operation. Final state will be set to OperationState.Cancelled
         """
         with self.lock:
-            if self._state.isFinished:
-                raise OperationError('operation already finished')
-            self.setStatus(OperationState.Cancelled)
+            if not self._state.isFinished:
+                self.setStatus(OperationState.Cancelled)
 
     def doWork(self):
         """This method should be reimplemented to contain operation code.
@@ -420,9 +413,6 @@ class Operation(QObject):
 
     def _setStateAttribute(self, attrib_name, value):
         with self.lock:
-            if self._state.isFinished:
-                raise OperationError('operation already finished')
-
             if getattr(self._state, attrib_name) != value:
                 setattr(self._state, attrib_name, value)
                 self.stateChanged.emit(self.state)
@@ -432,6 +422,9 @@ class Operation(QObject):
     def setStatus(self, new_status):
         with self.lock:
             if self._state.status != new_status:
+                if self._state.isFinished:
+                    raise OperationError('operation tried to set status after finish')
+
                 self._setStateAttribute('status', new_status)
 
                 if self._state.isFinished:
@@ -476,9 +469,6 @@ class Operation(QObject):
         Depending on message level, can automatically adjust error or warning count.
         """
         with self.lock:
-            if self._state.isFinished:
-                raise OperationError('operation tried to output message after finish (message was: {0})'.format(message))
-
             self._state.messages.append((message, level))
             if level >= logging.ERROR:
                 self._state.errorCount += 1
@@ -1003,7 +993,7 @@ class OperationProgressTextLabel(QLabel, OperationWidget):
     def _updateState(self, state):
         self.setEnabled(state is not None)
         if state is not None:
-            self.setText(state.progressText)
+            self.setText(state.progressText.capitalize())
 
 
 class OperationRunButton(OperationWidget):

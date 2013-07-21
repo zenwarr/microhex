@@ -2874,8 +2874,8 @@ class DataRange(QObject):
 
         if bound_to == self.BoundToData:
             if unit == self.UnitBytes:
-                self._hexWidget.editor.bytesInserted.connect(self._onInserted)
-                self._hexWidget.editor.bytesRemoved.connect(self._onRemoved)
+                self._hexWidget.editor.bytesInserted.connect(self._onInserted, Qt.QueuedConnection)
+                self._hexWidget.editor.bytesRemoved.connect(self._onRemoved, Qt.QueuedConnection)
             else:
                 self._model.indexesInserted.connect(self._onInserted)
                 self._model.indexesRemoved.connect(self._onRemoved)

@@ -1,7 +1,7 @@
 from PyQt4.QtCore import QFileInfo, Qt, QByteArray, QObject, pyqtSignal, QUrl, QSize
 from PyQt4.QtGui import QMainWindow, QTabWidget, QFileDialog, QKeySequence, QMdiSubWindow, QApplication, QProgressBar, \
                         QWidget, QVBoxLayout, QFileIconProvider, QApplication, QIcon, QDialog, QAction, QIcon, QLabel, \
-                        QMessageBox
+                        QMessageBox, QDockWidget
 from hex.hexwidget import HexWidget
 import hex.settings as settings
 import hex.appsettings as appsettings
@@ -57,6 +57,9 @@ class MainWindow(QMainWindow):
         self.buildMenus()
         self.buildStatusbar()
         self.buildToolbar()
+
+        self.dockSearch = SearchDockWidget(self)
+        self.addDockWidget(Qt.BottomDockWidgetArea, self.dockSearch)
 
         geom = globalQuickSettings['mainWindow.geometry']
         if geom and isinstance(geom, str):
@@ -577,7 +580,7 @@ class MainWindow(QMainWindow):
 
     @forActiveWidget
     def search(self):
-        from hex.searchdialog import SearchDialog
+        from hex.search import SearchDialog
 
         dlg = SearchDialog(self, self.activeSubWidget.hexWidget)
         dlg.exec_()
@@ -705,3 +708,19 @@ class OperationsStatusBarWidget(operations.OperationsInfoWidget):
     def _setOperation(self, old_operation, new_operation):
         operations.OperationsInfoWidget._setOperation(self, old_operation, new_operation)
         self.setVisible(new_operation is not None)
+
+
+class SearchDockWidget(QDockWidget):
+    def __init__(self, parent):
+        from hex.search import SearchResultsWidget
+
+        QDockWidget.__init__(self, utils.tr('Search'), parent)
+        self.setObjectName('dock-search')
+
+        self.searchResults = SearchResultsWidget(self)
+        self.setWidget(self.searchResults)
+
+    def newSearch(self, hex_widget, matcher):
+        self.searchResults.hexWidget = hex_widget
+        self.searchResults.matcher = matcher
+        self.setVisible(True)

@@ -302,7 +302,7 @@ class Editor(QObject):
     def spans(self):
         """Copy of list of all spans in editor"""
         with self.lock.read:
-            return copy.deepcopy(self._spans)
+            return self._spans[:]
 
     def spanAtPosition(self, position):
         """Get span that holds byte at :position:.
