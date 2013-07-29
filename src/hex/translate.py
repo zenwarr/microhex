@@ -22,11 +22,6 @@ class TranslationModule(object):
             return NotImplemented
         return self.language.casefold() == other.language.casefold()
 
-    def __ne__(self, other):
-        if not isinstance(other, TranslationModule):
-            return NotImplemented
-        return not self.__eq__(other)
-
 
 _activeModule = None
 _availModules = []

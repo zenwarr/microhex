@@ -88,7 +88,7 @@ class Dialog(QDialog):
 
     def __save(self):
         import hex.settings as settings
-        
+
         if self.name:
             settings.globalQuickSettings()[self.name + '.geometry'] = str(self.saveGeometry().toHex(), encoding='ascii')
 
@@ -270,3 +270,8 @@ def getIcon(icon_name):
         icon.addFile(':/main/images/' + icon_name + '16.png', QSize(16, 16))
         icon.addFile(':/main/images/' + icon_name + '32.png', QSize(32, 32))
     return icon
+
+
+def skip(iterable, count=1):
+    for x in range(count):
+        next(iterable)

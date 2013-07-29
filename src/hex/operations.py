@@ -929,6 +929,8 @@ class OperationWidget(object):
     def __init__(self, deps):
         self._operation = None
         self._deps = deps
+        self._stateChanged = True
+        self._queryTimer = self.startTimer(200)
 
     @property
     def operation(self):
@@ -945,14 +947,18 @@ class OperationWidget(object):
 
         if self._operation is not None:
             for dep in self._deps:
-                getattr(self._operation, dep + 'Changed').connect(self._onDepUpdated, Qt.QueuedConnection)
+                getattr(self._operation, dep + 'Changed').connect(self._onDepUpdated, Qt.DirectConnection)
 
         self._setOperation(old_operation, new_operation)
 
         self._updateState(self._operation.state if self._operation is not None else None)
 
     def _onDepUpdated(self):
-        self._updateState(self._operation.state if self._operation else None)
+        self._stateChanged = True
+
+    def timerEvent(self, event):
+        if event.timerId() == self._queryTimer and self._stateChanged:
+            self._updateState(self._operation.state if self._operation is not None else None)
 
     def _updateState(self, state):
         raise NotImplementedError()
@@ -1288,7 +1294,7 @@ class OperationDialog(utils.Dialog, OperationWidget):
             setattr(widget, 'operation', new_operation)
 
     def _updateState(self, state):
-        self.setWindowTitle(self.operation.title)
+        self.setWindowTitle(self.operation.title.capitalize())
 
 
 class OperationsModel(QAbstractTableModel):

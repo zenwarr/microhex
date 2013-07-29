@@ -80,11 +80,6 @@ class ModelIndex(object):
         return (self.valid and other.valid and self.row == other.row and self.column == other.column
                 and self.model is other.model)
 
-    def __ne__(self, other):
-        if not isinstance(other, ModelIndex):
-            return NotImplemented
-        return not self.__eq__(other)
-
     def __bool__(self):
         return self.valid
 
@@ -2999,11 +2994,6 @@ class DataRange(QObject):
             return NotImplemented
         return (self._unit == other._unit and self._start == other._start and self._length == other._length and
                     self._boundTo == other._boundTo)
-
-    def __ne__(self, other):
-        if not isinstance(other, DataRange):
-            return NotImplemented
-        return not self.__eq__(self, other)
 
     def intersectsWith(self, another_range):
         return not (another_range.startPosition >= self.startPosition + self.size or

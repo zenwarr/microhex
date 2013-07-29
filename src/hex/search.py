@@ -1,6 +1,7 @@
+import threading
 from PyQt4.QtCore import Qt, QAbstractListModel, QModelIndex
 from PyQt4.QtGui import QVBoxLayout, QHBoxLayout, QDialogButtonBox, QLabel, QPushButton, QMessageBox, QWidget, QTreeView, \
-                        QSizePolicy
+                        QSizePolicy, qApp
 import hex.utils as utils
 import hex.hexlineedit as hexlineedit
 import hex.matchers as matchers
@@ -92,16 +93,19 @@ class SearchResultsModel(QAbstractListModel):
 
     def __init__(self, hex_widget, matcher):
         QAbstractListModel.__init__(self)
+        self._lock = threading.RLock()
+        self._newResults = []
         self._matcher = matcher
         self._hexWidget = hex_widget
         self._results = []
         if self._matcher is not None:
             with self._matcher.lock:
-                self._matcher.newResult.connect(self._onNewMatch, Qt.QueuedConnection)
+                self._matcher.newResult.connect(self._onNewMatch, Qt.DirectConnection)
                 self._matcher.finished.connect(self._onMatchFinished, Qt.QueuedConnection)
 
                 for match in self._matcher.state.results.values():
                     self._results.append((match, self._createRange(match)))
+        self.startTimer(400)
 
     def rowCount(self, index=QModelIndex()):
         return len(self._results) if not index.isValid() else 0
@@ -122,9 +126,19 @@ class SearchResultsModel(QAbstractListModel):
         return None
 
     def _onNewMatch(self, result_name, match):
-        self.beginInsertRows(QModelIndex(), len(self._results), len(self._results))
-        self._results.append((match, self._createRange(match)))
-        self.endInsertRows()
+        with self._lock:
+            self._newResults.append(match)
+
+    def timerEvent(self, event):
+        has_results = False
+        with self._lock:
+            if self._newResults:
+                self.beginInsertRows(QModelIndex(), len(self._results), len(self._results) + len(self._newResults) - 1)
+                self._results += ((match, self._createRange(match)) for match in self._newResults)
+                self._newResults = []
+                has_results = True
+        if has_results:
+            self.endInsertRows()
 
     def _onMatchFinished(self, final_status):
         pass

@@ -12,31 +12,35 @@ class TestEditor(unittest.TestCase):
         editor = Editor(deviceFromBytes(b''))
 
         self.assertEqual(len(editor), 0)
-        self.assertEqual(len(editor.spans), 0)
         self.assertFalse(editor.isModified)
 
         data_span = DataSpan(editor, b'Hello, World!')
         editor.appendSpan(data_span)
         self.assertTrue(editor.isModified)
         self.assertEqual(len(editor), len('Hello, World!'))
-        self.assertEqual(len(editor.spans), 1)
-        self.assertEqual(editor.spanAtPosition(0), data_span)
-        self.assertFalse(editor.spanAtPosition(29))
-        self.assertEqual(len(editor.spansInRange(0, 5)[0]), 1)
-        self.assertRaises(OutOfBoundsError, lambda: editor.spansInRange(0, 200))
+        self.assertEqual(editor.readAll(), b'Hello, World!')
+        self.assertEqual(len(editor._spanChain.spans), 1)
+        self.assertEqual(editor._spanChain.spanAtOffset(0), data_span)
+        self.assertFalse(editor._spanChain.spanAtOffset(29))
+        self.assertEqual(len(editor._spanChain.spansInRange(0, 5)[0]), 1)
+        self.assertEqual(len(editor._spanChain.spansInRange(0, 200)[0]), 1)
+        self.assertEqual(len(editor._spanChain.spansInRange(200, 100)[0]), 0)
+        self.assertEqual(len(editor._spanChain.spansInRange(2, 0)[0]), 0)
+        self.assertRaises(OutOfBoundsError, lambda: editor._spanChain.spansInRange(-10, 100))
+        self.assertRaises(OutOfBoundsError, lambda: editor._spanChain.spansInRange(2, -1))
 
         self.assertEqual(editor.read(1, 4), b'ello')
 
         editor.insertSpan(1, DataSpan(editor, b'!!!'))
         self.assertEqual(editor.readAll(), b'H!!!ello, World!')
-        self.assertEqual(len(editor.spans), 3)
+        self.assertEqual(len(editor._spanChain.spans), 3)
         self.assertEqual(len(editor), len(data_span) + 3)
-        self.assertEqual(len(editor.spanAtPosition(0)), 1)
-        self.assertEqual(len(editor.spanAtPosition(1)), 3)
-        self.assertEqual(len(editor.spanAtPosition(6)), 12)
+        self.assertEqual(len(editor._spanChain.spanAtOffset(0)), 1)
+        self.assertEqual(len(editor._spanChain.spanAtOffset(1)), 3)
+        self.assertEqual(len(editor._spanChain.spanAtOffset(6)), 12)
 
         editor.remove(1, 3)
-        self.assertEqual(len(editor.spans), 2)
+        self.assertEqual(len(editor._spanChain.spans), 2)
         self.assertEqual(editor.readAll(), b'Hello, World!')
 
         editor.writeSpan(5, FillSpan(editor, b'?', 2))
@@ -47,14 +51,14 @@ class TestEditor(unittest.TestCase):
 
         editor.clear()
         self.assertEqual(len(editor), 0)
-        self.assertEqual(len(editor.spans), 0)
+        self.assertEqual(len(editor._spanChain.spans), 0)
 
         editor.writeSpan(0, data_span)
-        self.assertEqual(len(editor.takeSpans(2, 3)), 1)
-        self.assertEqual(len(editor.spans), 3)
-        self.assertEqual(len(editor.spans[0]), 2)
-        self.assertEqual(len(editor.spans[1]), 3)
-        self.assertEqual(len(editor.spans[2]), 8)
+        self.assertEqual(len(editor._spanChain.takeSpans(2, 3)), 1)
+        self.assertEqual(len(editor._spanChain.spans), 3)
+        self.assertEqual(len(editor._spanChain.spans[0]), 2)
+        self.assertEqual(len(editor._spanChain.spans[1]), 3)
+        self.assertEqual(len(editor._spanChain.spans[2]), 8)
 
         self.assertEqual(editor.read(5, 20), b', World!')
 
@@ -140,24 +144,30 @@ class TestEditor(unittest.TestCase):
 
     def testSave(self):
         array = QByteArray(b'Hello, World!')
+        array_device = BufferDevice(array)
+        second_array = QByteArray()
+        second_array_device = BufferDevice(second_array)
 
-        editor = Editor(BufferDevice(array))
+        editor = Editor(array_device)
 
         editor.insertSpan(3, DataSpan(editor, b'000'))
         self.assertEqual(editor.readAll(), b'Hel000lo, World!')
         self.assertTrue(editor.isModified)
 
-        editor.save()
+        editor.save(second_array_device, switch_device=True)
 
         self.assertEqual(editor.readAll(), b'Hel000lo, World!')
         self.assertFalse(editor.isModified)
+        self.assertEqual(array, b'Hello, World!')
+        self.assertEqual(second_array, b'Hel000lo, World!')
+        self.assertTrue(editor.device is second_array_device)
+        self.assertEqual(array_device.read(0, len(array_device)), b'Hello, World!')
+        self.assertEqual(second_array_device.read(0, len(second_array_device)), b'Hel000lo, World!')
 
         self.assertFalse(editor.isRangeModified(0, 5))
         editor.insertSpan(10, DataSpan(editor, b'!!!'))
         self.assertFalse(editor.isRangeModified(0, 5))
         self.assertTrue(editor.isModified)
-
-        self.assertEqual(array, b'Hel000lo, World!')
 
         editor.undo()
         self.assertEqual(editor.readAll(), b'Hel000lo, World!')
@@ -305,3 +315,22 @@ class TestEditor(unittest.TestCase):
         lock.releaseRead()
         time.sleep(1)
         self.assertTrue(locked)
+
+    def test5(self):
+        arr = QByteArray(b'1234567890' * 1000000)
+        arr_copy = QByteArray(arr)
+        arr_device = BufferDevice(arr)
+
+        editor = Editor(arr_device)
+
+        editor.remove(0, len(editor))
+        self.assertEqual(len(editor), 0)
+
+        editor.save()
+        editor.undo()
+        self.assertEqual(len(editor), len(arr))
+        self.assertEqual(editor.readAll(), arr)
+
+        editor.save()
+
+        self.assertEqual(arr, arr_copy)

@@ -29,8 +29,9 @@ class AbstractDevice(QObject):
         self._cacheStart = 0
         self._cacheLength = 0
         self._cacheSize = 4
-        self._cacheBoundary = 4
+        self._cacheBoundary = 2
         self.options = options
+        self._spans = weakref.WeakSet()
 
     def _read(self, position, length):
         raise NotImplementedError()
@@ -65,21 +66,46 @@ class AbstractDevice(QObject):
                 return self._cache[cache_offset:cache_end] + self._read(cache_end, length - (cache_end - position))
         elif self._cacheSize > 0:
             # cache miss - we should move cache
-            # it is best to choose position to force current pos to be in center of cache
-            ideal_start = max(0, position - self._cacheSize // 2)
-            ideal_start = ideal_start - ideal_start % self._cacheBoundary
-            if ideal_start + self._cacheSize <= position:
-                ideal_start = position - position % self._cacheBoundary
-
-            new_cache = self._read(ideal_start, self._cacheSize)
-            self._cacheStart = ideal_start
-            self._cache = new_cache
-            self._cacheLength = len(self._cache)
-
-            # and try to read again...
+            self._encache(position, center=True)
             return self.read(position, length)
         else:
             return self._read(position, length)
+
+    def byteRange(self, position, length):
+        if position < 0 or length < 0:
+            raise OutOfBoundsError()
+
+        if self._cacheSize > 0:
+            current_position = position
+            while current_position < position + length:
+                cache_start = self._cacheStart
+                cache_end = cache_start + self._cacheLength
+                cache = self._cache
+                if cache_start <= current_position < cache_end:
+                    cached_bytes_count = min(length, cache_end - current_position)
+                    cache_offset = current_position - self._cacheStart
+                    yield from cache[cache_offset:cache_offset + cached_bytes_count]
+                    current_position += cached_bytes_count
+                else:
+                    self._encache(current_position, center=(length - (current_position - position) < self._cacheSize))
+        else:
+            for byte_index in range(position, position + length):
+                yield self._read(byte_index, 1)
+
+    def _encache(self, from_position, center):
+        assert self._cacheBoundary <= self._cacheSize
+        if center:
+            cache_start = max(0, from_position - self._cacheSize // 2)
+            cache_start -= cache_start % self._cacheBoundary
+            if cache_start + self._cacheSize <= from_position:
+                cache_start = from_position - from_position % self._cacheBoundary
+        else:
+            cache_start = from_position - from_position % self._cacheBoundary
+
+        new_cache = self._read(cache_start, self._cacheSize)
+        self._cacheStart = cache_start
+        self._cache = new_cache
+        self._cacheLength = len(self._cache)
 
     def _write(self, position, data):
         raise NotImplementedError()
@@ -96,11 +122,19 @@ class AbstractDevice(QObject):
 
     def createSaver(self, editor, read_device):
         """Create saver to save data from :read_device: to this device."""
+        if not editor.checkCanQuickSave() and read_device is self:
+            raise IOError('it is impossible to save this editor data to same device')
         return StandardSaver(read_device, self)
 
     @property
     def url(self):
         return self._url
+
+    def _addSpan(self, device_span):
+        self._spans.add(device_span)
+
+    def _removeSpan(self, device_span):
+        self._spans.remove(device_span)
 
 
 class NullDevice(AbstractDevice):
@@ -206,6 +240,7 @@ class QtProxyDevice(AbstractDevice):
         bytes_written = self._qdevice.write(data)
         if bytes_written < 0:
             raise IOError(self._qdevice.errorString())
+        self._size = self._qdevice.size()
         return bytes_written
 
 
@@ -251,7 +286,7 @@ class FileDevice(QtProxyDevice):
                                                                                    utils.formatSize(new_size)))
 
     def createSaver(self, editor, read_device):
-        if editor.canQuickSave:
+        if editor.checkCanQuickSave():
             return QuickFileSaver(editor, read_device, self)
         else:
             return FileSaver(read_device, self)
