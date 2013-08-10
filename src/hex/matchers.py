@@ -1,16 +1,17 @@
 import hex.operations as operations
 import hex.utils as utils
+import hex.documents as documents
 
 
 class Match(object):
-    def __init__(self, editor, position, length):
-        self._editor = editor
+    def __init__(self, document=None, position=-1, length=-1):
+        self._document = document
         self._position = position
         self._length = length
 
     @property
-    def editor(self):
-        return self._editor
+    def document(self):
+        return self._document
 
     @property
     def position(self):
@@ -20,101 +21,30 @@ class Match(object):
     def length(self):
         return self._length
 
+    def __len__(self):
+        return self._length
 
-class Matcher(operations.Operation):
-    def __init__(self, editor, title=None):
+    @property
+    def valid(self):
+        return not (self._document is None or self._position < 0 or self._length < 0)
+
+
+class AbstractMatcher(operations.Operation):
+    def __init__(self, document, title=None):
         if title is None:
             title = utils.tr('looking for matches')
         operations.Operation.__init__(self, title)
-        self._editor = editor
-
-    @property
-    def allMatches(self):
-        return self.state.results.values()
-
-    def doWork(self):
-        self.findMatches()
-
-    def findMatches(self):
-        raise NotImplementedError()
-
-
-class BinaryMatcher(Matcher):
-    def __init__(self, editor, find_what, title=None):
-        Matcher.__init__(self, editor, title)
+        self._document = document
         self._resultCount = 0
 
         self.setCanPause(True)
         self.setCanCancel(True)
 
-        if not isinstance(find_what, bytes):
-            find_what = bytes(find_what)
-        self._findWhat = find_what
+    @property
+    def document(self):
+        return self._document
 
-        # build offset table
-        self._offsetTable = [len(find_what)] * 256
-        if find_what:
-            for byte_index in range(len(find_what) - 1):
-                byte = find_what[byte_index]
-                self._offsetTable[byte] = len(find_what) - byte_index - 1
-
-    def findMatches(self):
-        self.setProgressText(utils.tr('searching... no matches yet'))
-
-        cursor = self._editor.createReadCursor()
-        with cursor.activate():
-            if len(self._editor) < len(self._findWhat) or not self._findWhat:
-                return
-
-            counter = 0
-
-            template = self._findWhat
-            if len(template) == 1:
-                # simply iterate over bytes with byteRange
-                find_byte = template[0]
-                byte_index = 0
-                for byte in self._editor.byteRange(0, len(self._editor)):
-                    if find_byte == byte:
-                        self._addMatch(Match(self._editor, byte_index, 1))
-                    byte_index += 1
-
-                    if counter >= 1000:
-                        self._updateState((byte_index / len(self._editor)) * 100)
-                        counter = 0
-                    else:
-                        counter += 1
-            else:
-                template_end_position = len(template) - 1
-                offset_table = self._offsetTable
-                editor_length = len(self._editor)
-
-                counter = 0
-                while template_end_position < editor_length:
-                    # find first byte that does not match template
-                    for template_index in range(0, -len(template), -1):
-                        if cursor[template_end_position + template_index] != template[template_index - 1]:
-                            # shift template by offset
-                            template_end_position += offset_table[cursor[template_end_position + template_index]]
-                            break
-                    else:
-                        # sequence was found...
-                        self._addMatch(Match(self._editor, template_end_position - len(template) + 1, len(template)))
-                        template_end_position += 1
-
-                    if counter >= 1000:
-                        self._updateState((template_end_position / editor_length) * 100)
-                        counter = 0
-                    else:
-                        counter += 1
-
-            self.setProgressText(utils.tr('search completed: {0} results found').format(self._resultCount))
-
-    def _addMatch(self, match):
-        self._resultCount += 1
-        self.addResult(str(self._resultCount), match)
-        self.setProgressText(utils.tr('searching... {0} matches found').format(self._resultCount))
-
-    def _updateState(self, progress):
+    def _updateState(self, position):
         while True:
             command = self.takeCommand()
             if command == self.PauseCommand:
@@ -124,15 +54,70 @@ class BinaryMatcher(Matcher):
                     if command == self.CancelCommand:
                         self.setProgressText(utils.tr('search cancelled - {0} results was found').format(self._resultCount))
                         self._cancel()
-                        return
+                        return True
                     elif command == self.ResumeCommand:
                         self.setStatus(operations.OperationState.Running)
                         break
             elif command == self.CancelCommand:
                 self._cancel()
                 self.setProgressText(utils.tr('search cancelled - {0} results was found').format(self._resultCount))
-                return
+                return True
             else:
                 break
-        counter = 0
-        self.setProgress(progress)
+        self.setProgress((position / len(self.document)) * 100)
+        return False
+
+    @property
+    def allMatches(self):
+        return self.state.results.values()
+
+    def addResult(self, name, value):
+        self._resultCount += 1
+        operations.Operation.addResult(self, name, value)
+
+
+class BinaryMatcher(AbstractMatcher):
+    def __init__(self, document, find_what, title=None):
+        AbstractMatcher.__init__(self, document, title)
+        self._findWhat = find_what
+        self._finder = documents.BinaryFinder(document, find_what)
+
+    def doWork(self):
+        self.setProgressText(utils.tr('searching...'))
+        current_position = 0
+        step = 1024 * 1024
+        while current_position < len(self.document):
+            match_position, found = self._finder.findNext(current_position, len(self.document) - current_position)
+            if found:
+                self.addResult(str(self._resultCount), Match(self.document, match_position, len(self._findWhat)))
+                current_position = match_position + 1
+            else:
+                current_position += step
+
+            self._updateState(current_position)
+
+    def _doFind(self, from_position, limit, is_reversed):
+        if limit is None:
+            if is_reversed:
+                limit = from_position
+            else:
+                limit = max(0, len(self._document) - from_position)
+
+        if limit == 0:
+            return Match()
+
+        if not is_reversed:
+            match_position, found = self._finder.findNext(from_position, limit)
+        else:
+            match_position, found = self._finder.findPrevious(from_position, limit)
+
+        if found:
+            return Match(self._document, match_position, len(self._findWhat))
+        else:
+            return Match()
+
+    def findNext(self, from_position, limit=None):
+        return self._doFind(from_position, limit, False)
+
+    def findPrevious(self, from_position, limit=None):
+        return self._doFind(from_position, limit, True)

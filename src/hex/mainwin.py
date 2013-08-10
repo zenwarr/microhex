@@ -1,15 +1,15 @@
-from PyQt4.QtCore import QFileInfo, Qt, QByteArray, QObject, pyqtSignal, QUrl, QSize
+from PyQt4.QtCore import QFileInfo, Qt, QByteArray, QObject, pyqtSignal, QUrl
 from PyQt4.QtGui import QMainWindow, QTabWidget, QFileDialog, QKeySequence, QMdiSubWindow, QApplication, QProgressBar, \
                         QWidget, QVBoxLayout, QFileIconProvider, QApplication, QIcon, QDialog, QAction, QIcon, QLabel, \
-                        QMessageBox, QDockWidget
-from hex.hexwidget import HexWidget
+                        QMessageBox, QDockWidget, QColor
+from hex.hexwidget import HexWidget, EmphasizedRange, SelectionRange
 import hex.settings as settings
 import hex.appsettings as appsettings
 import hex.utils as utils
-import hex.devices as devices
-import hex.editor as editor
+import hex.documents as documents
 import hex.operations as operations
 import hex.resources.qrc_main
+import hex.search as search
 
 
 def forActiveWidget(fn):
@@ -30,6 +30,8 @@ class MainWindow(QMainWindow):
     def __init__(self, files_to_load):
         QMainWindow.__init__(self)
         self._inited = False
+        self._currentMatcher = None
+        self._lastMatch = None
 
         global globalMainWindow
         globalMainWindow = self
@@ -73,7 +75,7 @@ class MainWindow(QMainWindow):
 
         app = QApplication.instance()
         for file_to_load in files_to_load:
-            load_options = devices.FileLoadOptions()
+            load_options = documents.FileLoadOptions()
             load_options.readOnly = app.args.readOnly
             load_options.freezeSize = app.args.freezeSize
             if app.args.noLoadDialog:
@@ -207,10 +209,25 @@ class MainWindow(QMainWindow):
                                                     PropertyObserver(self, 'activeSubWidget.hexWidget'))
         self.actionRemoveBookmark.triggered.connect(self.removeBookmark)
 
-        self.actionSearch = ObservingAction(getIcon('edit-find'), utils.tr('Search...'),
+        self.actionFind = ObservingAction(getIcon('edit-find'), utils.tr('Find...'),
                                             PropertyObserver(self, 'activeSubWidget.hexWidget'))
-        self.actionSearch.setShortcut(QKeySequence('Ctrl+F'))
-        self.actionSearch.triggered.connect(self.search)
+        self.actionFind.setShortcut(QKeySequence('Ctrl+F'))
+        self.actionFind.triggered.connect(self.find)
+
+        self.actionFindNext = ObservingAction(QIcon(), utils.tr('Find next'),
+                                              PropertyObserver(self, 'activeSubWidget.hexWidget'))
+        self.actionFindNext.setShortcut(QKeySequence('F3'))
+        self.actionFindNext.triggered.connect(self.findNext)
+
+        self.actionFindPrevious = ObservingAction(QIcon(), utils.tr('Find previous'),
+                                                  PropertyObserver(self, 'activeSubWidget.hexWidget'))
+        self.actionFindPrevious.setShortcut('Shift+F3')
+        self.actionFindPrevious.triggered.connect(self.findPrevious)
+
+        self.actionFindAll = ObservingAction(QIcon(), utils.tr('Find all...'),
+                                             PropertyObserver(self, 'activeSubWidget.hexWidget'))
+        self.actionFindAll.setShortcut('Ctrl+Shift+F')
+        self.actionFindAll.triggered.connect(self.findAll)
 
         self.actionShowOperationManager = QAction(QIcon(), utils.tr('Show operation manager...'), None)
         self.actionShowOperationManager.triggered.connect(self.showOperationManager)
@@ -248,7 +265,10 @@ class MainWindow(QMainWindow):
         self.editMenu.addAction(self.actionAddBookmark)
         self.editMenu.addAction(self.actionRemoveBookmark)
         self.editMenu.addSeparator()
-        self.editMenu.addAction(self.actionSearch)
+        self.editMenu.addAction(self.actionFind)
+        self.editMenu.addAction(self.actionFindNext)
+        self.editMenu.addAction(self.actionFindPrevious)
+        self.editMenu.addAction(self.actionFindAll)
 
         self.viewMenu = menubar.addMenu(utils.tr('View'))
         self.viewMenu.addAction(self.actionShowHeader)
@@ -313,7 +333,7 @@ class MainWindow(QMainWindow):
         self.editToolBar.addAction(self.actionRedo)
         self.editToolBar.addAction(self.actionCopy)
         self.editToolBar.addAction(self.actionPaste)
-        self.editToolBar.addAction(self.actionSearch)
+        self.editToolBar.addAction(self.actionFind)
 
     def showEvent(self, event):
         if not self._inited:
@@ -372,7 +392,7 @@ class MainWindow(QMainWindow):
 
     def openFile(self, filename, load_options=None):
         try:
-            e = editor.Editor(devices.deviceFromUrl(QUrl.fromLocalFile(filename), load_options))
+            e = documents.Document(documents.deviceFromUrl(QUrl.fromLocalFile(filename), load_options))
         except Exception as err:
             msgbox = QMessageBox(self)
             msgbox.setWindowTitle(utils.tr('Error opening file'))
@@ -388,17 +408,22 @@ class MainWindow(QMainWindow):
 
     @forActiveWidget
     def saveAs(self):
-        url = self.activeSubWidget.hexWidget.editor.device.url
-        filename = url.toLocalFile() if url.isLocalFile() else ''
+        hex_widget = self.activeSubWidget.hexWidget
+        if hex_widget.document.device is not None:
+            url = hex_widget.document.device.url
+            filename = url.toLocalFile() if url.isLocalFile() else ''
+        else:
+            filename = ''
+
         filename = QFileDialog.getSaveFileName(self, utils.tr('Save file as'), filename)
         if filename:
-            options = devices.FileLoadOptions()
+            options = documents.FileLoadOptions()
             options.forceNew = True
-            save_device = devices.deviceFromUrl(QUrl.fromLocalFile(filename), options)
-            self.activeSubWidget.hexWidget.save(save_device, switch_to_device=True)
+            save_device = documents.deviceFromUrl(QUrl.fromLocalFile(filename), options)
+            hex_widget.save(save_device, switch_to_device=True)
 
     def newDocument(self):
-        e = editor.Editor(devices.NullDevice())
+        e = documents.Document()
         self._addTab(HexSubWindow(self, e, utils.tr('New document')))
 
     def _addTab(self, subWidget):
@@ -502,7 +527,7 @@ class MainWindow(QMainWindow):
 
     @forActiveWidget
     def fillZeros(self):
-        self.activeSubWidget.hexWidget.fillSelected(b'\x00')
+        self.activeSubWidget.hexWidget.fillSelected('\x00')
 
     @forActiveWidget
     def setupActiveColumn(self):
@@ -534,7 +559,7 @@ class MainWindow(QMainWindow):
 
     @forActiveWidget
     def save(self):
-        if isinstance(self.activeSubWidget.hexWidget.editor.device, devices.NullDevice):
+        if not self.activeSubWidget.hexWidget.document.device:
             self.saveAs()
         else:
             self.activeSubWidget.hexWidget.save()
@@ -579,11 +604,56 @@ class MainWindow(QMainWindow):
             hexWidget.removeBookmark(bookmarks[0])
 
     @forActiveWidget
-    def search(self):
-        from hex.search import SearchDialog
+    def findAll(self):
+        dlg = search.SearchDialog(self, self.activeSubWidget.hexWidget)
+        if dlg.exec_() == QDialog.Accepted:
+            matcher = dlg.matcher
+            self.dockSearch.newSearch(self.activeSubWidget.hexWidget, matcher)
+            matcher.run()
 
-        dlg = SearchDialog(self, self.activeSubWidget.hexWidget)
-        dlg.exec_()
+    def _ensureCurrentMatcher(self):
+        if utils.isNone(self._currentMatcher) or not utils.isClone(self._currentMatcher.document,
+                                                                   self._activeSubWidget.hexWidget.document):
+            dlg = search.SearchDialog(self, self.activeSubWidget.hexWidget)
+            if dlg.exec_() == QDialog.Accepted:
+                self._currentMatcher = dlg.matcher
+
+    def _doFind(self, reverse):
+        self._ensureCurrentMatcher()
+        if not utils.isNone(self._currentMatcher):
+            hex_widget = self._activeSubWidget.hexWidget
+            if not reverse:
+                match = self._currentMatcher.findNext(hex_widget.caretPosition + 1)
+            else:
+                match = self._currentMatcher.findPrevious(hex_widget.caretPosition)
+
+            if not match.valid:
+                QMessageBox.information(self, utils.tr('Find'), utils.tr('Nothing had been found'))
+            else:
+                emp_range = EmphasizedRange(hex_widget, match.position, match.length, EmphasizedRange.UnitBytes,
+                                            EmphasizedRange.BoundToPosition)
+                # emp_range.backgroundColor = hex_widget.theme.caretBackgroundColor
+                emp_range.backgroundColor = QColor(Qt.green)
+                hex_widget.emphasize(emp_range)
+                hex_widget.caretPosition = match.position
+                hex_widget.selectionRanges = [SelectionRange(hex_widget, match.position, match.length,
+                                                             SelectionRange.UnitBytes, SelectionRange.BoundToData)]
+            self._lastMatch = match
+
+    @forActiveWidget
+    def find(self):
+        dlg = search.SearchDialog(self, self.activeSubWidget.hexWidget)
+        if dlg.exec_() == QDialog.Accepted:
+            self._currentMatcher = dlg.matcher
+            self.findNext()
+
+    @forActiveWidget
+    def findNext(self):
+        self._doFind(reverse=False)
+
+    @forActiveWidget
+    def findPrevious(self):
+        self._doFind(reverse=True)
 
     def showOperationManager(self):
         operations.OperationsDialog(self).exec_()
@@ -663,14 +733,14 @@ class HexSubWindow(QWidget):
     titleChanged = pyqtSignal(str)
     isModifiedChanged = pyqtSignal(bool)
 
-    def __init__(self, parent, editor, name=''):
+    def __init__(self, parent, document, name=''):
         QWidget.__init__(self, parent)
-        if editor.url.isLocalFile():
-            self.icon = QFileIconProvider().icon(QFileInfo(editor.url.toLocalFile()))
+        if document.url.isLocalFile():
+            self.icon = QFileIconProvider().icon(QFileInfo(document.url.toLocalFile()))
         else:
             self.icon = QIcon()
         self.name = name
-        self.hexWidget = HexWidget(self, editor)
+        self.hexWidget = HexWidget(self, document)
         self.hexWidget.isModifiedChanged.connect(self._onModifiedChanged)
         self.hexWidget.urlChanged.connect(self._onUrlChanged)
         self.setFocusProxy(self.hexWidget)
@@ -712,15 +782,13 @@ class OperationsStatusBarWidget(operations.OperationsInfoWidget):
 
 class SearchDockWidget(QDockWidget):
     def __init__(self, parent):
-        from hex.search import SearchResultsWidget
-
         QDockWidget.__init__(self, utils.tr('Search'), parent)
         self.setObjectName('dock-search')
 
-        self.searchResults = SearchResultsWidget(self)
+        self.searchResults = search.SearchResultsWidget(self)
         self.setWidget(self.searchResults)
 
-    def newSearch(self, hex_widget, matcher):
+    def newSearch(self, hex_widget, matchOperation):
         self.searchResults.hexWidget = hex_widget
-        self.searchResults.matcher = matcher
+        self.searchResults.matchOperation = matchOperation
         self.setVisible(True)

@@ -4,7 +4,7 @@ import hex.utils as utils
 import hex.formatters as formatters
 import hex.settings as settings
 import hex.appsettings as appsettings
-import hex.devices as devices
+import hex.documents as documents
 
 
 globalSettings = settings.globalSettings()
@@ -42,10 +42,10 @@ class LoadFileDialog(utils.Dialog):
             self.ui.chkReadOnly.setChecked(load_options.readOnly)
             self.ui.chkFreezeSize.setChecked(load_options.freezeSize)
             self.ui.chkMemoryLoad.setChecked(load_options.memoryLoad)
-            self.ui.chkLoadRange.setChecked(load_options.range is not None)
-            if load_options.range is not None:
-                self.ui.rangeStart.number = load_options.range[0]
-                self.ui.rangeLength.number = load_options.range[1]
+            self.ui.chkLoadRange.setChecked(load_options.rangeLoad)
+            if load_options.rangeLoad:
+                self.ui.rangeStart.number = load_options.rangeStart
+                self.ui.rangeLength.number = load_options.rangeLength
 
     def _onRangeStartChanged(self, new_start):
         self.ui.rangeLength.maximum = self.fileSize - new_start
@@ -70,9 +70,11 @@ class LoadFileDialog(utils.Dialog):
 
     @property
     def loadOptions(self):
-        options = devices.FileLoadOptions()
+        options = documents.FileLoadOptions()
         if self.ui.chkLoadRange.isChecked():
-            options.range = self.ui.rangeStart.number, self.ui.rangeLength.number
+            options.rangeLoad = True
+            options.rangeStart = self.ui.rangeStart.number
+            options.rangeLength = self.ui.rangeLength.number
         options.readOnly = self.ui.chkReadOnly.isChecked()
         options.freezeSize = self.ui.chkFreezeSize.isChecked()
         options.memoryLoad = self.ui.chkMemoryLoad.isEnabled() and self.ui.chkMemoryLoad.isChecked()

@@ -14,10 +14,10 @@ class PartialCharacterError(EncodingError):
 class CharacterData(object):
     def __init__(self):
         self.unicode = ''
-        self.editor = None
+        self.document = None
         self.startPosition = -1
         self.bytesCount = -1
-        self.editorData = b''
+        self.documentData = b''
 
 
 class AbstractCodec(object):
@@ -48,21 +48,21 @@ class AbstractCodec(object):
         """
         raise NotImplementedError()
 
-    def findCharacterStart(self, editor, position):
+    def findCharacterStart(self, document, position):
         """Finds start of character that has byte at :position:. Should raise EncodingError if self.canDetermineCharacterStart
         is False"""
-        return self.getCharacterData(editor, position).startPosition
+        return self.getCharacterData(document, position).startPosition
 
-    def getCharacterSize(self, editor, position):
+    def getCharacterSize(self, document, position):
         """Finds number of bytes occupied by char that has byte at position. Can return -1 if number of bytes cannot be
         determined.
         """
-        return self.getCharacterData(editor, position).bytesCount
+        return self.getCharacterData(document, position).bytesCount
 
-    def decodeCharacter(self, editor, position):
+    def decodeCharacter(self, document, position):
         """Converts character that has byte at :position: to Python string.
         """
-        return self.getCharacterData(editor, position).unicode
+        return self.getCharacterData(document, position).unicode
 
     def encodeString(self, text):
         """Converts string to sequence of bytes in given encoding.
@@ -74,7 +74,7 @@ class AbstractCodec(object):
         """
         raise NotImplementedError()
 
-    def getCharacterData(self, editor, position):
+    def getCharacterData(self, document, position):
         raise NotImplementedError()
 
 
@@ -106,14 +106,14 @@ class SingleByteEncodingCodec(QtProxyCodec):
     def encodeString(self, text):
         return self._qcodec.fromUnicode(text)
 
-    def getCharacterData(self, editor, position):
+    def getCharacterData(self, document, position):
         d = CharacterData()
-        data = editor.read(position, 1)
+        data = document.read(position, 1)
         d.unicode = self._qcodec.toUnicode(data)
         d.startPosition = position
-        d.editor = editor
+        d.document = document
         d.bytesCount = 1
-        d.editorData = data
+        d.documentData = data
 
         if len(d.unicode) != 1:
             raise EncodingError()
@@ -139,16 +139,16 @@ class Utf16Codec(QtProxyCodec):
     def unitSize(self):
         return 2
 
-    def getCharacterSize(self, editor, position):
-        start = self.findCharacterStart(editor, position)
+    def getCharacterSize(self, document, position):
+        start = self.findCharacterStart(document, position)
         if start < position:
             # that was low surrogate at :position:, so length of our char is 4 bytes
             return 4
         else:
             return 2
 
-    def decodeCharacter(self, editor, position):
-        data = editor.read(self.findCharacterStart(editor, position), self.getCharacterSize(editor, position))
+    def decodeCharacter(self, document, position):
+        data = document.read(self.findCharacterStart(document, position), self.getCharacterSize(document, position))
         decoded = self._qcodec.toUnicode(data)
         return decoded
 
@@ -160,22 +160,22 @@ class Utf16Codec(QtProxyCodec):
         else:
             return converted
 
-    def getCharacterData(self, editor, position):
+    def getCharacterData(self, document, position):
         import hex.valuecodecs as valuecodecs
 
         d = CharacterData()
-        d.editor = editor
+        d.document = document
 
         word_codec = valuecodecs.IntegerCodec(valuecodecs.IntegerCodec.Format16Bit, False,
                                               valuecodecs.LittleEndian if self.littleEndian else valuecodecs.BigEndian)
 
-        raw_data = editor.read(position, 2)
+        raw_data = document.read(position, 2)
         if len(raw_data) != 2:
             raise PartialCharacterError()
         word = word_codec.decode(raw_data)
         if 0xd800 <= word <= 0xdbff:
             # high surrogate, next word should be trail surrogate... check it
-            trail_word_data = editor.read(position + 2, 2)
+            trail_word_data = document.read(position + 2, 2)
             if len(trail_word_data) < 2:
                 raise PartialCharacterError()
             trail_word = word_codec.decode(trail_word_data)
@@ -183,19 +183,19 @@ class Utf16Codec(QtProxyCodec):
                 raise EncodingError('lead surrogate without trail surrogate')
             d.startPosition = position
             d.unicode = self._qcodec.toUnicode(raw_data + trail_word_data)
-            d.editorData = raw_data + trail_word_data
+            d.documentData = raw_data + trail_word_data
             d.bytesCount = 4
         elif 0xdc00 <= word <= 0xdfff:
             # low surrogate, previous word should be lead surrogate
             if position < 2:
                 raise PartialCharacterError()
-            lead_word_data = editor.read(position - 2, 2)
+            lead_word_data = document.read(position - 2, 2)
             lead_word = word_codec.decode(lead_word_data)
-            if not (0xd800 <= word <= 0xdbff):
+            if not (0xd800 <= lead_word <= 0xdbff):
                 raise PartialCharacterError('trail surrogate without lead surrogate')
             d.startPosition = position - 2
             d.unicode = self._qcodec.toUnicode(lead_word_data + raw_data)
-            d.editorData = lead_word_data + raw_data
+            d.documentData = lead_word_data + raw_data
             d.bytesCount = 4
         else:
             # single character
@@ -226,14 +226,14 @@ class Utf32Codec(QtProxyCodec):
     def unitSize(self):
         return 4
 
-    def getCharacterData(self, editor, position):
+    def getCharacterData(self, document, position):
         d = CharacterData()
-        data = editor.read(position, 4)
+        data = document.read(position, 4)
         if len(data) != 4:
             raise PartialCharacterError()
-        d.editor = editor
+        d.document = document
         d.startPosition = position
-        d.editorData = data
+        d.documentData = data
         d.unicode = self._qcodec.toUnicode(data)
         if len(d.unicode) != 1:
             raise EncodingError()
@@ -264,13 +264,13 @@ class Utf8Codec(QtProxyCodec):
     def unitSize(self):
         return 1
 
-    def getCharacterData(self, editor, position):
+    def getCharacterData(self, document, position):
         d = CharacterData()
-        d.editor = editor
+        d.document = document
 
         # first first byte of sequence
         back_position = max(0, position - 5)
-        data = editor.read(back_position, position - back_position + 1)
+        data = bytes(document.read(back_position, position - back_position + 1))
 
         if not (data[-1] & 0x80):
             # if highest bit is off, this is first character
@@ -301,12 +301,12 @@ class Utf8Codec(QtProxyCodec):
             d.bytesCount = 1
 
         if first_byte_index + d.bytesCount > len(data):
-            d.editorData = editor.read(d.startPosition, d.bytesCount)
+            d.documentData = document.read(d.startPosition, d.bytesCount)
         else:
-            d.editorData = data[first_byte_index:first_byte_index+d.bytesCount]
+            d.documentData = data[first_byte_index:first_byte_index+d.bytesCount]
 
         # and decode character
-        d.unicode = self._qcodec.toUnicode(d.editorData)
+        d.unicode = self._qcodec.toUnicode(d.documentData)
         if len(d.unicode) != 1:
             raise EncodingError('failed to decode utf-8 sequence')
 

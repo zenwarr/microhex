@@ -47,5 +47,6 @@ TODO
 qrc_*
 ui_*
 *.qm
+*.pro.user
 
 lupdate.sh

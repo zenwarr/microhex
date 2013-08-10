@@ -3,11 +3,10 @@ import hex.hexwidget as hexwidget
 import hex.hexcolumn as hexcolumn
 import hex.charcolumn as charcolumn
 import hex.addresscolumn as addresscolumn
-import hex.editor as editor
-import hex.devices as devices
 import hex.valuecodecs as valuecodecs
 import hex.formatters as formatters
 import hex.encodings as encodings
+import hex.documents as documents
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QFont, qApp
 from PyQt4.QtTest import QTest
@@ -15,7 +14,7 @@ from PyQt4.QtTest import QTest
 
 class TestHexWidget(unittest.TestCase):
     def test(self):
-        ed = editor.Editor(devices.deviceFromBytes(b'1234567890' * 1000))
+        ed = documents.Document(documents.deviceFromData(b'1234567890' * 1000))
         hw = hexwidget.HexWidget(None, ed)
         hw.clearColumns()
 
@@ -44,7 +43,7 @@ class TestHexWidget(unittest.TestCase):
 
         r = hexwidget.DataRange(hw, charColumnModel.indexFromOffset(10), 1, hexwidget.DataRange.UnitCells,
                                 hexwidget.DataRange.BoundToData)
-        ed.insertSpan(3, editor.FillSpan(ed, b'\x00', 5))
+        ed.insertSpan(3, documents.FillSpan(5, b'\x00'))
         self.assertEqual(r.startPosition, 15)
         self.assertEqual(r.size, 1)
 
@@ -55,10 +54,10 @@ class TestHexWidget(unittest.TestCase):
         self.assertEqual(hw.caretIndex(hw.leadingColumn), hexColumnModel.indexFromPosition(10))
 
         index = hw.caretIndex(hw.leadingColumn)
-        self.assertEqual(index.data(hexwidget.ColumnModel.EditorDataRole), b'12')
+        self.assertEqual(index.data(hexwidget.ColumnModel.DocumentDataRole), b'12')
         self.assertEqual(index.data(Qt.DisplayRole), ' 3231')
         self.assertEqual(index.data(Qt.EditRole), '+3231')
-        self.assertEqual(index.data(hexwidget.ColumnModel.EditorPositionRole), 10)
+        self.assertEqual(index.data(hexwidget.ColumnModel.DocumentPositionRole), 10)
         self.assertEqual(index.data(hexwidget.ColumnModel.DataSizeRole), 2)
 
         hw.beginEditIndex()

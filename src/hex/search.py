@@ -7,6 +7,7 @@ import hex.hexlineedit as hexlineedit
 import hex.matchers as matchers
 import hex.hexwidget as hexwidget
 import hex.operations as operations
+import hex.documents as documents
 
 
 class SearchDialog(utils.Dialog):
@@ -27,23 +28,20 @@ class SearchDialog(utils.Dialog):
         self.buttonBox.addButton(QDialogButtonBox.Close)
         self.searchButton = QPushButton(utils.tr('Search'), self)
         self.searchButton.setIcon(utils.getIcon('edit-find'))
-        self.searchButton.clicked.connect(self.doSearch)
-        self.buttonBox.addButton(self.searchButton, QDialogButtonBox.ActionRole)
+        self.buttonBox.addButton(self.searchButton, QDialogButtonBox.AcceptRole)
+        self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
         self.m_layout.addWidget(self.buttonBox)
 
-    def doSearch(self):
-        self.searchButton.setEnabled(False)
-        self.matcher = matchers.BinaryMatcher(self.hexWidget.editor, self.hexInput.data)
-        self.parentWidget().dockSearch.newSearch(self.hexWidget, self.matcher)
-        self.matcher.run()
-        self.accept()
+    @property
+    def matcher(self):
+        return matchers.BinaryMatcher(self.hexWidget.document, self.hexInput.data)
 
 
 class SearchResultsWidget(QWidget):
-    def __init__(self, parent, hex_widget=None, matcher=None):
+    def __init__(self, parent, hex_widget=None, match_operation=None):
         QWidget.__init__(self, parent)
-        self._matcher = matcher
+        self._matchOperation = match_operation
         self.hexWidget = hex_widget
 
         self.setLayout(QVBoxLayout())
@@ -55,9 +53,9 @@ class SearchResultsWidget(QWidget):
         self.resultsView.clicked.connect(self._onResultClicked)
         self.layout().addWidget(self.resultsView)
 
-        self.progressTextLabel = operations.OperationProgressTextLabel(self, self._matcher)
+        self.progressTextLabel = operations.OperationProgressTextLabel(self, self._matchOperation)
         self.progressTextLabel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.searchCancelButton = operations.OperationCancelPushButton(self, self._matcher)
+        self.searchCancelButton = operations.OperationCancelPushButton(self, self._matchOperation)
 
         hl = QHBoxLayout()
         hl.setContentsMargins(0, 0, 0, 0)
@@ -65,19 +63,19 @@ class SearchResultsWidget(QWidget):
         hl.addWidget(self.searchCancelButton)
         self.layout().addLayout(hl)
 
-        self.matcher = matcher
+        self.matchOperation = match_operation
 
     @property
-    def matcher(self):
-        return self._matcher
+    def matchOperation(self):
+        return self._matchOperation
 
-    @matcher.setter
-    def matcher(self, matcher):
-        self._matcher = matcher
-        self.model = SearchResultsModel(self.hexWidget, matcher)
+    @matchOperation.setter
+    def matchOperation(self, match_operation):
+        self._matchOperation = match_operation
+        self.model = SearchResultsModel(self.hexWidget, match_operation)
         self.resultsView.setModel(self.model)
-        self.searchCancelButton.operation = matcher
-        self.progressTextLabel.operation = matcher
+        self.searchCancelButton.operation = match_operation
+        self.progressTextLabel.operation = match_operation
 
     def _onResultClicked(self, index):
         if index.isValid():
@@ -91,19 +89,19 @@ class SearchResultsWidget(QWidget):
 class SearchResultsModel(QAbstractListModel):
     MatchRangeRole, MatchRole = Qt.UserRole, Qt.UserRole + 1
 
-    def __init__(self, hex_widget, matcher):
+    def __init__(self, hex_widget, match_operation):
         QAbstractListModel.__init__(self)
         self._lock = threading.RLock()
         self._newResults = []
-        self._matcher = matcher
+        self._matchOperation = match_operation
         self._hexWidget = hex_widget
         self._results = []
-        if self._matcher is not None:
-            with self._matcher.lock:
-                self._matcher.newResult.connect(self._onNewMatch, Qt.DirectConnection)
-                self._matcher.finished.connect(self._onMatchFinished, Qt.QueuedConnection)
+        if self._matchOperation is not None:
+            with self._matchOperation.lock:
+                self._matchOperation.newResults.connect(self._onNewMatches, Qt.DirectConnection)
+                self._matchOperation.finished.connect(self._onMatchFinished, Qt.QueuedConnection)
 
-                for match in self._matcher.state.results.values():
+                for match in self._matchOperation.state.results.values():
                     self._results.append((match, self._createRange(match)))
         self.startTimer(400)
 
@@ -125,9 +123,9 @@ class SearchResultsModel(QAbstractListModel):
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         return None
 
-    def _onNewMatch(self, result_name, match):
+    def _onNewMatches(self, results):
         with self._lock:
-            self._newResults.append(match)
+            self._newResults += (result[1] for result in results)
 
     def timerEvent(self, event):
         has_results = False

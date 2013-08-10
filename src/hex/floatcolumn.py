@@ -8,8 +8,8 @@ from PyQt4.QtGui import QDoubleValidator, QWidget, QFormLayout, QSpinBox, QCombo
 
 
 class FloatColumnModel(hexwidget.RegularValueColumnModel):
-    def __init__(self, editor, valuecodec=None, formatter=None, columns_on_row=4):
-        hexwidget.RegularValueColumnModel.__init__(self, editor, valuecodec or valuecodecs.FloatCodec(),
+    def __init__(self, document, valuecodec=None, formatter=None, columns_on_row=4):
+        hexwidget.RegularValueColumnModel.__init__(self, document, valuecodec or valuecodecs.FloatCodec(),
                                                    formatter or formatters.FloatFormatter(), columns_on_row)
 
     @property
@@ -118,7 +118,7 @@ class FloatColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConf
         return f
 
     def createColumnModel(self, hex_widget):
-        return FloatColumnModel(hex_widget.editor, self._valueCodec, self._formatter, self.spnColumnsOnRow.value())
+        return FloatColumnModel(hex_widget.document, self._valueCodec, self._formatter, self.spnColumnsOnRow.value())
 
     def saveToColumn(self, column):
         column.valuecodec = self._valueCodec

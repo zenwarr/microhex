@@ -1,7 +1,6 @@
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QValidator, QWidget, QFormLayout, QComboBox, QCheckBox, QSpinBox, QSizePolicy
 import hex.hexwidget as hexwidget
-import hex.editor as editor
 import hex.columnproviders as columnproviders
 import hex.utils as utils
 import hex.valuecodecs as valuecodecs
@@ -12,14 +11,14 @@ class HexColumnModel(hexwidget.RegularValueColumnModel):
     """Standart column for hex-editors. Displays data as numbers. This model is regular (has equal number of
     columns in each row, except last one) and infinite (supports virtual indexes).
     """
-    def __init__(self, editor, valuecodec, formatter, columns_on_row=16):
+    def __init__(self, document, valuecodec, formatter, columns_on_row=16):
         self._cellTextSize = 0
-        hexwidget.RegularValueColumnModel.__init__(self, editor, valuecodec or valuecodecs.IntegerCodec(),
+        hexwidget.RegularValueColumnModel.__init__(self, document, valuecodec or valuecodecs.IntegerCodec(),
                                                    formatter or formatters.IntegerFormatter(), columns_on_row)
 
     def virtualIndexData(self, index, role=Qt.DisplayRole):
         if role == Qt.EditRole:
-            return self.textForEditorData(b'\x00' * self.regularCellDataSize, index, Qt.EditRole)
+            return self.textForDocumentData(b'\x00' * self.regularCellDataSize, index, Qt.EditRole)
         return hexwidget.RegularValueColumnModel.virtualIndexData(self, index, role)
 
     @property
@@ -197,7 +196,7 @@ class HexColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConfig
         return formatter
 
     def createColumnModel(self, hex_widget):
-        return HexColumnModel(hex_widget.editor, self._valueCodec, self._formatter, self.spnColumnsOnRow.value())
+        return HexColumnModel(hex_widget.document, self._valueCodec, self._formatter, self.spnColumnsOnRow.value())
 
     def saveToColumn(self, column):
         column.valuecodec = self._valueCodec

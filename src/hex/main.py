@@ -37,12 +37,9 @@ class Application(QApplication):
     def startUp(self):
         # hidden option --test, should not be visible in argument list...
         if '--test' in self.arguments():
-            try:
-                utils.testRun = True
-                from hex.test import runTests
-                runTests()
-            except ImportError:
-                pass
+            utils.testRun = True
+            from hex.test import runTests
+            runTests()
             return False
 
         self.argparser = argparse.ArgumentParser(prog='microhex',

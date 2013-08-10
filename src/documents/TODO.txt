@@ -1,0 +1,6 @@
+- incorrect PyQt tools default path in build.py
+- fix makefile
+- add install target
+rename freezeSize to fixedSize
+do not change document read-only flag when device read-onlyness was changed
+cover alternate branches with tests

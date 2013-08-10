@@ -9,8 +9,8 @@ import hex.utils as utils
 
 class AddressColumnModel(hexwidget.ColumnModel):
     def __init__(self, linked_model, formatter=None, base_address=0):
-        editor = linked_model.editor if linked_model is not None else linked_model
-        hexwidget.ColumnModel.__init__(self, editor)
+        document = linked_model.document if linked_model is not None else linked_model
+        hexwidget.ColumnModel.__init__(self, document)
         self._linkedModel = None
         self.formatter = formatter or formatters.IntegerFormatter(base=16, uppercase=True)
         self._baseAddress = base_address
@@ -28,9 +28,9 @@ class AddressColumnModel(hexwidget.ColumnModel):
             self._linkedModel = model
             if self._linkedModel is not None:
                 self._linkedModel.modelReset.connect(self.reset)
-                self.editor = self._linkedModel.editor
+                self.document = self._linkedModel.document
             else:
-                self.editor = None
+                self.document = None
             self.reset()
 
     @property
@@ -69,10 +69,10 @@ class AddressColumnModel(hexwidget.ColumnModel):
         if self._linkedModel is not None:
             model_index = self._linkedModel.index(index.row, 0)
             if role == Qt.DisplayRole and model_index:
-                raw = model_index.data(self.EditorPositionRole) - self._baseAddress
+                raw = model_index.data(self.DocumentPositionRole) - self._baseAddress
                 return self.formatter.format(raw) if self.formatter is not None else raw
-            elif role == self.EditorPositionRole:
-                return model_index.data(self.EditorPositionRole)
+            elif role == self.DocumentPositionRole:
+                return model_index.data(self.DocumentPositionRole)
             elif role == self.DataSizeRole:
                 return sum(index.data(self.DataSizeRole) for index in hexwidget.index_range(
                     model_index, self._linkedModel.lastRowIndex(index.row), include_last=True
@@ -96,17 +96,17 @@ class AddressColumnModel(hexwidget.ColumnModel):
         return 0
 
     def _maxLengthForSize(self, size):
-        """Calculate maximal length of address text for given editor size"""
+        """Calculate maximal length of address text for given document size"""
         sign1 = self._baseAddress > 0
-        sign2 = self._baseAddress < len(self._linkedModel.editor)
+        sign2 = self._baseAddress < len(self._linkedModel.document)
         max_raw = max(abs(0 - self._baseAddress) + sign1,
-                      abs(len(self._linkedModel.editor) - self._baseAddress) + sign2)
+                      abs(len(self._linkedModel.document) - self._baseAddress) + sign2)
         return len(self.formatter.format(max_raw))
 
     def _updatePadding(self):
         if self.formatter is None:
             self.formatter = formatters.IntegerFormatter()
-        self.formatter.padding = self._maxLengthForSize(len(self.editor))
+        self.formatter.padding = self._maxLengthForSize(len(self.document))
 
     def reset(self):
         self._updatePadding()

@@ -11,7 +11,7 @@ class GotoDialog(utils.Dialog):
 
         self.hexWidget = hex_widget
 
-        self.ui.intAddress.maximal = len(hex_widget.editor)
+        self.ui.intAddress.maximal = len(hex_widget.document)
         self.ui.intAddress.number = hex_widget.caretPosition
         self.ui.intAddress.selectAll()
 

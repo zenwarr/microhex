@@ -9,7 +9,7 @@ import math
 import html
 from hex.valuecodecs import IntegerCodec
 from hex.formatters import IntegerFormatter
-from hex.editor import DataSpan, FillSpan
+import hex.documents as documents
 from hex.proxystyle import ProxyStyle
 import hex.encodings as encodings
 import hex.utils as utils
@@ -245,8 +245,8 @@ class ColumnModel(AbstractModel):
     modelReset = pyqtSignal()  # emitted when model is totally resetted
     headerDataChanged = pyqtSignal()
 
-    EditorDataRole = Qt.UserRole + 1
-    EditorPositionRole = Qt.UserRole + 2
+    DocumentDataRole = Qt.UserRole + 1
+    DocumentPositionRole = Qt.UserRole + 2
     DataSizeRole = Qt.UserRole + 3
 
     FlagVirtual = 1
@@ -254,40 +254,40 @@ class ColumnModel(AbstractModel):
     FlagModified = 4
     FlagBroken = 8
 
-    def __init__(self, editor=None):
+    def __init__(self, document=None):
         AbstractModel.__init__(self)
         self.name = ''
-        self._editor = None
+        self._document = None
         self._editingIndex = None
-        self.editor = editor
+        self.document = document
 
     def reset(self):
         self.modelReset.emit()
         self.headerDataChanged.emit()
 
     @property
-    def editor(self):
-        return self._editor
+    def document(self):
+        return self._document
 
-    @editor.setter
-    def editor(self, new_editor):
-        if self._editor is not new_editor:
-            if self._editor is not None:
-                with self._editor.lock.read:
-                    self._editor.dataChanged.disconnect(self._onEditorDataChanged)
-                    self._editor.resized.disconnect(self._onEditorDataResized)
-                    self._editor.bytesInserted.disconnect(self._onEditorBytesInserted)
-                    self._editor.bytesRemoved.disconnect(self._onEditorBytesRemoved)
-                self._editor = None
+    @document.setter
+    def document(self, new_document):
+        if self._document is not new_document:
+            if self._document is not None:
+                with utils.readlock(self._document.lock):
+                    self._document.dataChanged.disconnect(self._onDocumentDataChanged)
+                    self._document.resized.disconnect(self._onDocumentDataResized)
+                    self._document.bytesInserted.disconnect(self._onDocumentBytesInserted)
+                    self._document.bytesRemoved.disconnect(self._onDocumentBytesRemoved)
+                self._document = None
 
-            self._editor = new_editor
-            if new_editor is not None:
-                with new_editor.lock.read:
+            self._document = new_document
+            if new_document is not None:
+                with utils.readlock(new_document.lock):
                     conn_mode = Qt.DirectConnection if utils.testRun else Qt.QueuedConnection
-                    new_editor.dataChanged.connect(self._onEditorDataChanged, conn_mode)
-                    new_editor.resized.connect(self._onEditorDataResized, conn_mode)
-                    new_editor.bytesInserted.connect(self._onEditorBytesInserted, conn_mode)
-                    new_editor.bytesRemoved.connect(self._onEditorBytesRemoved, conn_mode)
+                    new_document.dataChanged.connect(self._onDocumentDataChanged, conn_mode)
+                    new_document.resized.connect(self._onDocumentDataResized, conn_mode)
+                    new_document.bytesInserted.connect(self._onDocumentBytesInserted, conn_mode)
+                    new_document.bytesRemoved.connect(self._onDocumentBytesRemoved, conn_mode)
 
     @property
     def isInfinite(self):
@@ -318,19 +318,19 @@ class ColumnModel(AbstractModel):
             row -= 1
         return index
 
-    def _onEditorDataChanged(self, start, length):
+    def _onDocumentDataChanged(self, start, length):
         pass
 
-    def _onEditorDataResized(self, new_size):
+    def _onDocumentDataResized(self, new_size):
         pass
 
-    def _onEditorBytesInserted(self, position, length):
+    def _onDocumentBytesInserted(self, position, length):
         if self.regular and hasattr(self, 'regularCellDataSize'):
             start_index = self.indexFromPosition(position)
             if start_index:
                 self.indexesInserted.emit(start_index, length // self.regularCellDataSize)
 
-    def _onEditorBytesRemoved(self, position, length):
+    def _onDocumentBytesRemoved(self, position, length):
         if self.regular and hasattr(self, 'regularCellDataSize'):
             if position == 0:
                 start_index = ModelIndex()
@@ -344,7 +344,7 @@ class ColumnModel(AbstractModel):
         return True
 
     def indexFromPosition(self, position):
-        """Return index matching given editor position. Can return virtual index"""
+        """Return index matching given document position. Can return virtual index"""
         raise NotImplementedError()
 
     @property
@@ -369,11 +369,11 @@ class ColumnModel(AbstractModel):
         return self._editingIndex
 
     def removeIndex(self, index):
-        pos = index.data(self.EditorPositionRole)
+        pos = index.data(self.DocumentPositionRole)
         size = index.data(self.DataSizeRole)
         if pos < 0 or size < 0:
             raise ValueError()
-        self.editor.remove(pos, size)
+        self.document.remove(pos, size)
 
     def createValidator(self):
         """Validator is used to check values entered by user while editing column data. If createValidator returns
@@ -408,8 +408,8 @@ class ColumnModel(AbstractModel):
 
 
 class RegularColumnModel(ColumnModel):
-    def __init__(self, editor):
-        ColumnModel.__init__(self, editor)
+    def __init__(self, document):
+        ColumnModel.__init__(self, document)
         self._rowCount = 0
         self._editingIndexText = ''
         self._editingIndexModified = False
@@ -434,10 +434,10 @@ class RegularColumnModel(ColumnModel):
                 return self.virtualIndexData(index, Qt.EditRole)
             else:
                 return '.' * self.regularCellTextLength
-        elif role == self.EditorDataRole:
+        elif role == self.DocumentDataRole:
             return bytes()
 
-    def textForEditorData(self, editor_data, index, role=Qt.DisplayRole):
+    def textForDocumentData(self, document_data, index, role=Qt.DisplayRole):
         raise NotImplementedError()
 
     def reset(self):
@@ -464,37 +464,37 @@ class RegularColumnModel(ColumnModel):
         if row < 0:
             return -1
         elif row + 1 == self._rowCount:
-            count = (len(self.editor) % self.bytesOnRow) // self.regularCellDataSize
+            count = (len(self.document) % self.bytesOnRow) // self.regularCellDataSize
             return count or self.columnsOnRow
         elif row >= self._rowCount:
             return 0
         return self.columnsOnRow
 
-    def indexFromPosition(self, editor_position):
-        return self.index(int(editor_position // self.bytesOnRow),
-                          int(editor_position % self.bytesOnRow) // self.regularCellDataSize)
+    def indexFromPosition(self, document_position):
+        return self.index(int(document_position // self.bytesOnRow),
+                          int(document_position % self.bytesOnRow) // self.regularCellDataSize)
 
     def indexData(self, index, role=Qt.DisplayRole):
-        if not index or self.editor is None:
+        if not index or self.document is None:
             return None
-        editor_position = self.bytesOnRow * index.row + self.regularCellDataSize * index.column
+        document_position = self.bytesOnRow * index.row + self.regularCellDataSize * index.column
 
-        if role == self.EditorPositionRole:
-            return editor_position
+        if role == self.DocumentPositionRole:
+            return document_position
         elif role == self.DataSizeRole:
             return self.regularCellDataSize
 
-        if editor_position >= len(self.editor):
+        if document_position >= len(self.document):
             return self.virtualIndexData(index, role)
 
         if role == Qt.DisplayRole or role == Qt.EditRole:
             if self.editingIndex and self.editingIndex == index:
                 return self._editingIndexText
             else:
-                editor_data = self.editor.read(editor_position, self.regularCellDataSize)
-                return self.textForEditorData(editor_data, role, index)
-        elif role == self.EditorDataRole:
-            return self.editor.read(editor_position, self.regularCellDataSize)
+                document_data = self.document.read(document_position, self.regularCellDataSize)
+                return self.textForDocumentData(document_data, role, index)
+        elif role == self.DocumentDataRole:
+            return self.document.read(document_position, self.regularCellDataSize)
         elif role == self.DataSizeRole:
             return self.regularCellDataSize
 
@@ -510,7 +510,7 @@ class RegularColumnModel(ColumnModel):
         flags = self.FlagEditable
         if index.row >= self._rowCount or (index.row + 1 == self._rowCount and index > self.lastRealIndex):
             flags |= self.FlagVirtual
-        elif self.editor is not None and self.editor.isRangeModified(index.data(self.EditorPositionRole),
+        elif self.document is not None and self.document.isRangeModified(index.data(self.DocumentPositionRole),
                                                                      self.regularCellDataSize):
             flags |= self.FlagModified
         elif self.editingIndex and self.editingIndex == index and self._editingIndexModified:
@@ -521,11 +521,11 @@ class RegularColumnModel(ColumnModel):
         if role == Qt.DisplayRole and 0 <= section < self.columnsOnRow:
             return formatters.IntegerFormatter(base=16).format(section * self.regularCellDataSize)
 
-    def _onEditorDataChanged(self, start, length):
-        length = length if length >= 0 else len(self.editor) - start
+    def _onDocumentDataChanged(self, start, length):
+        length = length if length >= 0 else len(self.document) - start
         self.dataChanged.emit(self.indexFromPosition(start), self.indexFromPosition(start + length - 1))
 
-    def _onEditorDataResized(self, new_size):
+    def _onDocumentDataResized(self, new_size):
         self._updateRowCount()
         self.dataResized.emit(self.lastRealIndex)
 
@@ -534,10 +534,10 @@ class RegularColumnModel(ColumnModel):
         return True
 
     def _updateRowCount(self):
-        self._rowCount = len(self.editor) // self.bytesOnRow + bool(len(self.editor) % self.bytesOnRow)
+        self._rowCount = len(self.document) // self.bytesOnRow + bool(len(self.document) % self.bytesOnRow)
 
     def beginEditIndex(self, index):
-        if not self.editor.readOnly:
+        if not self.document.readOnly:
             edit_data = index.data(Qt.EditRole)
             index_text = index.data()
             self._editingIndexText = edit_data
@@ -557,11 +557,11 @@ class RegularColumnModel(ColumnModel):
         raise NotImplementedError()
 
     def beginEditNewIndex(self, input_text, before_index):
-        if not self.editor.readOnly and not self.editor.fixedSize:
+        if not self.document.readOnly and not self.document.fixedSize:
             data_to_insert, index_text, cursor_offset = self._dataForNewIndex(input_text, before_index)
-            position = before_index.data(self.EditorPositionRole) if before_index else len(self.editor)
+            position = before_index.data(self.DocumentPositionRole) if before_index else len(self.document)
             if data_to_insert and position >= 0:
-                self.editor.insertSpan(position, DataSpan(self.editor, data_to_insert))
+                self.document.insertSpan(position, documents.DataSpan(data_to_insert))
                 new_index = self.indexFromPosition(position)
                 self._editingIndexText = index_text
                 self._editingIndexInserted = True
@@ -572,11 +572,11 @@ class RegularColumnModel(ColumnModel):
 
 
 class RegularValueColumnModel(RegularColumnModel):
-    def __init__(self, editor, valuecodec, formatter, columns_on_row=16):
+    def __init__(self, document, valuecodec, formatter, columns_on_row=16):
         self.valuecodec = valuecodec
         self.formatter = formatter
         self.columnsOnRow = columns_on_row
-        RegularColumnModel.__init__(self, editor)
+        RegularColumnModel.__init__(self, document)
 
     @property
     def regularCellDataSize(self):
@@ -586,11 +586,11 @@ class RegularValueColumnModel(RegularColumnModel):
     def regularColumnCount(self):
         return self.columnsOnRow
 
-    def textForEditorData(self, editor_data, index, role=Qt.DisplayRole):
+    def textForDocumentData(self, document_data, index, role=Qt.DisplayRole):
         import struct
 
         try:
-            decoded = self.valuecodec.decode(editor_data)
+            decoded = self.valuecodec.decode(document_data)
         except struct.error:
             return '!' * self.regularCellTextLength if self.regularCellTextLength > 0 else '!'
         return self.formatter.format(decoded)
@@ -600,15 +600,15 @@ class RegularValueColumnModel(RegularColumnModel):
             edited_index = self.editingIndex
             should_emit = True
             if save:
-                position = self.indexData(self.editingIndex, self.EditorPositionRole)
+                position = self.indexData(self.editingIndex, self.DocumentPositionRole)
                 if position is None or position < 0:
                     raise ValueError('invalid position for index resolved')
 
                 raw_data = self.valuecodec.encode(self.formatter.parse(self._editingIndexText))
-                current_data = self.indexData(self.editingIndex, self.EditorDataRole)
+                current_data = self.indexData(self.editingIndex, self.DocumentDataRole)
 
                 if raw_data != current_data:
-                    self.editor.writeSpan(position, DataSpan(self.editor, raw_data))
+                    self.document.writeSpan(position, documents.DataSpan(raw_data))
             elif self._editingIndexInserted:
                 self.removeIndex(self._editingIndex)
                 should_emit = False
@@ -1156,8 +1156,8 @@ class Column(QObject):
         self._updateGeometry()
 
     @property
-    def editor(self):
-        return self.dataModel.editor
+    def document(self):
+        return self.dataModel.document
 
     @property
     def spaced(self):
@@ -1537,7 +1537,7 @@ class Column(QObject):
         return self._documentBackend.rectForRow(row_index).translated(self.documentOrigin)
 
     def translateIndex(self, index):
-        return self.dataModel.indexFromPosition(index.data(ColumnModel.EditorPositionRole))
+        return self.dataModel.indexFromPosition(index.data(ColumnModel.DocumentPositionRole))
 
 
 def _translate(x, dx, dy=0):
@@ -1560,11 +1560,11 @@ class HexWidget(QWidget):
     hasSelectionChanged = pyqtSignal(bool)
     leadingColumnChanged = pyqtSignal(object)
     showHeaderChanged = pyqtSignal(bool)
-    urlChanged = pyqtSignal(object)
+    urlChanged = pyqtSignal(QUrl)
 
     MethodShowBottom, MethodShowTop, MethodShowCenter = range(3)
 
-    def __init__(self, parent, editor):
+    def __init__(self, parent, document):
         from hex.floatscrollbar import LargeScrollBar
 
         QWidget.__init__(self, parent)
@@ -1596,7 +1596,7 @@ class HexWidget(QWidget):
         self.m_layout.setContentsMargins(0, 0, 0, 0)
 
         self._theme = DefaultTheme
-        self._editor = editor
+        self._document = document
         self._columns = []
         self._leadingColumn = None
         self._caretPosition = 0
@@ -1624,9 +1624,9 @@ class HexWidget(QWidget):
 
         self._contextMenu = QMenu()
         self._actionCopy = self._contextMenu.addAction(utils.tr('Copy'))
-        self._actionCopy.triggered.connect(self.copy)
+        # self._actionCopy.triggered.connect(self.copy)
         self._actionPaste = self._contextMenu.addAction(utils.tr('Paste'))
-        self._actionPaste.triggered.connect(self.paste)
+        # self._actionPaste.triggered.connect(self.paste)
         self._contextMenu.addSeparator()
         self._actionSetup = self._contextMenu.addAction(utils.tr('Setup column...'))
         self._actionSetup.triggered.connect(self.setupActiveColumn)
@@ -1643,21 +1643,21 @@ class HexWidget(QWidget):
         from hex.addresscolumn import AddressColumnModel
         from hex.floatcolumn import FloatColumnModel
 
-        hex_column = HexColumnModel(self.editor, IntegerCodec(IntegerCodec.Format8Bit, False),
+        hex_column = HexColumnModel(self.document, IntegerCodec(IntegerCodec.Format8Bit, False),
                                          IntegerFormatter(16, padding=2))
         address_bar = AddressColumnModel(hex_column)
         self.appendColumn(hex_column)
         self.insertColumn(address_bar, 0)
 
-        self.appendColumn(CharColumnModel(self.editor, encodings.getCodec('ISO 8859-1'), self.font()))
-        self.appendColumn(CharColumnModel(self.editor, encodings.getCodec('UTF-16le'), self.font()))
+        self.appendColumn(CharColumnModel(self.document, encodings.getCodec('ISO 8859-1'), self.font()))
+        self.appendColumn(CharColumnModel(self.document, encodings.getCodec('UTF-16le'), self.font()))
         self.leadingColumn = self._columns[1]
 
         conn_mode = Qt.DirectConnection if utils.testRun else Qt.QueuedConnection
-        self.editor.canUndoChanged.connect(self.canUndoChanged, conn_mode)
-        self.editor.canRedoChanged.connect(self.canRedoChanged, conn_mode)
-        self.editor.isModifiedChanged.connect(self.isModifiedChanged, conn_mode)
-        self.editor.urlChanged.connect(self.urlChanged, conn_mode)
+        self.document.canUndoChanged.connect(self.canUndoChanged, conn_mode)
+        self.document.canRedoChanged.connect(self.canRedoChanged, conn_mode)
+        self.document.isModifiedChanged.connect(self.isModifiedChanged, conn_mode)
+        self.document.urlChanged.connect(self.urlChanged, conn_mode)
 
         globalSettings.settingChanged.connect(self._onSettingChanged)
 
@@ -1673,8 +1673,8 @@ class HexWidget(QWidget):
             self.setFont(appsettings.getFontFromSetting(value))
 
     @property
-    def editor(self):
-        return self._editor
+    def document(self):
+        return self._document
 
     def setFont(self, new_font):
         QWidget.setFont(self, new_font)
@@ -1895,10 +1895,10 @@ class HexWidget(QWidget):
 
     def syncColumnFrame(self, column, sync_row=0):
         if self.leadingColumn is not None and column is not None and column is not self.leadingColumn:
-            editor_position = self.leadingColumn.frameModel.index(sync_row, 0).data(ColumnModel.EditorPositionRole)
-            if editor_position is not None:
+            document_position = self.leadingColumn.frameModel.index(sync_row, 0).data(ColumnModel.DocumentPositionRole)
+            if document_position is not None:
                 # position frame of non-leading column so same data will be on same row
-                sync_index = column.dataModel.indexFromPosition(editor_position)
+                sync_index = column.dataModel.indexFromPosition(document_position)
                 column_first_row = sync_index.row - sync_row if sync_index.row >= sync_row else 0
                 column.scrollToFirstRow(column_first_row)
 
@@ -2008,12 +2008,12 @@ class HexWidget(QWidget):
             method = self.NavMethod_ScreenDown
         elif event.key() == Qt.Key_Home:
             if event.modifiers() & Qt.ControlModifier:
-                method = self.NavMethod_EditorStart
+                method = self.NavMethod_DocumentStart
             else:
                 method = self.NavMethod_RowStart if not self.editMode else self.NavMethod_CellStart
         elif event.key() == Qt.Key_End:
             if event.modifiers() & Qt.ControlModifier:
-                method = self.NavMethod_EditorEnd
+                method = self.NavMethod_DocumentEnd
             else:
                 method = self.NavMethod_RowEnd if not self.editMode else self.NavMethod_CellEnd
 
@@ -2119,7 +2119,7 @@ class HexWidget(QWidget):
                     self._navigate(nav_method)
 
     (NavMethod_NextCell, NavMethod_PrevCell, NavMethod_RowStart, NavMethod_RowEnd, NavMethod_ScreenUp,
-        NavMethod_ScreenDown, NavMethod_RowUp, NavMethod_RowDown, NavMethod_EditorStart, NavMethod_EditorEnd,
+        NavMethod_ScreenDown, NavMethod_RowUp, NavMethod_RowDown, NavMethod_DocumentStart, NavMethod_DocumentEnd,
         NavMethod_NextCharacter, NavMethod_PrevCharacter, NavMethod_CellEnd, NavMethod_CellStart) = range(14)
 
     def _goNextCell(self):
@@ -2147,10 +2147,10 @@ class HexWidget(QWidget):
     def _goRowDown(self):
         self._goByRows(1)
 
-    def _goEditorStart(self):
+    def _goDocumentStart(self):
         self._goCaretIndex(self._leadingColumn.dataModel.index(0, 0))
 
-    def _goEditorEnd(self):
+    def _goDocumentEnd(self):
         self._goCaretIndex(self._leadingColumn.dataModel.lastRealIndex)
 
     @property
@@ -2198,7 +2198,7 @@ class HexWidget(QWidget):
         self.makeIndexVisible(new_caret_index, method)
 
         if new_caret_index != caret_index:
-            self.caretPosition = new_caret_index.data(ColumnModel.EditorPositionRole)
+            self.caretPosition = new_caret_index.data(ColumnModel.DocumentPositionRole)
 
         if self.editMode:
             self._updateCursorOffset()
@@ -2242,8 +2242,8 @@ class HexWidget(QWidget):
         NavMethod_ScreenUp: _goScreenUp,
         NavMethod_RowUp: _goRowUp,
         NavMethod_RowDown: _goRowDown,
-        NavMethod_EditorStart: _goEditorStart,
-        NavMethod_EditorEnd: _goEditorEnd,
+        NavMethod_DocumentStart: _goDocumentStart,
+        NavMethod_DocumentEnd: _goDocumentEnd,
         NavMethod_NextCharacter: _goNextCharacter,
         NavMethod_PrevCharacter: _goPrevCharacter,
         NavMethod_CellEnd: _goCellEnd,
@@ -2332,7 +2332,7 @@ class HexWidget(QWidget):
                             self.cursorOffset = cursor_offset
                     else:
                         self.endEditIndex(True)
-                        self.caretPosition = activated_index.data(ColumnModel.EditorPositionRole)
+                        self.caretPosition = activated_index.data(ColumnModel.DocumentPositionRole)
 
                         if not activated_index.virtual and event.button() == Qt.LeftButton:
                             self._selectStartIndex = activated_index
@@ -2384,7 +2384,7 @@ class HexWidget(QWidget):
                         if self._selectStartColumn.selectionProxy is not None:
                             proxy = self._selectStartColumn.selectionProxy
                             selection_start = sel.startPosition
-                            selection_end = min(len(self.editor) - 1, selection_start + sel.size - 1)
+                            selection_end = min(len(self.document) - 1, selection_start + sel.size - 1)
                             sel = self.selectionBetweenIndexes(proxy.dataModel.indexFromPosition(selection_start),
                                                                proxy.dataModel.indexFromPosition(selection_end))
                         selections = [sel]
@@ -2596,7 +2596,7 @@ class HexWidget(QWidget):
             self.view.update()
 
     def selectAll(self):
-        if self.editor is not None and self._leadingColumn is not None:
+        if self.document is not None and self._leadingColumn is not None:
             first_index = self._leadingColumn.dataModel.firstIndex
             last_index = self._leadingColumn.dataModel.lastRealIndex
             if first_index and last_index:
@@ -2604,51 +2604,49 @@ class HexWidget(QWidget):
                                            SelectionRange.UnitCells, SelectionRange.BoundToData)
                 self.selectionRanges = [sel_range]
 
-    def copy(self):
+    def copyAsData(self):
         if len(self._selections) == 1:
-            from hex.clipboard import Clipboard
+            documents.Clipboard.setData(self.document, self._selections[0].startPosition, self._selections[0].size)
 
-            clb = Clipboard()
-            clb.copy(self.editor, self._selections[0].startPosition, self._selections[0].size)
+    def copyAsText(self):
+        pass
+
+    def pasteAsData(self):
+        pass
+
+    def pasteAsText(self):
+        pass
 
     def paste(self):
-        from hex.clipboard import Clipboard
-
-        clb = Clipboard()
-        span = clb.spanFromData(self.editor)
-        if span is not None:
-            try:
-                self.editor.insertSpan(self.caretPosition, span)
-            except IOError:
-                pass
+        pass
 
     def undo(self):
         try:
-            self.editor.undo()
+            self.document.undo()
         except IOError:
             pass
 
     def canUndo(self):
-        return self.editor.canUndo()
+        return self.document.canUndo()
 
     def canRedo(self):
-        return self.editor.canRedo()
+        return self.document.canRedo()
 
-    def redo(self, branch=None):
+    def redo(self, branch=-1):
         try:
-            self.editor.redo(branch)
+            self.document.redo(branch)
         except IOError:
             pass
 
     def deleteSelected(self):
         """Deletes all bytes that are selected"""
-        if not self._editor.readOnly and not self._editor.fixedSize:
-            self._editor.beginComplexAction()
+        if not self._document.readOnly and not self._document.fixedSize:
+            self._document.beginComplexAction()
             try:
                 for selection in self._selections:
-                    self._editor.remove(selection.startPosition, selection.size)
+                    self._document.remove(selection.startPosition, selection.size)
             finally:
-                self._editor.endComplexAction()
+                self._document.endComplexAction()
 
     @property
     def showHeader(self):
@@ -2731,11 +2729,11 @@ class HexWidget(QWidget):
 
     def removeSelected(self):
         for selection in self._selections:
-            self.editor.remove(selection.startPosition, selection.size)
+            self.document.remove(selection.startPosition, selection.size)
 
-    def fillSelected(self, pattern):
+    def fillSelected(self, fill_byte):
         for selection in self._selections:
-            self.editor.writeSpan(selection.startPosition, FillSpan(self.editor, pattern, selection.size))
+            self.document.writeSpan(selection.startPosition, documents.FillSpan(selection.size, fill_byte))
         self.view.update()
 
     def removeActiveColumn(self):
@@ -2763,15 +2761,15 @@ class HexWidget(QWidget):
 
     @property
     def readOnly(self):
-        return self.editor.readOnly if self.editor is not None else True
+        return self.document.readOnly if self.document is not None else True
 
     @property
     def isModified(self):
-        return self.editor.isModified if self.editor is not None else False
+        return self.document.modified if self.document is not None else False
 
     def save(self, device=None, switch_to_device=False):
-        if self.editor is not None:
-            self.editor.save(device, switch_to_device)
+        if self.document is not None:
+            self.document.save(device, switch_to_device)
             self.reset()
 
     def reset(self):
@@ -2780,7 +2778,7 @@ class HexWidget(QWidget):
 
     @property
     def url(self):
-        return self.editor.url if self.editor is not None else QUrl()
+        return self.document.url if self.document is not None else QUrl()
 
     def goto(self, position):
         if self._leadingColumn is not None:
@@ -2844,7 +2842,7 @@ class DataRange(QObject):
     when based on cells, size is automatically adjusted when column data is changed to always represent data occupied
     by given number of cells.
     Also DataRange can be bound to data or to positions. When bound to positions, range always will start at given position
-    despite editor data modifications. When bound to data, inserting or removing data before range start shifts range
+    despite document data modifications. When bound to data, inserting or removing data before range start shifts range
     start position; removing data inside range leads to collapsing range size.
     """
 
@@ -2856,7 +2854,7 @@ class DataRange(QObject):
     updated = pyqtSignal()
 
     def __init__(self, hexwidget, start=-1, length=0, unit=UnitBytes, bound_to=BoundToData):
-        """When unit == UnitBytes, start should be editor position (int), if unit == UnitCells, start should be ModelIndex
+        """When unit == UnitBytes, start should be document position (int), if unit == UnitCells, start should be ModelIndex
         """
         QObject.__init__(self)
         self._hexWidget = hexwidget
@@ -2869,8 +2867,8 @@ class DataRange(QObject):
 
         if bound_to == self.BoundToData:
             if unit == self.UnitBytes:
-                self._hexWidget.editor.bytesInserted.connect(self._onInserted, Qt.QueuedConnection)
-                self._hexWidget.editor.bytesRemoved.connect(self._onRemoved, Qt.QueuedConnection)
+                self._hexWidget.document.bytesInserted.connect(self._onInserted, Qt.QueuedConnection)
+                self._hexWidget.document.bytesRemoved.connect(self._onRemoved, Qt.QueuedConnection)
             else:
                 self._model.indexesInserted.connect(self._onInserted)
                 self._model.indexesRemoved.connect(self._onRemoved)
@@ -2900,7 +2898,7 @@ class DataRange(QObject):
         elif self._unit == self.UnitBytes:
             return self._start
         else:
-            pos = self.start.data(ColumnModel.EditorPositionRole)
+            pos = self.start.data(ColumnModel.DocumentPositionRole)
             return pos if pos is not None else -1
 
     @property
@@ -2944,10 +2942,10 @@ class DataRange(QObject):
             first_index = self._model.indexFromOffset(self._start)
             last_index = self._model.indexFromOffset(self._start + self._length - 1)
             if last_index:
-                last_pos = last_index.data(ColumnModel.EditorPositionRole) + last_index.data(ColumnModel.DataSizeRole)
-                return last_pos - first_index.data(ColumnModel.EditorPositionRole)
+                last_pos = last_index.data(ColumnModel.DocumentPositionRole) + last_index.data(ColumnModel.DataSizeRole)
+                return last_pos - first_index.data(ColumnModel.DocumentPositionRole)
             elif first_index:
-                return len(self._model.editor) - first_index.data(ColumnModel.EditorPositionRole)
+                return len(self._model.document) - first_index.data(ColumnModel.DocumentPositionRole)
         return 0
 
     def _onInserted(self, start, length):
@@ -3062,7 +3060,7 @@ class EmphasizedRange(HighlightedRange):
 
     def __init__(self, hexwidget, start=-1, length=0, unit=DataRange.UnitBytes, bound_to=DataRange.BoundToData):
         HighlightedRange.__init__(self, hexwidget, start, length, unit, bound_to)
-        self._backgroundColor = QColor(Qt.red)
+        self.backgroundColor = QColor(Qt.red)
 
         self._animation = QSequentialAnimationGroup(self)
         animation1 = QPropertyAnimation(self, 'alpha', self)
@@ -3082,7 +3080,3 @@ class EmphasizedRange(HighlightedRange):
 
     def emphasize(self):
         self._animation.start()
-
-    @property
-    def backgroundColor(self):
-        return self._backgroundColor

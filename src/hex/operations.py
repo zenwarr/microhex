@@ -159,7 +159,6 @@ class Operation(QObject):
         - use WrapperOperation to execute any callable in operation context.
     """
 
-    stateChanged = pyqtSignal(OperationState)
     statusChanged = pyqtSignal(int)
     progressChanged = pyqtSignal(float)
     progressTextChanged = pyqtSignal(str)
@@ -168,7 +167,7 @@ class Operation(QObject):
     messageAdded = pyqtSignal(str, int)
     errorCountIncreased = pyqtSignal(int)
     warningCountIncreased = pyqtSignal(int)
-    newResult = pyqtSignal(str, object)
+    newResults = pyqtSignal(list)
     finished = pyqtSignal(int)
     started = pyqtSignal()
 
@@ -204,10 +203,18 @@ class Operation(QObject):
         self._callbackAccepted = False
         self._callbackResult = None
         self._subOperationStack = []
+        self._newResults = []
+        self._resultsTimer = None
 
         self._errorPolicy = self.DefaultErrorPolicy
 
         self._parentOperation = parent
+
+    def timerEvent(self, event):
+        with self.lock:
+            if event.timerId() == self._resultsTimer and self._newResults:
+                self.newResults.emit(self._newResults)
+                self._newResults = []
 
     @property
     def title(self):
@@ -347,6 +354,14 @@ class Operation(QObject):
         with self.lock:
             self.setStatus(OperationState.Running)
             self.started.emit()
+            self._resultsTimer = self.startTimer(300)
+
+    def _finalize(self):
+        with self.lock:
+            if self._newResults:
+                self.newResults.emit(self._newResults)
+            self.killTimer(self._resultsTimer)
+            self._resultsTimer = None
 
     def _finish(self):
         """Finish operation. If operation has error messages (state.errorCount > 0) final
@@ -354,6 +369,7 @@ class Operation(QObject):
         """
         with self.lock:
             if not self._state.isFinished:
+                self._finalize()
                 self.setProgress(100)
                 self.setStatus(OperationState.Failed if self._state.errorCount > 0 else OperationState.Completed)
 
@@ -362,6 +378,7 @@ class Operation(QObject):
         """
         with self.lock:
             if not self._state.isFinished:
+                self._finalize()
                 self.setStatus(OperationState.Cancelled)
 
     def doWork(self):
@@ -415,7 +432,6 @@ class Operation(QObject):
         with self.lock:
             if getattr(self._state, attrib_name) != value:
                 setattr(self._state, attrib_name, value)
-                self.stateChanged.emit(self.state)
                 attrib_signal = attrib_name + 'Changed'
                 getattr(self, attrib_signal).emit(value)
 
@@ -443,7 +459,8 @@ class Operation(QObject):
     def setProgress(self, new_progress):
         if new_progress > 100:
             raise TypeError('invalid argument :new_progress: - should not be >100')
-        self._setStateAttribute('progress', new_progress)
+        if new_progress - self._state.progress >= 0.01:
+            self._setStateAttribute('progress', new_progress)
 
     def setProgressText(self, new_progress_text):
         self._setStateAttribute('progressText', new_progress_text)
@@ -460,9 +477,8 @@ class Operation(QObject):
                 raise OperationError('operation already finished')
 
             self._state.results[new_result_name] = new_result_value
+            self._newResults.append((new_result_name, new_result_value))
             self._waitResults.notify_all()
-            self.stateChanged.emit(self.state)
-            self.newResult.emit(new_result_name, new_result_value)
 
     def addMessage(self, message, level=logging.INFO):
         """Add message to operation message list. :level: should be from logging module level enumeration.
@@ -475,7 +491,6 @@ class Operation(QObject):
             elif level == logging.WARNING:
                 self._state.warningCount += 1
 
-            self.stateChanged.emit(self.state)
             self.messageAdded.emit(message, level)
             if level >= logging.ERROR:
                 self.errorCountIncreased.emit(self._state.errorCount)
@@ -543,11 +558,12 @@ class Operation(QObject):
                 subop.statusChanged.connect(self._onSubopStatus, Qt.DirectConnection)
 
                 if process_results:
-                    if result_name_converter is not None:
-                        subop.newResult.connect(lambda k, v: self.addResult(result_name_converter(k), v),
-                                                Qt.DirectConnection)
-                    else:
-                        subop.newResult.connect(self.addResult, Qt.DirectConnection)
+                    def add_sub_results(results):
+                        for result_name, result_value in results:
+                            self.addResult(result_name_converter(result_name) if result_name_converter is not None
+                                                                              else result_name, result_value)
+
+                    subop.newResults.connect(add_sub_results, Qt.DirectConnection)
 
                 subop.finished.connect(self._onSubopFinish, Qt.DirectConnection)
 

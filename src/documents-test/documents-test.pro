@@ -1,24 +1,19 @@
-#-------------------------------------------------
-#
-# Project created by QtCreator 2013-07-25T20:38:49
-#
-#-------------------------------------------------
-
 QT       += core testlib
-QT       -= gui
 
 TARGET = documents-test
-CONFIG   += console
-CONFIG   -= app_bundle qtestlib
-
+CONFIG   += console qtestlib
 TEMPLATE = app
 
 SOURCES += main.cpp \
     ../documents/spans.cpp \
+    ../documents/readwritelock.cpp \
+    ../documents/matcher.cpp \
     ../documents/document.cpp \
     ../documents/devices.cpp \
+    ../documents/clipboard.cpp \
     ../documents/chain.cpp \
-    ../documents/readwritelock.cpp
+    ../documents/sharedwrap.cpp \
+    ../documents/base.cpp
 
 HEADERS += \
     ../documents/spans.h \
@@ -26,9 +21,19 @@ HEADERS += \
     ../documents/devices.h \
     ../documents/chain.h \
     ../documents/readwritelock.h \
-    tests.h
+    ../documents/matcher.h \
+    tests.h \
+    ../documents/clipboard.h \
+    ../documents/base.h \
+    ../documents/sharedwrap.h
+
+OTHER_FILES += \
+    ../documents/TODO.txt
 
 INCLUDEPATH += ../documents/
 
-QMAKE_CXXFLAGS += -std=c++0x
+*g++* {
+    QMAKE_CXXFLAGS += -std=c++0x
+}
+
 DESTDIR = ../documents

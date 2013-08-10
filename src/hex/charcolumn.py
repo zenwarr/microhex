@@ -2,9 +2,9 @@ from PyQt4.QtGui import QRawFont, QFont, QValidator, QWidget, QComboBox, QFormLa
 from PyQt4.QtCore import Qt
 import hex.hexwidget as hexwidget
 import hex.encodings as encodings
-import hex.editor as editor
 import hex.columnproviders as columnproviders
 import hex.utils as utils
+import hex.documents as documents
 
 
 class CharColumnModel(hexwidget.ColumnModel):
@@ -13,8 +13,8 @@ class CharColumnModel(hexwidget.ColumnModel):
 
     ReplacementCharacter = '·'
 
-    def __init__(self, editor, codec, render_font, bytes_on_row=16):
-        hexwidget.ColumnModel.__init__(self, editor)
+    def __init__(self, document, codec, render_font, bytes_on_row=16):
+        hexwidget.ColumnModel.__init__(self, document)
 
         self.codec = codec
         self.bytesOnRow = bytes_on_row
@@ -50,7 +50,7 @@ class CharColumnModel(hexwidget.ColumnModel):
         self.modelReset.emit()
 
     def _updateRowCount(self):
-        self._rowCount = len(self.editor) // self.bytesOnRow + bool(len(self.editor) % self.bytesOnRow)
+        self._rowCount = len(self.document) // self.bytesOnRow + bool(len(self.document) % self.bytesOnRow)
 
     def rowCount(self):
         return -1
@@ -65,10 +65,10 @@ class CharColumnModel(hexwidget.ColumnModel):
         if row < 0:
             return -1
         position = row * self.bytesOnRow
-        if position >= len(self.editor):
+        if position >= len(self.document):
             return 0
         elif row + 1 == self._rowCount:
-            bytes_left = len(self.editor) % self.bytesOnRow
+            bytes_left = len(self.document) % self.bytesOnRow
             if not bytes_left:
                 return self.bytesOnRow // self.codec.unitSize
             else:
@@ -81,23 +81,23 @@ class CharColumnModel(hexwidget.ColumnModel):
                          (position % self.bytesOnRow) // self.codec.unitSize)
 
     def indexData(self, index, role=Qt.DisplayRole):
-        if not index or self.editor is None:
+        if not index or self.document is None:
             return None
 
         position = index.row * self.bytesOnRow + index.column * self.codec.unitSize
-        is_virtual = position >= len(self.editor)
+        is_virtual = position >= len(self.document)
 
-        if role == self.EditorPositionRole:
+        if role == self.DocumentPositionRole:
             return position
         elif role == self.DataSizeRole:
             return self.codec.unitSize
-        elif role == self.EditorDataRole:
-            return bytes() if is_virtual else self.editor.read(position, self.codec.unitSize)
+        elif role == self.DocumentDataRole:
+            return bytes() if is_virtual else self.document.read(position, self.codec.unitSize)
         elif role in (Qt.DisplayRole, Qt.EditRole):
             if is_virtual:
                 return '.' if role == Qt.DisplayRole else ''
             try:
-                char_data = self.codec.getCharacterData(self.editor, position)
+                char_data = self.codec.getCharacterData(self.document, position)
                 if char_data.startPosition != position:
                     return ' '
                 else:
@@ -111,11 +111,11 @@ class CharColumnModel(hexwidget.ColumnModel):
         if not self.lastRealIndex or (index.row + 1 >= self.realRowCount() and index > self.lastRealIndex):
             flags |= self.FlagVirtual
         else:
-            if self.editor.isRangeModified(index.data(self.EditorPositionRole), index.data(self.DataSizeRole)):
+            if self.document.isRangeModified(index.data(self.DocumentPositionRole), index.data(self.DataSizeRole)):
                 flags |= self.FlagModified
 
             try:
-                d = self.codec.getCharacterData(self.editor, index.data(self.EditorPositionRole))
+                d = self.codec.getCharacterData(self.document, index.data(self.DocumentPositionRole))
             except encodings.EncodingError:
                 flags |= self.FlagBroken
         return flags
@@ -127,7 +127,7 @@ class CharColumnModel(hexwidget.ColumnModel):
         return False, False
 
     def beginEditNewIndex(self, input_text, before_index):
-        if not self.editor.fixedSize:
+        if not self.document.fixedSize:
             if input_text:
                 if self.createValidator().validate(input_text[0], 1)[0] == QValidator.Invalid:
                     return hexwidget.ModelIndex(), -1, False
@@ -135,8 +135,8 @@ class CharColumnModel(hexwidget.ColumnModel):
             else:
                 data_to_insert = self.codec.encodeString('\x00')
 
-            position = self.indexData(before_index, self.EditorPositionRole)
-            self.editor.insertSpan(position, editor.DataSpan(self.editor, data_to_insert))
+            position = self.indexData(before_index, self.DocumentPositionRole)
+            self.document.insertSpan(position, documents.DataSpan(data_to_insert))
 
             new_index = self.indexFromPosition(position)
             hexwidget.ColumnModel.beginEditIndex(self, new_index)
@@ -148,17 +148,17 @@ class CharColumnModel(hexwidget.ColumnModel):
             raise RuntimeError()
 
         if role == Qt.EditRole:
-            position = self.indexData(index, self.EditorPositionRole)
+            position = self.indexData(index, self.DocumentPositionRole)
             if position is None or position < 0:
                 raise ValueError('invalid position for index resolved')
 
             raw_data = self.codec.encodeString(value)
-            current_data = self.indexData(index, self.EditorDataRole)
+            current_data = self.indexData(index, self.DocumentDataRole)
 
             if raw_data == current_data:
                 return
 
-            self.editor.writeSpan(position, editor.DataSpan(self.editor, raw_data))
+            self.document.writeSpan(position, documents.DataSpan(raw_data))
         else:
             raise ValueError('data for given role is not writeable')
 
@@ -166,9 +166,9 @@ class CharColumnModel(hexwidget.ColumnModel):
         if not from_index:
             return hexwidget.ModelIndex()
 
-        position = self.indexData(from_index, self.EditorPositionRole)
+        position = self.indexData(from_index, self.DocumentPositionRole)
         try:
-            char_data = self.codec.getCharacterData(self.editor, position)
+            char_data = self.codec.getCharacterData(self.document, position)
         except encodings.EncodingError:
             return from_index.next
 
@@ -179,20 +179,20 @@ class CharColumnModel(hexwidget.ColumnModel):
 
     def previousEditableIndex(self, from_index):
         if not from_index:
-            prev_char_byte = len(self.editor)
+            prev_char_byte = len(self.document)
         else:
             try:
-                position = self.codec.findCharacterStart(self.editor, from_index.data(self.EditorPositionRole))
+                position = self.codec.findCharacterStart(self.document, from_index.data(self.DocumentPositionRole))
                 if position <= 0:
                     return hexwidget.ModelIndex()
-                elif position != from_index.data(self.EditorPositionRole):
+                elif position != from_index.data(self.DocumentPositionRole):
                     return from_index.previous
             except encodings.EncodingError:
                 return from_index.previous
             prev_char_byte = position - 1
 
         try:
-            character_start = self.codec.findCharacterStart(self.editor, prev_char_byte)
+            character_start = self.codec.findCharacterStart(self.document, prev_char_byte)
             return self.indexFromPosition(character_start)
         except encodings.EncodingError:
             return self.indexFromPosition(prev_char_byte)
@@ -218,11 +218,11 @@ class CharColumnModel(hexwidget.ColumnModel):
     def regular(self):
         return True
 
-    def _onEditorDataChanged(self, start, length):
-        length = length if length >= 0 else len(self.editor) - start
+    def _onDocumentDataChanged(self, start, length):
+        length = length if length >= 0 else len(self.document) - start
         self.dataChanged.emit(self.indexFromPosition(start), self.indexFromPosition(start + length - 1))
 
-    def _onEditorDataResized(self, new_size):
+    def _onDocumentDataResized(self, new_size):
         self._updateRowCount()
         self.dataResized.emit(self.lastRealIndex)
 
@@ -282,7 +282,7 @@ class CharColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConfi
             self.spnBytesOnRow.setValue(16)
 
     def createColumnModel(self, hex_widget):
-        model = CharColumnModel(self.hexWidget.editor, encodings.getCodec(self.cmbEncoding.currentText()),
+        model = CharColumnModel(self.hexWidget.document, encodings.getCodec(self.cmbEncoding.currentText()),
                                 self.hexWidget.font(), self.spnBytesOnRow.value())
         return model
 

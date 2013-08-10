@@ -46,7 +46,7 @@ class LargeScrollBar(QScrollBar):
     def setPageStepLarge(self, new_page_step):
         if self._pageStep != new_page_step:
             self._pageStep = new_page_step
-            self.setPageStep(self._ticksToValue(self._pageStep))
+            self.setPageStep(int(self._ticksToValue(self._pageStep)))
 
     def setValueLarge(self, new_value):
         if not (self._valueRange[0] <= new_value < self._valueRange[1]):
