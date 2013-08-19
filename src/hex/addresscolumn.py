@@ -1,16 +1,16 @@
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QWidget, QFormLayout, QComboBox, QVBoxLayout, QDialogButtonBox, QLineEdit, QSizePolicy
-import hex.hexwidget as hexwidget
+import hex.models as models
 import hex.formatters as formatters
 import hex.columnproviders as columnproviders
 import hex.integeredit as integeredit
 import hex.utils as utils
 
 
-class AddressColumnModel(hexwidget.ColumnModel):
+class AddressColumnModel(models.ColumnModel):
     def __init__(self, linked_model, formatter=None, base_address=0):
         document = linked_model.document if linked_model is not None else linked_model
-        hexwidget.ColumnModel.__init__(self, document)
+        models.ColumnModel.__init__(self, document)
         self._linkedModel = None
         self.formatter = formatter or formatters.IntegerFormatter(base=16, uppercase=True)
         self._baseAddress = base_address
@@ -74,7 +74,7 @@ class AddressColumnModel(hexwidget.ColumnModel):
             elif role == self.DocumentPositionRole:
                 return model_index.data(self.DocumentPositionRole)
             elif role == self.DataSizeRole:
-                return sum(index.data(self.DataSizeRole) for index in hexwidget.index_range(
+                return sum(index.data(self.DataSizeRole) for index in models.index_range(
                     model_index, self._linkedModel.lastRowIndex(index.row), include_last=True
                 ))
         return None
@@ -91,8 +91,8 @@ class AddressColumnModel(hexwidget.ColumnModel):
     def indexFlags(self, index):
         if self._linkedModel is not None:
             model_index = self._linkedModel.index(index.row, 0)
-            if model_index and model_index.flags & hexwidget.ColumnModel.FlagVirtual:
-                return hexwidget.ColumnModel.FlagVirtual
+            if model_index and model_index.flags & models.ColumnModel.FlagVirtual:
+                return models.ColumnModel.FlagVirtual
         return 0
 
     def _maxLengthForSize(self, size):

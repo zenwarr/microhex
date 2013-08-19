@@ -10,6 +10,8 @@ applicationPath = ''
 guiThread = None
 testRun = False
 
+MaximalPosition = 0xffffffffffffffff
+
 
 def first(iterable, default=None):
     try:

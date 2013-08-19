@@ -9,7 +9,6 @@ App_DefaultErrorPolicy = 'app.default_error_policy'
 App_PoolOperationLimit = 'app.pool_operation_limit'
 IntegerEdit_Uppercase = 'integeredit.uppercase'
 IntegerEdit_DefaultStyle = 'integeredit.default_style'
-Files_MaxMemoryLoadSize = 'files.max_memoryload_size'
 HexWidget_ShowHeader = 'hexwidget.show_header'
 HexWidget_DefaultTheme = 'hexwidget.default_theme'
 HexWidget_AlternatingRows = 'hexwidget.alternating_rows'
@@ -28,7 +27,6 @@ def doRegister():
         _settings_to_register = (
             (IntegerEdit_Uppercase, False, bool),
             (IntegerEdit_DefaultStyle, 'c', str),
-            (Files_MaxMemoryLoadSize, 1024 * 1024 * 10, int),
             (HexWidget_ShowHeader, True, bool),
             (App_Translation, '', str),
             (App_DefaultErrorPolicy, 'ask', str),

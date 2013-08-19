@@ -1,34 +1,39 @@
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QValidator, QWidget, QFormLayout, QComboBox, QCheckBox, QSpinBox, QSizePolicy
-import hex.hexwidget as hexwidget
+import hex.models as models
 import hex.columnproviders as columnproviders
 import hex.utils as utils
 import hex.valuecodecs as valuecodecs
 import hex.formatters as formatters
 
 
-class HexColumnModel(hexwidget.RegularValueColumnModel):
-    """Standart column for hex-editors. Displays data as numbers. This model is regular (has equal number of
-    columns in each row, except last one) and infinite (supports virtual indexes).
+class HexColumnModel(models.RegularValueColumnModel):
+    """Standart column for hex-editors. Displays data as numbers. This model is regular and supports virtual
+    indexes.
     """
     def __init__(self, document, valuecodec, formatter, columns_on_row=16):
         self._cellTextSize = 0
-        hexwidget.RegularValueColumnModel.__init__(self, document, valuecodec or valuecodecs.IntegerCodec(),
-                                                   formatter or formatters.IntegerFormatter(), columns_on_row)
+        models.RegularValueColumnModel.__init__(self, document, valuecodec or valuecodecs.IntegerCodec(),
+                                                   formatter or formatters.IntegerFormatter(), columns_on_row,
+                                                   delegate_type=HexColumnDelegate)
+        self._updateCellTextSize()
 
     def virtualIndexData(self, index, role=Qt.DisplayRole):
         if role == Qt.EditRole:
-            return self.textForDocumentData(b'\x00' * self.regularCellDataSize, index, Qt.EditRole)
-        return hexwidget.RegularValueColumnModel.virtualIndexData(self, index, role)
+            return self.textForDocumentData(b'\x00' * self.regularDataSize, index, Qt.EditRole)
+        return models.RegularValueColumnModel.virtualIndexData(self, index, role)
 
     @property
-    def regularCellTextLength(self):
+    def regularTextLength(self):
         return self._cellTextSize
 
-    def reset(self):
+    def _updateCellTextSize(self):
         min_value, max_value = self.valuecodec.minimal, self.valuecodec.maximal
         self._cellTextSize = max(len(self.formatter.format(min_value)), len(self.formatter.format(max_value)))
-        hexwidget.RegularValueColumnModel.reset(self)
+
+    def reset(self):
+        self._updateCellTextSize()
+        models.RegularValueColumnModel.reset(self)
 
     @property
     def preferSpaced(self):
@@ -38,11 +43,11 @@ class HexColumnModel(hexwidget.RegularValueColumnModel):
         return HexColumnValidator(self.formatter, self.valuecodec)
 
     def indexData(self, index, role=Qt.DisplayRole):
-        data = hexwidget.RegularValueColumnModel.indexData(self, index, role)
+        data = models.RegularValueColumnModel.indexData(self, index, role)
         if data is not None:
-            if role == Qt.DisplayRole and index != self.editingIndex:
+            if role == Qt.DisplayRole:
                 return ' ' * (self._cellTextSize - len(data)) + data
-            elif role == Qt.EditRole or (role == Qt.DisplayRole and index == self.editingIndex):
+            elif role == Qt.EditRole:
                 if self.valuecodec.signed and not data.startswith('-') and not data.startswith('+'):
                     return '+' + data
         return data
@@ -58,14 +63,14 @@ class HexColumnModel(hexwidget.RegularValueColumnModel):
             zero_count = self._cellTextSize - len(input_text)
             while zero_count > 0:
                 text = ('+' * self.valuecodec.signed) + input_text + '0' * zero_count
-                if self.createValidator().validate(text, len(input_text) + self.valuecodec.signed)[0] != QValidator.Invalid:
+                if self.createValidator().validate(text, len(input_text) + self.valuecodec.signed) != QValidator.Invalid:
                     break
                 zero_count -= 1
             else:
                 return None, '', -1
             cursor_pos = len(input_text) + self.valuecodec.signed
 
-        if self.createValidator().validate(text, len(input_text))[0] != QValidator.Invalid:
+        if self.createValidator().validate(text, len(input_text)) != QValidator.Invalid:
             import struct
             try:
                 return self.valuecodec.encode(self.formatter.parse(text)), text, cursor_pos
@@ -75,8 +80,21 @@ class HexColumnModel(hexwidget.RegularValueColumnModel):
         return None, '', -1
 
     @property
-    def defaultCellInsertMode(self):
+    def defaultInsertMode(self):
         return False
+
+
+class HexColumnDelegate(models.StandardEditDelegate):
+    def overwriteText(self, text):
+        model = self.index.model
+        if model.valuecodec.signed:
+            if self.cursorOffset == 0 and text[0] not in '-+':
+                self.cursorOffset += 1
+            elif self.cursorOffset != 0 and len(text) == 1 and text in '-+':
+                self._setData(text + self.data()[1:])
+                return True
+
+        return models.StandardEditDelegate.overwriteText(self, text)
 
 
 class HexColumnValidator(QValidator):
@@ -85,25 +103,20 @@ class HexColumnValidator(QValidator):
         self.formatter = formatter
         self.codec = codec
 
-    def validate(self, text, cursor_pos, original_text=None):
+    def validate(self, text, cursor_pos):
         import struct
 
         if not text:
-            return self.Intermediate, text, cursor_pos
-        elif self.codec.signed and original_text is not None and cursor_pos == 0 and text[0] not in '-+':
-            text = original_text[0] + text[0] + text[2:]
-            cursor_pos = 2
-        else:
-            cursor_pos = None
+            return self.Intermediate
 
         r1 = self.formatter.validate(text)
         if r1 == self.Acceptable:
             try:
                 self.codec.encode(self.formatter.parse(text))
-                return r1, text, cursor_pos
+                return self.Acceptable
             except struct.error:
-                return self.Invalid, text, cursor_pos
-        return r1, text, cursor_pos
+                return self.Invalid
+        return r1
 
 
 class HexColumnProvider(columnproviders.AbstractColumnProvider):

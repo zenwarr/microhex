@@ -1,4 +1,4 @@
-from PyQt4.QtCore import QFileInfo
+from PyQt4.QtCore import QFileInfo, QSize
 from hex.forms.ui_loadfiledialog import Ui_LoadFileDialog
 import hex.utils as utils
 import hex.formatters as formatters
@@ -32,10 +32,6 @@ class LoadFileDialog(utils.Dialog):
         self.ui.chkLoadRange.toggled.connect(self._onLoadRangeChecked)
         self.ui.chkFreezeSize.toggled.connect(self._onFreezeSizeChecked)
 
-        self._maxMemoryLoadSize = globalSettings[appsettings.Files_MaxMemoryLoadSize]
-        self.ui.chkMemoryLoad.setText(utils.tr('Completely read into memory (up to {0})').format(
-                        utils.formatSize(self._maxMemoryLoadSize)))
-
         self._updateLoadSize()
 
         if load_options is not None:
@@ -47,17 +43,19 @@ class LoadFileDialog(utils.Dialog):
                 self.ui.rangeStart.number = load_options.rangeStart
                 self.ui.rangeLength.number = load_options.rangeLength
 
+        self.setMaximumHeight(self.minimumHeight())
+
     def _onRangeStartChanged(self, new_start):
         self.ui.rangeLength.maximum = self.fileSize - new_start
 
     def _updateLoadSize(self):
         load_size = self.ui.rangeLength.number if self.ui.chkLoadRange.isChecked() else self.fileSize
         self.ui.lblLoadSize.setText(utils.tr('{0} to be loaded').format(utils.formatSize(load_size)))
-        self.ui.chkMemoryLoad.setEnabled(load_size <= self._maxMemoryLoadSize)
 
     def _onLoadRangeChecked(self):
         stored_freeze_size = self._userFreezeSize
         try:
+            self.ui.chkFreezeSize.setEnabled(not self.ui.chkLoadRange.isChecked())
             if self.ui.chkLoadRange.isChecked():
                 self.ui.chkFreezeSize.setChecked(True)
             elif not self._userFreezeSize:

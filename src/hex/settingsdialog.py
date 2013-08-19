@@ -34,7 +34,6 @@ class SettingsDialog(utils.Dialog):
 
     def _addStandardPages(self):
         standard_pages = (
-            (utils.tr('Loading'), self.ui.pageLoading),
             (utils.tr('Misc'), self.ui.pageMisc),
             (utils.tr('Translation'), self.ui.pageTranslation),
             (utils.tr('Hex view'), self.ui.pageHex)
@@ -66,9 +65,7 @@ class SettingsDialog(utils.Dialog):
             self.ui.pagesStack.setCurrentWidget(page_data.page)
 
     def _initStandardPage(self, page_data):
-        if page_data.page is self.ui.pageLoading:
-            self.ui.maximalRAMLoadSize.number = globalSettings[appsettings.Files_MaxMemoryLoadSize]
-        elif page_data.page is self.ui.pageMisc:
+        if page_data.page is self.ui.pageMisc:
             self.ui.chkIntegerEditUppercase.setChecked(globalSettings[appsettings.IntegerEdit_Uppercase])
 
             self.ui.cmbIntegerEditStyle.clear()
@@ -113,9 +110,7 @@ class SettingsDialog(utils.Dialog):
                 self._saveStandardPage(page_data)
 
     def _saveStandardPage(self, page_data):
-        if page_data.page is self.ui.pageLoading:
-            globalSettings[appsettings.Files_MaxMemoryLoadSize] = self.ui.maximalRAMLoadSize.number
-        elif page_data.page is self.ui.pageMisc:
+        if page_data.page is self.ui.pageMisc:
             globalSettings[appsettings.IntegerEdit_Uppercase] = self.ui.chkIntegerEditUppercase.isChecked()
             style_index = self.ui.cmbIntegerEditStyle.currentIndex()
             globalSettings[appsettings.IntegerEdit_DefaultStyle] = self.ui.cmbIntegerEditStyle.itemData(style_index)

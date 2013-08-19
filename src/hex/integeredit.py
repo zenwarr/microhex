@@ -36,13 +36,8 @@ class IntegerEdit(QAbstractSpinBox):
             self._addBase(utils.tr(standard_base[0]), standard_base[1])
 
         self._defaultLeftMargin = self.lineEdit().getTextMargins()[0]
-
-        min_size = self.minimumSize()
-        min_size.setWidth(min_size.width() + self._baseButton.minimumSize().width() + 4)
-        min_size.setHeight(max(min_size.height(), self._baseButton.minimumSize().height() + 4))
-        self.setMinimumSize(min_size)
-
         self._updateBaseButton()
+
         self.number = self._min
         self.lineEdit().setCursorPosition(0)
 
@@ -51,7 +46,7 @@ class IntegerEdit(QAbstractSpinBox):
     def minimumSizeHint(self):
         min_size = QAbstractSpinBox.minimumSizeHint(self)
         min_button_size = self._baseButton.minimumSizeHint()
-        min_size.setHeight(max(min_size.height(), min_button_size.height()))
+        min_size.setHeight(max(min_size.height(), min_button_size.height() + 4))
         min_size.setWidth(min_size.width() + min_button_size.width() + 4)
         return min_size
 
@@ -73,7 +68,7 @@ class IntegerEdit(QAbstractSpinBox):
         self._baseButton.setGeometry(2, 2, button_size, button_size)
 
         margins = self.lineEdit().getTextMargins()
-        self.lineEdit().setTextMargins(QMargins(self._defaultLeftMargin + button_size + 2 * 2, margins[1],
+        self.lineEdit().setTextMargins(QMargins(max(self._defaultLeftMargin, button_size + 2 * 2), margins[1],
                                                 margins[2], margins[3]))
 
     @property
@@ -85,9 +80,18 @@ class IntegerEdit(QAbstractSpinBox):
         self._setBase(base)
 
     def _setBase(self, base, convert_number=True):
+        """If :convert_number: is True, text in widget will be converted to new base. Otherwise text will
+        be assumed to be in base we are converting to.
+        """
         if base != self._formatter.base:
-            if convert_number and self.text():
-                number = self.number
+            # we should not try to convert empty string into another base, but if string is Invalid or Intermediate
+            # it would be converted to empty string.
+            new_text = self.lineEdit().text()
+            if self._formatter.validate(self.lineEdit().text()) != QValidator.Acceptable:
+                new_text = ''
+                number = 0
+            else:
+                number = self._formatter.parse(new_text)
 
             for action in self._baseActionGroup.actions():
                 if action.data() == base:
@@ -99,44 +103,25 @@ class IntegerEdit(QAbstractSpinBox):
             self._formatter.base = base
             self._baseButton.setText(str(base))
 
-            # convert number we have into different base
-            if convert_number and self.text():
-                self.number = number
+            # should be convert this this text to new base?
+            if convert_number and new_text:
+                self.lineEdit().setText(self._formatter.format(number))
+            else:
+                self.lineEdit().setText(new_text)
 
     def _setBaseFromAction(self):
         self.base = self.sender().data()
 
     @property
     def number(self):
-        if self.validate(self.text(), 0)[0] == QValidator.Acceptable:
+        if self._formatter.validate(self.lineEdit().text()) == QValidator.Acceptable:
             return self._formatter.parse(self.lineEdit().text())
         return 0
 
     @number.setter
     def number(self, new_number):
-        if self.number != new_number or self.validate(self.text(), 0) != QValidator.Acceptable:
+        if self.number != new_number or self._doValidate(self.text(), 0, False) != QValidator.Acceptable:
             self.lineEdit().setText(self._formatter.format(new_number))
-
-    def validate(self, text, pos):
-        r = self._formatter.validate(text)
-        if r == QValidator.Invalid:
-            guessed = formatters.IntegerFormatter.guessFormat(text)
-            if guessed is not None:
-                if guessed[0] != self._formatter.style:
-                    self._formatter.style = guessed[0]
-                if guessed[1] != self._formatter.base:
-                    self._setBase(guessed[1], False)
-                r = self._formatter.validate(text)
-
-        if r == QValidator.Acceptable:
-            num = self._formatter.parse(text)
-            if num < self._min or (self._max >= 0 and num > self._max):
-                r = QValidator.Invalid
-        elif r == QValidator.Intermediate and text == '-':
-            if self._min >= 0:
-                r = QValidator.Invalid
-
-        return r, text, pos
 
     @property
     def minimum(self):
@@ -174,9 +159,37 @@ class IntegerEdit(QAbstractSpinBox):
                         (self.StepDownEnabled if self.number > self._min else 0))
 
     def _onTextChanged(self, new_text):
-        if self._number != self.number:
+        if (self._doValidate(new_text, self.lineEdit().cursorPosition(), False) == QValidator.Acceptable
+                    and self._number != self.number):
             self._number = self.number
             self.numberChanged.emit(self.number)
+
+    def _doValidate(self, text, pos, correct):
+        status = self._formatter.validate(text)
+        if status == QValidator.Invalid:
+            # try to guess base and style in which number is typed.
+            if correct:
+                guessed = formatters.IntegerFormatter.guessFormat(text)
+                if guessed is not None:
+                    if guessed[0] != self._formatter.style:
+                        self._formatter.style = guessed[0]
+                    if guessed[1] != self._formatter.base:
+                        self._setBase(guessed[1], False)
+                    status = self._formatter.validate(text)
+
+        if status == QValidator.Acceptable:
+            # check if number is in allowed range.
+            num = self._formatter.parse(text)
+            if num < self._min or (self._max >= 0 and num > self._max):
+                status = QValidator.Invalid
+        elif status == QValidator.Intermediate and text.startswith('-'):
+            # check if user has typed minus sign and minimal value is not negative
+            if self._min >= 0:
+                status = QValidator.Invalid
+        return status
+
+    def validate(self, text, pos):
+        return self._doValidate(text, pos, True), text, pos
 
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.ControlModifier:

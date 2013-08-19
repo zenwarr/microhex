@@ -1,50 +1,57 @@
-import hex.hexwidget as hexwidget
+import hex.models as models
 import hex.valuecodecs as valuecodecs
 import hex.formatters as formatters
 import hex.columnproviders as columnproviders
 import hex.utils as utils
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QDoubleValidator, QWidget, QFormLayout, QSpinBox, QComboBox, QSizePolicy, QValidator
+import struct
 
 
-class FloatColumnModel(hexwidget.RegularValueColumnModel):
+class FloatColumnModel(models.RegularValueColumnModel):
     def __init__(self, document, valuecodec=None, formatter=None, columns_on_row=4):
-        hexwidget.RegularValueColumnModel.__init__(self, document, valuecodec or valuecodecs.FloatCodec(),
-                                                   formatter or formatters.FloatFormatter(), columns_on_row)
+        models.RegularValueColumnModel.__init__(self, document, valuecodec or valuecodecs.FloatCodec(),
+                                                   formatter or formatters.FloatFormatter(), columns_on_row,
+                                                   delegate_type=FloatColumnEditDelegate)
 
     @property
-    def regularCellTextLength(self):
+    def regularTextLength(self):
         return self.formatter.maximalWidth
 
     def virtualIndexData(self, index, role=Qt.DisplayRole):
-        if role == Qt.EditRole or (role == Qt.DisplayRole and self.editingIndex == index):
+        if role == Qt.EditRole:
             return '0'
-        return hexwidget.RegularValueColumnModel.virtualIndexData(self, index, role)
+        return models.RegularValueColumnModel.virtualIndexData(self, index, role)
 
     @property
     def preferSpaced(self):
         return True
 
-    def indexData(self, index, role=Qt.DisplayRole):
-        d = hexwidget.RegularValueColumnModel.indexData(self, index, role)
-        return d.strip() if (role == Qt.EditRole and d) else d
+    # def textForDocumentData(self, document_data, index, role=Qt.DisplayRole):
+    #     d = models.RegularValueColumnModel.textForDocumentData(self, document_data, index, role)
+    #     return d
 
     def _dataForNewIndex(self, input_text, before_index):
-        import struct
-        if self.createValidator().validate(input_text, len(input_text))[0] != QDoubleValidator.Invalid:
+        if self.createValidator().validate(input_text, len(input_text)) != QDoubleValidator.Invalid:
             try:
                 text = input_text or '0'
                 return self.valuecodec.encode(self.formatter.parse(text)), text, max(len(input_text), 1)
             except (ValueError, struct.error):
                 pass
-        return None, -1
+        return b'', '', -1
 
     @property
-    def defaultCellInsertMode(self):
+    def defaultInsertMode(self):
         return True
 
     def createValidator(self):
         return FloatColumnValidator()
+
+
+class FloatColumnEditDelegate(models.StandardEditDelegate):
+    @property
+    def minimalCursorOffset(self):
+        return len(self.data()) - len(self.data().lstrip())
 
 
 class FloatColumnValidator(QValidator):
@@ -52,9 +59,10 @@ class FloatColumnValidator(QValidator):
         QValidator.__init__(self)
         self._qvalidator = QDoubleValidator()
 
-    def validate(self, text, cursor_pos, original_text=None):
-        status, text, new_cursor_pos = self._qvalidator.validate(text, cursor_pos)
-        return status, text, new_cursor_pos if new_cursor_pos != cursor_pos else None
+    def validate(self, text, cursor_pos):
+        adjusted_cursor_pos = cursor_pos - (len(text) - len(text.lstrip()))
+        status, text, new_cursor_pos = self._qvalidator.validate(text.strip(), adjusted_cursor_pos)
+        return status
 
 
 class FloatColumnProvider(columnproviders.AbstractColumnProvider):

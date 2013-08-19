@@ -26,8 +26,8 @@ class AbstractCodec(object):
 
     @property
     def fixedSize(self):
-        """Returns number of bytes occupied by one character if encoding is fixed-byte. Should return -1 for multibyte
-        encodings.
+        """Returns number of bytes occupied by one character if encoding is fixed-width. Should return -1 for
+        variable-width encodings.
         """
         raise NotImplementedError()
 
@@ -35,22 +35,22 @@ class AbstractCodec(object):
     def canDetermineCharacterStart(self):
         """Returns True if codec can determine where character starts by any byte of this character. For example,
         for utf-8 encoding this property should return True, and False for utf-16 or utf-32 encodings. Note that
-        this property indicates if start position can be found unambiguously, but codec can make some assumpitons
+        this property indicates if start position can be found unambiguously, but codec can make some assumptions
         and return some value from findCharacterStart basing on this assumption. For example, utf-16 codec cannot
-        determine if some byte represents high or low byte in 2-byte character, but can determine if character
-        that starts at some position is high or low surrogate.
+        determine if byte represents high or low byte in 2-byte character, but can determine if pair of bytes
+        at some position is high or low surrogate.
         """
         raise NotImplementedError()
 
     @property
     def unitSize(self):
-        """Unit size is maximal number of bytes any character size is multiplied by
+        """Unit size is greatest common divisor of all possible character sizes.
         """
         raise NotImplementedError()
 
     def findCharacterStart(self, document, position):
-        """Finds start of character that has byte at :position:. Should raise EncodingError if self.canDetermineCharacterStart
-        is False"""
+        """Finds start of character that has byte at :position:.
+        """
         return self.getCharacterData(document, position).startPosition
 
     def getCharacterSize(self, document, position):
@@ -65,20 +65,31 @@ class AbstractCodec(object):
         return self.getCharacterData(document, position).unicode
 
     def encodeString(self, text):
-        """Converts string to sequence of bytes in given encoding.
+        """Converts string to sequence of bytes in this encoding.
         """
         raise NotImplementedError()
 
     def canEncode(self, text):
-        """Returns True if text can be converted to given encoding, False otherwise
+        """Returns True if text can be converted to this encoding, False otherwise
         """
         raise NotImplementedError()
 
     def getCharacterData(self, document, position):
+        """Returns CharacterData object that describes properties of character that
+        includes byte at :position: in :document:
+        Attributes of this object has the following meaning:
+            .unicode - Python string, decoded from character;
+            .document - document from which data are read, as passed to this method;
+            .startPosition - position which was assumed as position of first byte of
+                             decoded character;
+            .bytesCount - number of bytes that was used;
+            .documentData - bytes decoded character consist of in this encoding
+        """
         raise NotImplementedError()
 
 
 class QtProxyCodec(AbstractCodec):
+    """Codec that encapsulates QTextCodec class"""
     def __init__(self, qcodec):
         AbstractCodec.__init__(self, qcodec.name())
         self._qcodec = qcodec
@@ -109,6 +120,9 @@ class SingleByteEncodingCodec(QtProxyCodec):
     def getCharacterData(self, document, position):
         d = CharacterData()
         data = document.read(position, 1)
+        if len(data) != 1:
+            raise PartialCharacterError()
+
         d.unicode = self._qcodec.toUnicode(data)
         d.startPosition = position
         d.document = document
@@ -128,34 +142,21 @@ class Utf16Codec(QtProxyCodec):
 
     @property
     def fixedSize(self):
-        return -1 # we will support surrogates, so utf16 is not fixedbyte for us
+        return -1 # we support surrogates, so utf16 is not fixed width for us
 
     @property
     def canDetermineCharacterStart(self):
-        return False # we can determine if word is high or low surrogate, but cannot determine if character start on
-                  # position or position + 1
+        return False # we can determine if word is high or low surrogate, but cannot determine if character starts on
+                     # position or position + 1
 
     @property
     def unitSize(self):
         return 2
 
-    def getCharacterSize(self, document, position):
-        start = self.findCharacterStart(document, position)
-        if start < position:
-            # that was low surrogate at :position:, so length of our char is 4 bytes
-            return 4
-        else:
-            return 2
-
-    def decodeCharacter(self, document, position):
-        data = document.read(self.findCharacterStart(document, position), self.getCharacterSize(document, position))
-        decoded = self._qcodec.toUnicode(data)
-        return decoded
-
     def encodeString(self, text):
         # looks like QTextCodec adds BOM before converted string. It is not what we want.
         converted = self._qcodec.fromUnicode(text)
-        if len(converted) >= 4 and converted[:2] in (b'\xff\xfe', b'\xfe\xff'):
+        if len(converted) >= 2 and converted[:2] in (b'\xff\xfe', b'\xfe\xff'):
             return converted[2:]
         else:
             return converted
@@ -198,7 +199,6 @@ class Utf16Codec(QtProxyCodec):
             d.documentData = lead_word_data + raw_data
             d.bytesCount = 4
         else:
-            # single character
             d.startPosition = position
             d.unicode = self._qcodec.toUnicode(raw_data)
             d.bytesCount = 2
@@ -268,9 +268,10 @@ class Utf8Codec(QtProxyCodec):
         d = CharacterData()
         d.document = document
 
-        # first first byte of sequence
         back_position = max(0, position - 5)
         data = bytes(document.read(back_position, position - back_position + 1))
+        if not data:
+            raise PartialCharacterError()
 
         if not (data[-1] & 0x80):
             # if highest bit is off, this is first character
@@ -313,10 +314,14 @@ class Utf8Codec(QtProxyCodec):
         return d
 
     def encodeString(self, text):
-        return self._qcodec.fromUnicode(text)
+        encoded = self._qcodec.fromUnicode(text)
+        if len(encoded) > 3 and encoded.startswith('\xef\xbb\xbf'):
+            return encoded[3:]
+        else:
+            return encoded
 
 
-singlebyte_encodings = {
+singlebyte_encodings = (
     'ISO 8859-1',
     'ISO 8859-2',
     'ISO 8859-3',
@@ -347,7 +352,7 @@ singlebyte_encodings = {
     'KOI8-R',
     'KOI8-U',
     'roman8'
-}
+)
 
 encodings = {
     'UTF-8': Utf8Codec(),

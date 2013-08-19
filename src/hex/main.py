@@ -17,7 +17,7 @@ class Application(QApplication):
         QApplication.__init__(self, sys.argv)
         self.setApplicationName('Microhex')
         self.setOrganizationName('zenwarr')
-        self.setOrganizationDomain('http://github.org/zenwarr/hexedit')
+        self.setOrganizationDomain('https://github.com/zenwarr/microhex')
         self.setApplicationVersion('0.0.2 indev')
 
         # initialize settings

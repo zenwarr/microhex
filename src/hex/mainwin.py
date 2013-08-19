@@ -144,12 +144,10 @@ class MainWindow(QMainWindow):
         self.actionInsertMode = ObservingAction(QIcon(), utils.tr('Insert mode'),
                                                 PropertyObserver(self, 'activeSubWidget.hexWidget'),
                                                 PropertyObserver(self, 'activeSubWidget.hexWidget.insertMode'))
-        self.actionInsertMode.setShortcut(QKeySequence('Ins'))
         self.actionInsertMode.triggered.connect(self.setInsertMode)
 
         self.actionRemoveSelected = ObservingAction(getIcon('edit-delete'), utils.tr('Remove selected'),
                                                     PropertyObserver(self, 'activeSubWidget.hexWidget.hasSelection'))
-        self.actionRemoveSelected.setShortcut(QKeySequence('Del'))
         self.actionRemoveSelected.triggered.connect(self.removeSelected)
 
         self.actionFillZeros = ObservingAction(QIcon(), utils.tr('Fill selected with zeros'),

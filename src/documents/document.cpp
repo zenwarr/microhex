@@ -660,86 +660,84 @@ QList<std::shared_ptr<PrimitiveDeviceSpan> > Document::_prepareToUpdateDevice(co
 
     QList<std::shared_ptr<PrimitiveDeviceSpan>> spans_to_dissolve;
 
-    // now process all spans that are not in our document main chain. These spans can reside in undo stack or
+    // now process all spans that should be dissolved. These spans can reside in undo stack or
     // another documents. We should find spans that needs to be updated, and update them to keep referring to
     // same data.
     for (auto span : write_device->getSpans()) {
-        if (!new_span_positions.contains(span)) {
-            // now determine replacement for this span. We can split span into several ones, if part of
-            // data will remain unmodified in new device
-            SpanList replacement;
+        // now determine replacement for this span. We can split span into several ones, if part of
+        // data will remain unmodified in new device
+        SpanList replacement;
 
-            qulonglong current_offset = span->getDeviceOffset();
-            while (current_offset < span->getDeviceOffset() + span->getLength()) {
-                // find spans from new device that will contain current byte
-                QList<std::shared_ptr<PrimitiveDeviceSpan>> hitted;
-                for (auto span_to_test_for_hit : new_span_positions.keys()) {
-                    if (span_to_test_for_hit->getDeviceOffset() <= current_offset &&
-                            current_offset < span_to_test_for_hit->getDeviceOffset() + span_to_test_for_hit->getLength()) {
-                        hitted.append(span_to_test_for_hit);
-                    }
+        qulonglong current_offset = span->getDeviceOffset();
+        while (current_offset < span->getDeviceOffset() + span->getLength()) {
+            // find spans from new device that will contain current byte
+            QList<std::shared_ptr<PrimitiveDeviceSpan>> hitted;
+            for (auto span_to_test_for_hit : new_span_positions.keys()) {
+                if (span_to_test_for_hit->getDeviceOffset() <= current_offset &&
+                        current_offset < span_to_test_for_hit->getDeviceOffset() + span_to_test_for_hit->getLength()) {
+                    hitted.append(span_to_test_for_hit);
                 }
-
-                if (hitted.isEmpty()) {
-                    // there is no spans that contain this data. It means that data are removed from document,
-                    // but we still need them. We will store this data in DataSpan
-                    // first determine length of data that we should store by finding closest span to the right.
-                    std::shared_ptr<PrimitiveDeviceSpan> closest = nullptr;
-                    qulonglong closest_distance = -1;
-                    for (auto span_to_test : new_span_positions.keys()) {
-                        qulonglong dev_offset = span_to_test->getDeviceOffset();
-                        if (dev_offset > current_offset && (!closest || dev_offset - current_offset < closest_distance)) {
-                            closest = span_to_test;
-                            closest_distance = dev_offset - current_offset;
-                        }
-                    }
-
-                    qulonglong data_to_store_length;
-                    if (!closest) {
-                        // there is no another spans till the end of device... We should store all remaining data
-                        data_to_store_length = span->getLength() - (current_offset - span->getDeviceOffset());
-                    } else {
-                        // another span starts near...
-                        data_to_store_length = closest->getDeviceOffset() - current_offset;
-                    }
-                    data_to_store_length = std::min(span->getDeviceOffset() + span->getLength() - current_offset,
-                                                    data_to_store_length);
-
-                    // now replace with data span. Problem is that we can have no enough memory to keep
-                    // all data in memory, so we should ask user to do something (we can't say what exactly)
-                    // to remove this span - clear undo history, save another document that depends on this device
-                    // data, etc.
-                    bool ok = false;
-                    QByteArray data_to_store;
-                    try {
-                        data_to_store = write_device->read(current_offset, data_to_store_length);
-                        ok = true;
-                    } catch (const std::bad_alloc &) {
-                        // not enough memory
-                        throw;
-                    }
-
-                    if (!ok || qulonglong(data_to_store.length()) != data_to_store_length) {
-                        throw DocumentError("failed to save document data - some data from device you want to write into "
-                                            "should be kept, but system has no enough free RAM to do it. Try clearing "
-                                            "undo history, or save another document that depends on data from this device.");
-                    }
-
-                    replacement.append(std::make_shared<DataSpan>(data_to_store));
-                } else {
-                    // part of data is kept by another span that will remain in new device.
-                    // choose span that keeps more data.
-                    std::shared_ptr<PrimitiveDeviceSpan> choosen = hitted.first();
-                    qulonglong offset = current_offset - choosen->getDeviceOffset();
-
-                    replacement.append(write_device->createSpan(new_span_positions[choosen] + offset,
-                                                                choosen->getLength() - offset));
-                }
-                current_offset += replacement.last()->getLength();
             }
-            span->prepareToDissolve(replacement);
-            spans_to_dissolve.append(span);
+
+            if (hitted.isEmpty()) {
+                // there is no spans that contain this data. It means that data are removed from document,
+                // but we still need them. We will store this data in DataSpan
+                // first determine length of data that we should store by finding closest span to the right.
+                std::shared_ptr<PrimitiveDeviceSpan> closest = nullptr;
+                qulonglong closest_distance = -1;
+                for (auto span_to_test : new_span_positions.keys()) {
+                    qulonglong dev_offset = span_to_test->getDeviceOffset();
+                    if (dev_offset > current_offset && (!closest || dev_offset - current_offset < closest_distance)) {
+                        closest = span_to_test;
+                        closest_distance = dev_offset - current_offset;
+                    }
+                }
+
+                qulonglong data_to_store_length;
+                if (!closest) {
+                    // there is no another spans till the end of device... We should store all remaining data
+                    data_to_store_length = span->getLength() - (current_offset - span->getDeviceOffset());
+                } else {
+                    // another span starts near...
+                    data_to_store_length = closest->getDeviceOffset() - current_offset;
+                }
+                data_to_store_length = std::min(span->getDeviceOffset() + span->getLength() - current_offset,
+                                                data_to_store_length);
+
+                // now replace with data span. Problem is that we can have no enough memory to keep
+                // all data in memory, so we should ask user to do something (we can't say what exactly)
+                // to remove this span - clear undo history, save another document that depends on this device
+                // data, etc.
+                bool ok = false;
+                QByteArray data_to_store;
+                try {
+                    data_to_store = write_device->read(current_offset, data_to_store_length);
+                    ok = true;
+                } catch (const std::bad_alloc &) {
+                    // not enough memory
+                    throw;
+                }
+
+                if (!ok || qulonglong(data_to_store.length()) != data_to_store_length) {
+                    throw DocumentError("failed to save document data - some data from device you want to write into "
+                                        "should be kept, but system has no enough free RAM to do it. Try clearing "
+                                        "undo history, or save another document that depends on data from this device.");
+                }
+
+                replacement.append(std::make_shared<DataSpan>(data_to_store));
+            } else {
+                // part of data is kept by another span that will remain in new device.
+                // choose span that keeps more data.
+                std::shared_ptr<PrimitiveDeviceSpan> choosen = hitted.first();
+                qulonglong offset = current_offset - choosen->getDeviceOffset();
+
+                replacement.append(write_device->createSpan(new_span_positions[choosen] + offset,
+                                                            choosen->getLength() - offset));
+            }
+            current_offset += replacement.last()->getLength();
         }
+        span->prepareToDissolve(replacement);
+        spans_to_dissolve.append(span);
     }
 
     return spans_to_dissolve;
@@ -763,7 +761,7 @@ QString AbstractUndoAction::getTitle()const {
 }
 
 std::shared_ptr<ComplexAction> AbstractUndoAction::getParentAction() const {
-    return std::shared_ptr<ComplexAction>(_parentAction);
+    return _parentAction.lock();
 }
 
 void AbstractUndoAction::setParentAction(const std::shared_ptr<ComplexAction> &action) {

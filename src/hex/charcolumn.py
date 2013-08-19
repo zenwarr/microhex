@@ -1,42 +1,46 @@
 from PyQt4.QtGui import QRawFont, QFont, QValidator, QWidget, QComboBox, QFormLayout, QSpinBox, QSizePolicy
 from PyQt4.QtCore import Qt
-import hex.hexwidget as hexwidget
+import unicodedata
+import hex.models as models
 import hex.encodings as encodings
 import hex.columnproviders as columnproviders
 import hex.utils as utils
 import hex.documents as documents
 
 
-class CharColumnModel(hexwidget.ColumnModel):
+blocked_categories = ('Cc', 'Cf', 'Cn', 'Co', 'Cs', 'Lm', 'Mc', 'Zl', 'Zp')
+
+
+class CharColumnModel(models.RegularColumnModel):
     """This column displays data as characters in one of possible encodings.
     """
 
     ReplacementCharacter = '·'
 
     def __init__(self, document, codec, render_font, bytes_on_row=16):
-        hexwidget.ColumnModel.__init__(self, document)
-
         self.codec = codec
-        self.bytesOnRow = bytes_on_row
+        self._bytesOnRow = bytes_on_row
         self._renderFont = QRawFont.fromFont(render_font)
-        self._rowCount = 0
-        self._editingIndex = None
+        models.RegularColumnModel.__init__(self, document, delegate_type=CharColumnEditDelegate)
         self.reset()
 
     @property
-    def regularCellDataSize(self):
+    def regularDataSize(self):
         return self.codec.unitSize
 
     @property
     def regularColumnCount(self):
-        return self.bytesOnRow // self.codec.unitSize
+        return self._bytesOnRow // self.codec.unitSize
+
+    @property
+    def defaultInsertMode(self):
+        return False
 
     def reset(self):
         # number of bytes on row should be multiplier of codec.unitSize
-        if self.bytesOnRow % self.codec.unitSize:
+        if self._bytesOnRow % self.codec.unitSize:
             raise ValueError('number of bytes on row should be multiplier of encoding unit size')
-        self._updateRowCount()
-        hexwidget.ColumnModel.reset(self)
+        models.ColumnModel.reset(self)
 
     @property
     def renderFont(self):
@@ -47,162 +51,52 @@ class CharColumnModel(hexwidget.ColumnModel):
         if isinstance(new_font, QFont):
             new_font = QRawFont.fromFont(new_font)
         self._renderFont = new_font
-        self.modelReset.emit()
+        self.reset()
 
-    def _updateRowCount(self):
-        self._rowCount = len(self.document) // self.bytesOnRow + bool(len(self.document) % self.bytesOnRow)
-
-    def rowCount(self):
-        return -1
-
-    def columnCount(self, row):
-        return self.bytesOnRow // self.codec.unitSize if row >= 0 else -1
-
-    def realRowCount(self):
-        return self._rowCount
-
-    def realColumnCount(self, row):
-        if row < 0:
-            return -1
-        position = row * self.bytesOnRow
-        if position >= len(self.document):
-            return 0
-        elif row + 1 == self._rowCount:
-            bytes_left = len(self.document) % self.bytesOnRow
-            if not bytes_left:
-                return self.bytesOnRow // self.codec.unitSize
-            else:
-                return bytes_left // self.codec.unitSize + bool(bytes_left % self.codec.unitSize)
-        else:
-            return self.bytesOnRow // self.codec.unitSize
-
-    def indexFromPosition(self, position):
-        return self.index(position // self.bytesOnRow,
-                         (position % self.bytesOnRow) // self.codec.unitSize)
-
-    def indexData(self, index, role=Qt.DisplayRole):
-        if not index or self.document is None:
-            return None
-
-        position = index.row * self.bytesOnRow + index.column * self.codec.unitSize
-        is_virtual = position >= len(self.document)
-
-        if role == self.DocumentPositionRole:
-            return position
-        elif role == self.DataSizeRole:
-            return self.codec.unitSize
-        elif role == self.DocumentDataRole:
-            return bytes() if is_virtual else self.document.read(position, self.codec.unitSize)
-        elif role in (Qt.DisplayRole, Qt.EditRole):
-            if is_virtual:
-                return '.' if role == Qt.DisplayRole else ''
+    def textForDocumentData(self, document_data, index, role=Qt.DisplayRole):
+        if role == Qt.DisplayRole or role == Qt.EditRole:
             try:
+                position = index.documentPosition
                 char_data = self.codec.getCharacterData(self.document, position)
                 if char_data.startPosition != position:
                     return ' '
                 else:
-                    return char_data.unicode if role == Qt.EditRole else self._translateToVisualCharacter(char_data.unicode)
+                    return self._translateToVisualCharacter(char_data.unicode)
             except encodings.EncodingError:
-                return '!' if role == Qt.DisplayRole else ''
-        return None
+                return '!' if role == Qt.DisplayRole else self.ReplacementCharacter
 
     def indexFlags(self, index):
-        flags = self.FlagEditable
-        if not self.lastRealIndex or (index.row + 1 >= self.realRowCount() and index > self.lastRealIndex):
-            flags |= self.FlagVirtual
-        else:
-            if self.document.isRangeModified(index.data(self.DocumentPositionRole), index.data(self.DataSizeRole)):
-                flags |= self.FlagModified
-
-            try:
-                d = self.codec.getCharacterData(self.document, index.data(self.DocumentPositionRole))
-            except encodings.EncodingError:
-                flags |= self.FlagBroken
+        flags = models.RegularColumnModel.indexFlags(self, index)
+        try:
+            self.codec.getCharacterData(self.document, index.documentPosition)
+        except encodings.EncodingError:
+            flags |= self.FlagBroken
         return flags
 
-    def beginEditIndex(self, index):
-        if index:
-            hexwidget.ColumnModel.beginEditIndex(self, index)
-            return True, False
-        return False, False
+    def _dataForNewIndex(self, input_text, before_index):
+        # check if input is correct
+        if input_text:
+            if self.createValidator().validate(input_text[0], 1) != QValidator.Acceptable:
+                return b'', '', -1
+            data_to_insert = self.codec.encodeString(input_text[0])
+        else:
+            data_to_insert = self.codec.encodeString('\x00')
 
-    def beginEditNewIndex(self, input_text, before_index):
-        if not self.document.fixedSize:
-            if input_text:
-                if self.createValidator().validate(input_text[0], 1)[0] == QValidator.Invalid:
-                    return hexwidget.ModelIndex(), -1, False
-                data_to_insert = self.codec.encodeString(input_text[0])
-            else:
-                data_to_insert = self.codec.encodeString('\x00')
+        return data_to_insert, input_text[0], 1
 
-            position = self.indexData(before_index, self.DocumentPositionRole)
-            self.document.insertSpan(position, documents.DataSpan(data_to_insert))
-
-            new_index = self.indexFromPosition(position)
-            hexwidget.ColumnModel.beginEditIndex(self, new_index)
-            return new_index, 1, False
-        return hexwidget.ModelIndex(), -1, False
-
-    def setIndexData(self, index, value, role=Qt.EditRole):
-        if not self.editingIndex or self.editingIndex != index or role != Qt.EditRole:
-            raise RuntimeError()
-
-        if role == Qt.EditRole:
-            position = self.indexData(index, self.DocumentPositionRole)
-            if position is None or position < 0:
-                raise ValueError('invalid position for index resolved')
-
-            raw_data = self.codec.encodeString(value)
-            current_data = self.indexData(index, self.DocumentDataRole)
-
-            if raw_data == current_data:
-                return
-
+    def _saveData(self, delegate):
+        position = delegate.index.documentPosition
+        if position is None or position < 0:
+            raise ValueError('invalid position for index resolved')
+        raw_data = self.codec.encodeString(delegate.data(Qt.EditRole))
+        current_data = delegate.index.documentData
+        if raw_data != current_data:
             self.document.writeSpan(position, documents.DataSpan(raw_data))
-        else:
-            raise ValueError('data for given role is not writeable')
-
-    def nextEditableIndex(self, from_index):
-        if not from_index:
-            return hexwidget.ModelIndex()
-
-        position = self.indexData(from_index, self.DocumentPositionRole)
-        try:
-            char_data = self.codec.getCharacterData(self.document, position)
-        except encodings.EncodingError:
-            return from_index.next
-
-        if char_data.startPosition != position:
-            return from_index.next
-        else:
-            return self.indexFromPosition(position + char_data.bytesCount)
-
-    def previousEditableIndex(self, from_index):
-        if not from_index:
-            prev_char_byte = len(self.document)
-        else:
-            try:
-                position = self.codec.findCharacterStart(self.document, from_index.data(self.DocumentPositionRole))
-                if position <= 0:
-                    return hexwidget.ModelIndex()
-                elif position != from_index.data(self.DocumentPositionRole):
-                    return from_index.previous
-            except encodings.EncodingError:
-                return from_index.previous
-            prev_char_byte = position - 1
-
-        try:
-            character_start = self.codec.findCharacterStart(self.document, prev_char_byte)
-            return self.indexFromPosition(character_start)
-        except encodings.EncodingError:
-            return self.indexFromPosition(prev_char_byte)
 
     def _translateToVisualCharacter(self, text):
-        import unicodedata
-
         result = ''
         for char in text:
-            if unicodedata.category(char) in ('Cc', 'Cf', 'Cn', 'Co', 'Cs', 'Lm', 'Mc', 'Zl', 'Zp'):
+            if unicodedata.category(char) in blocked_categories:
                 result += self.ReplacementCharacter
             elif not self._renderFont.supportsCharacter(char):
                 result += self.ReplacementCharacter
@@ -214,20 +108,51 @@ class CharColumnModel(hexwidget.ColumnModel):
     def preferSpaced(self):
         return False
 
-    @property
-    def regular(self):
-        return True
-
-    def _onDocumentDataChanged(self, start, length):
-        length = length if length >= 0 else len(self.document) - start
-        self.dataChanged.emit(self.indexFromPosition(start), self.indexFromPosition(start + length - 1))
-
-    def _onDocumentDataResized(self, new_size):
-        self._updateRowCount()
-        self.dataResized.emit(self.lastRealIndex)
-
     def createValidator(self):
         return CharColumnValidator(self.codec)
+
+
+class CharColumnEditDelegate(models.StandardEditDelegate):
+    @property
+    def nextEditIndex(self):
+        if not self.index:
+            return models.ModelIndex()
+
+        codec = self.index.model.codec
+        document = self.index.model.document
+        position = self.index.documentPosition
+        try:
+            char_data = codec.getCharacterData(document, position)
+        except encodings.EncodingError:
+            return self.index.next
+
+        if char_data.startPosition != position:
+            return self.index.next
+        else:
+            return self.index.model.indexFromPosition(position + char_data.bytesCount)
+
+    @property
+    def previousEditIndex(self):
+        if not self.index:
+            return models.ModelIndex()
+
+        codec = self.index.model.codec
+        document = self.index.model.document
+        try:
+            position = codec.findCharacterStart(document, self.index.documentPosition)
+            if position <= 0:
+                return models.ModelIndex()
+            elif position != self.index.documentPosition:
+                return self.index.previous
+        except encodings.EncodingError:
+            return self.index.previous
+        prev_char_byte = position - 1
+
+        try:
+            character_start = codec.findCharacterStart(document, prev_char_byte)
+            return self.index.model.indexFromPosition(character_start)
+        except encodings.EncodingError:
+            return self.index.model.indexFromPosition(prev_char_byte)
 
 
 class CharColumnValidator(QValidator):
@@ -235,10 +160,10 @@ class CharColumnValidator(QValidator):
         QValidator.__init__(self)
         self.codec = codec
 
-    def validate(self, text, cursor_pos, original_text=None):
+    def validate(self, text, cursor_pos):
         if not text:
-            return self.Intermediate, text, None
-        return (self.Acceptable if self.codec.canEncode(text) and len(text) == 1 else self.Invalid), text, None
+            return self.Intermediate
+        return self.Acceptable if self.codec.canEncode(text) and len(text) == 1 else self.Invalid
 
 
 class CharColumnProvider(columnproviders.AbstractColumnProvider):
@@ -288,5 +213,5 @@ class CharColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConfi
 
     def saveToColumn(self, column):
         column.codec = encodings.getCodec(self.cmbEncoding.currentText())
-        column.bytesOnRow = self.spnBytesOnRow.value()
+        column._bytesOnRow = self.spnBytesOnRow.value()
         column.reset()

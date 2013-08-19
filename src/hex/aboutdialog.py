@@ -8,23 +8,23 @@ class AboutDialog(QDialog):
     def __init__(self, parent=None):
         QDialog.__init__(self, parent)
 
-        self.resize(500, 500)
+        self.setFixedSize(500, 500)
         self.setWindowTitle(utils.tr('About MicroHex'))
 
         layout = QVBoxLayout(self)
 
         self.label = QLabel(self)
         self.label.setTextFormat(Qt.RichText)
-        self.label.setText(utils.tr('MicroHex version {0}, (c) 2013 zenwarr<br>'
-                            '<a href="https://github.com/zenwarr/microhex">https://github.com/zenwarr/microhex</a>')
-                            .format(QCoreApplication.applicationVersion()))
+        self.label.setText(utils.tr('MicroHex version {0}, (c) 2013 zenwarr<br><a href="{1}">{1}</a>')
+                                    .format(QCoreApplication.applicationVersion(), QCoreApplication.organizationDomain()))
+        self.label.setOpenExternalLinks(True)
 
         self.tabWidget = QTabWidget(self)
         self.copyingText = QTextBrowser(self)
-        self.copyingText.setOpenLinks(False)
+        self.copyingText.setOpenExternalLinks(True)
         self.tabWidget.addTab(self.copyingText, utils.tr('License'))
         self.creditsText = QTextBrowser(self)
-        self.creditsText.setOpenLinks(False)
+        self.creditsText.setOpenExternalLinks(True)
         self.tabWidget.addTab(self.creditsText, utils.tr('Credits'))
 
         l_file = QFile(':/main/data/COPYING.html')
