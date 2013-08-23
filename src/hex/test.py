@@ -10,8 +10,8 @@ import hex.tests.bigintscrollbar
 def runTests():
     module_list = (
         hex.tests.integeredit,
-        # hex.tests.hexwidget,
-        # hex.tests.operations,
+        hex.tests.hexwidget,
+        hex.tests.operations,
         hex.tests.hexcolumn,
         hex.tests.charcolumn,
         hex.tests.bigintscrollbar,

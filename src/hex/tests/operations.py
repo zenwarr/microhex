@@ -84,6 +84,7 @@ class TestOperation(unittest.TestCase):
                                                  ('warning', logging.WARNING)])
 
             op.setProgress(20)
+            self.assertEqual(op.state.progress, 20)
 
             with globalOperationContext().newOperation('sub-operation', progress_weight=40) as subop:
                 subop.setCanPause(True)   # parent -> True

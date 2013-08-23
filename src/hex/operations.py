@@ -459,7 +459,7 @@ class Operation(QObject):
     def setProgress(self, new_progress):
         if new_progress > 100:
             raise TypeError('invalid argument :new_progress: - should not be >100')
-        if new_progress - self._state.progress >= 0.01:
+        if abs(new_progress - self._state.progress) >= 0.01:
             self._setStateAttribute('progress', new_progress)
 
     def setProgressText(self, new_progress_text):

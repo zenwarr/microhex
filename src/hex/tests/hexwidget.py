@@ -39,7 +39,7 @@ class TestHexWidget(unittest.TestCase):
         hw.selectAll()
         self.assertEqual(len(hw.selectionRanges), 1)
         self.assertEqual(hw.selectionRanges[0].startPosition, 0)
-        self.assertEqual(hw.selectionRanges[0].size, len(ed))
+        self.assertEqual(hw.selectionRanges[0].size, ed.length)
 
         r = hexwidget.DataRange(hw, charColumnModel.indexFromOffset(10), 1, hexwidget.DataRange.UnitCells,
                                 hexwidget.DataRange.BoundToData)
@@ -59,27 +59,5 @@ class TestHexWidget(unittest.TestCase):
         self.assertEqual(index.data(Qt.EditRole), '+3231')
         self.assertEqual(index.data(hexwidget.ColumnModel.DocumentPositionRole), 10)
         self.assertEqual(index.data(hexwidget.ColumnModel.DataSizeRole), 2)
-
-        hw.beginEditIndex()
-        self.assertEqual(hw.editingIndex, index)
-        QTest.keyClick(hw.view, Qt.Key_Escape)
-        self.assertFalse(hw.editingIndex)
-        self.assertEqual(index.data(), ' 3231')
-
-        hw.beginEditIndex()
-        QTest.keyClicks(hw.view, 'f')
-        self.assertEqual(hw.editingIndex, hexColumnModel.indexFromPosition(10))
-        self.assertEqual(hw.editingIndex.data(), '+3231')  # index value will remain the same, because +f321 is invalid
-        QTest.keyClick(hw.view, Qt.Key_Enter)
-        self.assertFalse(hw.editingIndex)
-        self.assertEqual(hexColumnModel.indexFromPosition(10).data(), ' 3231')
-
-        hw.beginEditIndex()
-        QTest.keyClicks(hw.view, '0')
-        self.assertEqual(hw.editingIndex, hexColumnModel.indexFromPosition(10))
-        self.assertEqual(hw.editingIndex.data(), '+0231')
-        QTest.keyClick(hw.view, Qt.Key_Enter)
-        self.assertFalse(hw.editingIndex)
-        self.assertEqual(hexColumnModel.indexFromPosition(10).data(), '  231') # no padding on column, btw)
 
         hw.deleteLater()
