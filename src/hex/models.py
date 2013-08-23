@@ -1,4 +1,5 @@
 import struct
+import math
 from PyQt4.QtCore import Qt, QObject, pyqtSignal, QEvent
 from PyQt4.QtGui import QValidator
 import hex.utils as utils
@@ -589,6 +590,8 @@ class RegularColumnModel(ColumnModel):
         return utils.MaximalPosition // self.bytesOnRow + 1
 
     def columnCount(self, row):
+        if row + 1 == self.rowCount():
+            return math.ceil(((utils.MaximalPosition + 1) % self.bytesOnRow) / self.regularDataSize)
         return self.regularColumnCount if self.hasRow(row) else -1
 
     def realRowCount(self):
