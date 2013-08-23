@@ -1,0 +1,7 @@
+1. There is bug in sip (or PyQt, or both) due to which integer values are processed incorrectly - positive
+   values that are too big for int are trimmed and treated as negative (even if C++ type is unsigned).
+   This behaviour affects values returned from __len__ attribute implementation generated for wrapped C++ code
+   as well as Python values that are passed through signals. Fortunately, values returned from wrapped C++
+   function or plain variables are not affected (values from signal that was emitted in C++ are correct too).
+   Workaround is not to use __len__ in sip, and replace 'int' with 'object' in calls to pyqtSignal if integer
+   value can be too big.

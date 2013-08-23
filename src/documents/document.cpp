@@ -199,6 +199,7 @@ Document::Document(const std::shared_ptr<AbstractDevice> &device) : _spanChain(s
     _undoDisabled(false), _fixedSize(false), _readOnly(false), _currentAtomicOperationIndex(),
     _savepoint(), _lock(std::make_shared<ReadWriteLock>()) {
 
+    _rootAction = _currentUndoAction;
     _device = device;
     if (_device) {
         ReadLocker dlocker(_device->getLock());

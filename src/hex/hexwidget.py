@@ -209,6 +209,7 @@ class TextDocumentBackend(ColumnDocumentBackend):
             if block.isValid():
                 cursor = QTextCursor(block)
                 cursor.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+                cursor.removeSelectedText()
                 cursor.insertHtml(row_data.html)
 
                 self.documentUpdated.emit()
@@ -868,7 +869,7 @@ class HexWidget(QWidget):
     MethodShowBottom, MethodShowTop, MethodShowCenter = range(3)
 
     def __init__(self, parent, document):
-        from hex.floatscrollbar import LargeScrollBar
+        from hex.bigintscrollbar import BigIntScrollBar
 
         QWidget.__init__(self, parent)
 
@@ -881,10 +882,11 @@ class HexWidget(QWidget):
 
         self.view = QWidget(self)
         self.view.installEventFilter(self)
+        self.view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setFocusProxy(self.view)
 
-        self.vScrollBar = LargeScrollBar(Qt.Vertical, self)
-        self.vScrollBar.valueChangedLarge.connect(self._onVScroll)
+        self.vScrollBar = BigIntScrollBar(Qt.Vertical, self)
+        self.vScrollBar.valueChanged.connect(self._onVScroll)
 
         self.hScrollBar = QScrollBar(Qt.Horizontal, self)
         self.hScrollBar.valueChanged.connect(self._onHScroll)
@@ -1005,7 +1007,7 @@ class HexWidget(QWidget):
     def caretPosition(self, new_pos):
         """If widget is in edit mode and caret index in leading column is changed, changes are saved.
         """
-        if self.caretPosition != new_pos:
+        if self.caretPosition != new_pos and self.caretPosition <= utils.MaximalPosition:
             # if we are in edit mode, we should end editing of index if caret index was changed. Note that
             # caret index in column being edited can stay the same even if caret position was changed.
 
@@ -1249,10 +1251,10 @@ class HexWidget(QWidget):
         if should_show:
             lc = self._leadingColumn
             max_value = max(lc.dataModel.realRowCount() - 1, lc.firstVisibleRow)
-            self.vScrollBar.setRangeLarge(0, max_value)
-            self.vScrollBar.setPageStepLarge(lc.visibleRows)
+            self.vScrollBar.maximum = max_value
+            self.vScrollBar.pageStep = lc.visibleRows
             # self.vScrollBar.setSingleStepLarge(1)
-            self.vScrollBar.setValueLarge(lc.firstVisibleRow)
+            self.vScrollBar.value = lc.firstVisibleRow
         self.vScrollBar.setVisible(should_show)
 
         should_show = self._shouldShowHScroll
@@ -1284,7 +1286,7 @@ class HexWidget(QWidget):
 
     def _onVScroll(self, value):
         if self._leadingColumn is not None:
-            if int(value) != self._leadingColumn.firstVisibleRow:
+            if value != self._leadingColumn.firstVisibleRow:
                 self.scrollToLeadingColumnRow(int(value))
 
     def _onHScroll(self, value):
@@ -1613,7 +1615,7 @@ class HexWidget(QWidget):
                         if self._selectStartColumn.selectionProxy is not None:
                             proxy = self._selectStartColumn.selectionProxy
                             selection_start = sel.startPosition
-                            selection_end = min(len(self.document) - 1, selection_start + sel.size - 1)
+                            selection_end = min(self.document.length - 1, selection_start + sel.size - 1)
                             sel = self.selectionBetweenIndexes(proxy.dataModel.indexFromPosition(selection_start),
                                                                proxy.dataModel.indexFromPosition(selection_end))
                         selections = [sel]
@@ -2135,7 +2137,7 @@ class DataRange(QObject):
     BoundToData, BoundToPosition = range(2)
 
     moved = pyqtSignal(object, object)
-    resized = pyqtSignal(int, int)
+    resized = pyqtSignal(object, object)
     updated = pyqtSignal()
 
     def __init__(self, hexwidget, start=-1, length=0, unit=UnitBytes, bound_to=BoundToData):
@@ -2230,7 +2232,7 @@ class DataRange(QObject):
                 last_pos = last_index.data(ColumnModel.DocumentPositionRole) + last_index.data(ColumnModel.DataSizeRole)
                 return last_pos - first_index.data(ColumnModel.DocumentPositionRole)
             elif first_index:
-                return len(self._model.document) - first_index.data(ColumnModel.DocumentPositionRole)
+                return self._model.document.length - first_index.data(ColumnModel.DocumentPositionRole)
         return 0
 
     def _onInserted(self, start, length):

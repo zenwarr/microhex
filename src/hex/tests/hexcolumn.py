@@ -18,7 +18,7 @@ class HexColumnTest(unittest.TestCase):
         model = HexColumnModel(doc, valuecodecs.IntegerCodec(signed=False),
                                formatters.IntegerFormatter(base=16, padding=2))
         formatter = formatters.IntegerFormatter(base=16, padding=2)
-        self.assertEqual(model.rowCount(), math.ceil((utils.MaximalPosition + 1) / 16))
+        self.assertEqual(model.rowCount(), utils.MaximalPosition // model.bytesOnRow + 1)
         index = model.firstIndex
         index_count = 0
         while index and not index.virtual:
@@ -78,12 +78,12 @@ class HexColumnTest(unittest.TestCase):
         self.assertEqual(delegate.data(), 'ff')
 
         delegate = model.delegateForNewIndex('f', model.index(0, 10))
-        self.assertEqual(len(model.document), 257)
+        self.assertEqual(model.document.length, 257)
         self.assertEqual(delegate.data(), 'f0')
         delegate.end(save=False)
-        self.assertEqual(len(model.document), 256)
+        self.assertEqual(model.document.length, 256)
 
         delegate = model.delegateForNewIndex('z', model.index(0, 10))
         self.assertIsNone(delegate)
-        self.assertEqual(len(model.document), 256)
+        self.assertEqual(model.document.length, 256)
 

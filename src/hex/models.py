@@ -1,5 +1,4 @@
 import struct
-import math
 from PyQt4.QtCore import Qt, QObject, pyqtSignal, QEvent
 from PyQt4.QtGui import QValidator
 import hex.utils as utils
@@ -304,7 +303,7 @@ class StandardEditDelegate(QObject):
     def end(self, save) -> None:
         """Called by HexWidget before it finishes editing of index. If :save: is False, delegate should
         correctly cancel all changes made to model. Default implementation removes index if it was inserted."""
-        if save and self.modified:
+        if save and (self.modified or self.index.virtual):
             self.index.model._saveData(self)
         elif self.isInserted:
             self.index.model.removeIndex(self.index)
@@ -442,8 +441,8 @@ class StandardEditDelegate(QObject):
 class ColumnModel(AbstractModel):
     dataChanged = pyqtSignal(ModelIndex, ModelIndex)  # first argument is first changed index, second is last one
     dataResized = pyqtSignal(ModelIndex)              # argument is new last real index
-    indexesInserted = pyqtSignal(ModelIndex, int)     # first argument is first inserted index
-    indexesRemoved = pyqtSignal(ModelIndex, int)      # first argument is index BEFORE which indexes was removed, or
+    indexesInserted = pyqtSignal(ModelIndex, object)     # first argument is first inserted index
+    indexesRemoved = pyqtSignal(ModelIndex, object)      # first argument is index BEFORE which indexes was removed, or
                                                       # ModelIndex() if indexes was removed from model beginning
     modelReset = pyqtSignal()                         # emitted when model is resetted
     headerDataChanged = pyqtSignal()
@@ -552,10 +551,7 @@ class ColumnModel(AbstractModel):
 class RegularColumnModel(ColumnModel):
     def __init__(self, document, delegate_type=StandardEditDelegate):
         ColumnModel.__init__(self, document)
-        self._realRowCount = 0
-        self._rowCount = 0
         self._delegateType = delegate_type
-        self._updateRowCount()
 
     @property
     def regularDataSize(self) -> int:
@@ -587,17 +583,19 @@ class RegularColumnModel(ColumnModel):
         raise NotImplementedError()
 
     def reset(self):
-        self._updateRowCount()
         ColumnModel.reset(self)
 
     def rowCount(self):
-        return self._rowCount
+        return utils.MaximalPosition // self.bytesOnRow + 1
 
     def columnCount(self, row):
         return self.regularColumnCount if self.hasRow(row) else -1
 
     def realRowCount(self):
-        return self._realRowCount
+        document_length = self.document.length
+        if document_length == 0:
+            return 0
+        return (document_length - 1) // self.bytesOnRow + 1
 
     @property
     def bytesOnRow(self):
@@ -606,11 +604,11 @@ class RegularColumnModel(ColumnModel):
     def realColumnCount(self, row):
         if not self.hasRow(row):
             return -1
-        elif row + 1 == self._realRowCount:
+        elif row + 1 == self.realRowCount():
             # last row in model
-            count = (len(self.document) % self.bytesOnRow) // self.regularDataSize
+            count = (self.document.length % self.bytesOnRow) // self.regularDataSize
             return count or self.regularColumnCount
-        elif row >= self._realRowCount:
+        elif row >= self.realRowCount():
             return 0
         else:
             return self.regularColumnCount
@@ -634,7 +632,7 @@ class RegularColumnModel(ColumnModel):
         elif role == self.DataSizeRole:
             return self.regularDataSize
 
-        if document_position >= len(self.document):
+        if document_position >= self.document.length:
             return self.virtualIndexData(index, role)
 
         if role == Qt.DisplayRole or role == Qt.EditRole:
@@ -659,20 +657,15 @@ class RegularColumnModel(ColumnModel):
             return formatters.IntegerFormatter(base=16).format(section * self.regularDataSize)
 
     def _onDocumentDataChanged(self, start, length):
-        length = length if length >= 0 else len(self.document) - start
+        length = length if length >= 0 else self.document.length - start
         self.dataChanged.emit(self.indexFromPosition(start), self.indexFromPosition(start + length - 1))
 
     def _onDocumentDataResized(self, new_size):
-        self._updateRowCount()
         self.dataResized.emit(self.lastRealIndex)
 
     @property
     def regular(self):
         return True
-
-    def _updateRowCount(self):
-        self._realRowCount = math.ceil(len(self.document) / self.bytesOnRow)
-        self._rowCount = math.ceil((utils.MaximalPosition + 1) / self.bytesOnRow)
 
     def delegateForIndex(self, index):
         if not self.document.readOnly and index.flags & self.FlagEditable:
@@ -681,9 +674,11 @@ class RegularColumnModel(ColumnModel):
     def delegateForNewIndex(self, input_text, before_index):
         if not self.document.readOnly and not self.document.fixedSize:
             data_to_insert, index_text, cursor_offset = self._dataForNewIndex(input_text, before_index)
-            position = before_index.data(self.DocumentPositionRole) if before_index else len(self.document)
+            position = before_index.data(self.DocumentPositionRole) if before_index else self.document.length
             if data_to_insert and position >= 0:
                 # note that length of inserted data can differ from regular data size, it is normal
+                if isinstance(data_to_insert, str):
+                    data_to_insert = bytes(data_to_insert, encoding='latin')
                 self.document.insertSpan(position, documents.DataSpan(data_to_insert))
                 new_index = self.indexFromPosition(position)
                 return self._delegateType(new_index, is_inserted=True, init_text=index_text,
@@ -760,7 +755,10 @@ class RegularValueColumnModel(RegularColumnModel):
                 raw_data = self.valuecodec.encode(self.formatter.parse(delegate.data(Qt.EditRole)))
             except (ValueError, struct.error, OverflowError):
                 return False
-            current_data = delegate.index.documentData
+            current_data = delegate.index.documentData if not delegate.index.virtual else b''
+
+            if isinstance(raw_data, str):
+                raw_data = bytes(raw_data, encoding='latin')
 
             if raw_data != current_data:
                 self.document.writeSpan(position, documents.DataSpan(raw_data))
@@ -789,7 +787,7 @@ class FrameModel(AbstractModel):
     Frame can be scrolled and resized.
     """
 
-    frameScrolled = pyqtSignal(int, int)  # first argument is new first frame row, second one is old first frame row
+    frameScrolled = pyqtSignal(object, object)  # first argument is new first frame row, second one is old first frame row
     frameResized = pyqtSignal(int, int)  # first argument is new frame size, second one is old frame size
     rowsUpdated = pyqtSignal(int, int)  # first argument is first modified frame row, second one is number of modified rows
                                 # signal is emitted for rows that has been modified (and not emitted when frame scrolled)
@@ -880,18 +878,23 @@ class FrameModel(AbstractModel):
         # check if update area lays inside frame
         if last_index.row < self._firstRow or first_index.row >= self._firstRow + self._rowCount:
             return
-        first_row = first_index.row - self._firstRow
-        self.rowsUpdated.emit(first_row, min(last_index.row - first_index.row + 1, self._rowCount - first_row))
+        first_row = max(self._firstRow, first_index.row)
+        row_count = max(0, min(last_index.row - first_row + 1, self._rowCount + self._firstRow - first_row))
+        self.rowsUpdated.emit(first_row - self._firstRow, row_count)
 
     def _onDataResized(self, new_last_index):
         # as number of rows will not be affected, the only thing this can cause is updating some indexes.
         if not new_last_index:
-            # boundary case: model has data and was cleared
+            # boundary case: model was cleared
             first_model_row = 0
+            if not self._lastSourceIndex:
+                # our frame was empty and will stay empty too: no need to do any updates
+                return
             last_model_row = self._lastSourceIndex.row
         elif not self._lastSourceIndex:
-            # boundary case: model was empty and was expanded
-            first_model_row = 0
+            if new_last_index.row < self._firstRow:
+                return
+            first_model_row = self._firstRow
             last_model_row = new_last_index.row
         else:
             first_model_row = min(self._lastSourceIndex.row, new_last_index.row)
@@ -899,9 +902,14 @@ class FrameModel(AbstractModel):
 
         self._lastSourceIndex = new_last_index
 
-        # now check if changes affect frame
-        if not (last_model_row < self._firstRow or first_model_row >= self._firstRow + self._rowCount):
-            self.rowsUpdated.emit(first_model_row - self._firstRow, last_model_row - first_model_row + 1)
+        # now determine range of rows that we should update
+        if last_model_row < self._firstRow or first_model_row >= self._firstRow + self._rowCount:
+            return
+
+        first_model_row = max(self._firstRow, first_model_row)
+        last_model_row = min(self._firstRow + self._rowCount - 1, last_model_row)
+
+        self.rowsUpdated.emit(first_model_row - self._firstRow, last_model_row - first_model_row + 1)
 
     def _onModelResetted(self):
         self.rowsUpdated.emit(0, self._rowCount)

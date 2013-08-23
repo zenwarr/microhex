@@ -4,6 +4,7 @@ import hex.tests.hexwidget
 import hex.tests.operations
 import hex.tests.hexcolumn
 import hex.tests.charcolumn
+import hex.tests.bigintscrollbar
 
 
 def runTests():
@@ -13,6 +14,7 @@ def runTests():
         # hex.tests.operations,
         hex.tests.hexcolumn,
         hex.tests.charcolumn,
+        hex.tests.bigintscrollbar,
     )
 
     for module in module_list:

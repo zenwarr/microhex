@@ -90,6 +90,8 @@ class CharColumnModel(models.RegularColumnModel):
             raise ValueError('invalid position for index resolved')
         raw_data = self.codec.encodeString(delegate.data(Qt.EditRole))
         current_data = delegate.index.documentData
+        if isinstance(raw_data, str):
+            raw_data = bytes(raw_data, encoding='latin')
         if raw_data != current_data:
             self.document.writeSpan(position, documents.DataSpan(raw_data))
 

@@ -196,6 +196,7 @@ class Settings(QObject):
                         if warningOutputRoutine is not None:
                             warningOutputRoutine('failed to copy broken settings file {0} -> {1}'.format(self.filename, new_filename))
 
+                    warningOutputRoutine('broken settings file was stored with {0} name'.format(new_filename))
                     self.__broken = False
 
                 with open(self.filename, 'w+t') as f:

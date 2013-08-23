@@ -64,7 +64,7 @@ class AbstractMatcher(operations.Operation):
                 return True
             else:
                 break
-        self.setProgress((position / len(self.document)) * 100)
+        self.setProgress((position / self.document.length) * 100)
         return False
 
     @property
@@ -86,8 +86,8 @@ class BinaryMatcher(AbstractMatcher):
         self.setProgressText(utils.tr('searching...'))
         current_position = 0
         step = 1024 * 1024
-        while current_position < len(self.document):
-            match_position, found = self._finder.findNext(current_position, len(self.document) - current_position)
+        while current_position < self.document.length:
+            match_position, found = self._finder.findNext(current_position, self.document.length - current_position)
             if found:
                 self.addResult(str(self._resultCount), Match(self.document, match_position, len(self._findWhat)))
                 current_position = match_position + 1
@@ -101,7 +101,7 @@ class BinaryMatcher(AbstractMatcher):
             if is_reversed:
                 limit = from_position
             else:
-                limit = max(0, len(self._document) - from_position)
+                limit = max(0, self._document.length - from_position)
 
         if limit == 0:
             return Match()

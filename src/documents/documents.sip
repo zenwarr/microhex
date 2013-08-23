@@ -107,7 +107,7 @@ class SharedAbstractSpan : public WrappedBase /PyName=AbstractSpan/ {
     #include "sharedwrap.h"
     %End
 public:
-    qulonglong getLength()const throw (std::exception) /__len__/;
+    qulonglong getLength()const throw (std::exception);
     QByteArray read(qulonglong offset, qulonglong length)const throw (std::exception);
 
     %Property(name=length, get=getLength)
@@ -146,7 +146,7 @@ public:
     SharedReadWriteLock getLock()const throw (std::exception);
     bool isFixedSize()const throw (std::exception);
     bool isReadOnly()const throw (std::exception);
-    qulonglong getLength()const throw (std::exception) /__len__/;
+    qulonglong getLength()const throw (std::exception);
     const LoadOptions &getLoadOptions()const throw (std::exception);
 
     QByteArray read(qulonglong position, qulonglong length)const throw (std::exception);
@@ -203,7 +203,7 @@ class SharedSpanChain : public WrappedBase /PyName=SpanChain/ {
     #include "sharedwrap.h"
     %End
 public:
-    qulonglong getLength()const throw (std::exception) /__len__/;
+    qulonglong getLength()const throw (std::exception);
     SharedReadWriteLock getLock()const throw (std::exception);
 
     QList<SharedAbstractSpan> getSpans()const throw (std::exception);
@@ -242,7 +242,7 @@ public:
     SharedAbstractDevice getDevice()const throw (std::exception);
     SharedReadWriteLock getLock()const throw (std::exception);
     QUrl getUrl()const throw (std::exception);
-    qulonglong getLength()const throw (std::exception) /__len__/;
+    qulonglong getLength()const throw (std::exception);
     bool isFixedSize()const throw (std::exception);
     void setFixedSize(bool f) throw (std::exception);
     bool isReadOnly()const throw (std::exception);

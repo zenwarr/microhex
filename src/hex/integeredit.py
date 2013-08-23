@@ -10,7 +10,7 @@ globalSettings = settings.globalSettings()
 
 
 class IntegerEdit(QAbstractSpinBox):
-    numberChanged = pyqtSignal(int)
+    numberChanged = pyqtSignal(object)
 
     def __init__(self, parent, base=16, minimum=0, maximum=-1):
         QAbstractSpinBox.__init__(self, parent)

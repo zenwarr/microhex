@@ -538,6 +538,22 @@ private slots:
         QVERIFY(!document->isModified());
     }
 
+    void test10() {
+        auto dev = deviceFromData("Lorem ipsum");
+        auto doc = std::make_shared<Document>(dev);
+        doc->writeSpan(0xfffffffffffffffe, std::make_shared<DataSpan>(QByteArray("\x00", 1)));
+        QCOMPARE(doc->getLength(), qulonglong(0xffffffffffffffff));
+        QCOMPARE(doc->read(0, 11), QByteArray("Lorem ipsum"));
+    }
+
+    void test11() {
+        auto dev = deviceFromData("Lorem ipsum");
+        auto doc = std::make_shared<Document>(dev);
+        doc->beginComplexAction();
+        doc->clear();
+        doc->endComplexAction();
+    }
+
 private:
     void testDocument(const std::shared_ptr<Document> &document, const QByteArray &real_data) {
         QCOMPARE(document->getLength(), qulonglong(real_data.length()));

@@ -89,6 +89,7 @@ protected:
     std::shared_ptr<AbstractDevice> _device;
     std::shared_ptr<SpanChain> _spanChain;
     std::shared_ptr<ComplexAction> _currentUndoAction;
+    std::shared_ptr<ComplexAction> _rootAction;
     bool _undoDisabled;
     bool _fixedSize;
     bool _readOnly;

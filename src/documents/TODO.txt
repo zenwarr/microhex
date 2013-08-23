@@ -5,7 +5,5 @@ rename freezeSize to fixedSize
 do not change document read-only flag when device read-onlyness was changed
 cover alternate branches with tests
 
-BUG: document is unrecoverable after integer overflow caused by writing into last allowed position or event simple
-     write into too big position
-BUG: crash after writing into last allowed position - 1 (without overflow)
+BUG: crash after writing into last allowed position - 1 and - 2 (without overflow)
 BUG: remove -> undo -> write -> removed bytes are marked as modified

@@ -1,7 +1,6 @@
 from PyQt4.QtCore import QCoreApplication, QByteArray, QSize
 from PyQt4.QtGui import QDialog, QFontDatabase, QColor, QIcon
 import os
-import threading
 import contextlib
 import random
 
@@ -10,7 +9,7 @@ applicationPath = ''
 guiThread = None
 testRun = False
 
-MaximalPosition = 0xffffffffffffffff
+MaximalPosition = 0xffffffffffffffff - 1
 
 
 def first(iterable, default=None):
@@ -171,3 +170,8 @@ def isNone(obj):
 
 def isClone(obj1, obj2):
     return obj1 is obj2 or (hasattr(obj1, 'isClone') and obj1.isClone(obj2)) or (hasattr(obj2, 'isClone') and obj2.isClone(obj1))
+
+
+class IntWrapper(object):
+    def __init__(self, value):
+        self.value = value

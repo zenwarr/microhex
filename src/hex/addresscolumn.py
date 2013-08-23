@@ -98,15 +98,15 @@ class AddressColumnModel(models.ColumnModel):
     def _maxLengthForSize(self, size):
         """Calculate maximal length of address text for given document size"""
         sign1 = self._baseAddress > 0
-        sign2 = self._baseAddress < len(self._linkedModel.document)
+        sign2 = self._baseAddress < self._linkedModel.document.length
         max_raw = max(abs(0 - self._baseAddress) + sign1,
-                      abs(len(self._linkedModel.document) - self._baseAddress) + sign2)
+                      abs(self._linkedModel.document.length - self._baseAddress) + sign2)
         return len(self.formatter.format(max_raw))
 
     def _updatePadding(self):
         if self.formatter is None:
             self.formatter = formatters.IntegerFormatter()
-        self.formatter.padding = self._maxLengthForSize(len(self.document))
+        self.formatter.padding = self._maxLengthForSize(self.document.length)
 
     def reset(self):
         self._updatePadding()
