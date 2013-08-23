@@ -439,7 +439,7 @@ std::shared_ptr<AbstractDevice> deviceFromUrl(const QUrl &url, const LoadOptions
     if (url.isLocalFile()) {
         QString local_file_path = url.toLocalFile();
 
-        FileLoadOptions *file_options = new FileLoadOptions;
+        std::unique_ptr<FileLoadOptions> file_options(new FileLoadOptions);
         file_options->copyBaseFrom(options);
 
         auto given_file_options = dynamic_cast<const FileLoadOptions*>(&options);
@@ -458,9 +458,9 @@ std::shared_ptr<AbstractDevice> deviceFromUrl(const QUrl &url, const LoadOptions
             throw DeviceError(QString("file %1 does not exist").arg(local_file_path));
         }
 
-        device = std::shared_ptr<FileDevice>(new FileDevice(local_file_path, file_options));
+        device = std::shared_ptr<FileDevice>(new FileDevice(local_file_path, file_options.release()));
     } else if (url.scheme().toLower() == "microdata") {
-        BufferLoadOptions *buffer_options = new BufferLoadOptions();
+        std::unique_ptr<BufferLoadOptions> buffer_options(new BufferLoadOptions());
         buffer_options->copyBaseFrom(options);
 
         auto given_buffer_options = dynamic_cast<const BufferLoadOptions*>(&options);
@@ -480,7 +480,7 @@ std::shared_ptr<AbstractDevice> deviceFromUrl(const QUrl &url, const LoadOptions
             buffer_options->freezeSize = true;
         }
 
-        device = std::shared_ptr<BufferDevice>(new BufferDevice(buffer_options));
+        device = std::shared_ptr<BufferDevice>(new BufferDevice(buffer_options.release()));
 
         // disable cache for buffers
         device->setCacheSize(0);

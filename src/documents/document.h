@@ -125,7 +125,7 @@ public:
     virtual void redo() = 0;
 
 private:
-    std::shared_ptr<Document> _document;
+    std::weak_ptr<Document> _document;
     QString _title;
     std::weak_ptr<ComplexAction> _parentAction;
 };

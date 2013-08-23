@@ -23,11 +23,17 @@ public:
     }
 
     void undo() {
-        getDocument()->_remove(_position, _chain->getLength(), true, -1);
+        auto doc = getDocument();
+        if (doc) {
+            doc->_remove(_position, _chain->getLength(), true, -1);
+        }
     }
 
     void redo() {
-        getDocument()->_insertChain(_position, _chain, 0, true, 1);
+        auto doc = getDocument();
+        if (doc) {
+            doc->_insertChain(_position, _chain, 0, true, 1);
+        }
     }
 
 private:
@@ -48,11 +54,17 @@ public:
     }
 
     void undo() {
-        getDocument()->_insertChain(_position, _chain, 0, true, -1);
+        auto doc = getDocument();
+        if (doc) {
+            doc->_insertChain(_position, _chain, 0, true, -1);
+        }
     }
 
     void redo() {
-        getDocument()->_remove(_position, _chain->getLength(), true, 1);
+        auto doc = getDocument();
+        if (doc) {
+            doc->_remove(_position, _chain->getLength(), true, 1);
+        }
     }
 
 private:
@@ -86,11 +98,15 @@ private:
     std::shared_ptr<SpanChain> _overwrittenChain, _writtenChain;
 
     void _do(bool undo) {
+        auto doc = getDocument();
+        if (!doc) {
+            return;
+        }
         int done_increment = _overwrittenChain->getLength() ? (undo ? -1 : 1) : 0;
-        getDocument()->_writeChain(_position, _overwrittenChain, 0, true, done_increment);
+        doc->_writeChain(_position, _overwrittenChain, 0, true, done_increment);
         if (_overwrittenChain->getLength() < _writtenChain->getLength()) {
             done_increment = done_increment ? 0 : (undo ? -1 : 1);
-            getDocument()->_remove(_position + _overwrittenChain->getLength(),
+            doc->_remove(_position + _overwrittenChain->getLength(),
                                    _writtenChain->getLength() - _overwrittenChain->getLength(), true, done_increment);
         }
 
@@ -754,7 +770,7 @@ AbstractUndoAction::~AbstractUndoAction() {
 }
 
 std::shared_ptr<Document> AbstractUndoAction::getDocument() {
-    return _document;
+    return _document.lock();
 }
 
 QString AbstractUndoAction::getTitle()const {
