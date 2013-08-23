@@ -423,7 +423,7 @@ bool Document::isRangeModified(qulonglong position, qulonglong length) const {
 
     if (!isModified() || position >= this->getLength()) {
         return false;
-    } else if (position + length > this->getLength()) {
+    } else if (this->getLength() - length < position) {
         length = this->getLength() - position;
     }
 
@@ -449,7 +449,7 @@ void Document::_remove(qulonglong position, qulonglong length, bool from_undo, i
 
     if (position >= this->getLength()) {
         return;
-    } else if (position + length > this->getLength()) {
+    } else if (this->getLength() - length < position) {
         length = this->getLength() - position;
     }
 

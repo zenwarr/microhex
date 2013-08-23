@@ -85,7 +85,7 @@ qulonglong PrimitiveDeviceSpan::getLength() const {
 }
 
 QByteArray PrimitiveDeviceSpan::read(qulonglong offset, qulonglong length) const {
-    if (!_isRangeValid(offset, length) || offset >= _device->getLength() || offset + length > _device->getLength()) {
+    if (!_isRangeValid(offset, length) || offset >= _device->getLength() || _device->getLength() - length < offset) {
         throw OutOfBoundsError();
     } else if (length > qulonglong(INT_MAX)) {
         throw std::overflow_error("integer overflow");

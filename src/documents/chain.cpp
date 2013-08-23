@@ -83,7 +83,7 @@ QByteArray SpanChain::read(qulonglong offset, qulonglong length) const {
 
     if (offset > _length) {
         return QByteArray();
-    } else if (offset + length > _length) {
+    } else if (_length - offset < length) {
         length = _length - offset;
     } else if (length > qulonglong(INT_MAX)) {
         throw std::overflow_error("integer overflow");
@@ -124,7 +124,7 @@ SpanList SpanChain::spansInRange(qulonglong offset, qulonglong length, qulonglon
         *right_offset = 0;
     }
 
-    if (offset + length > _length) {
+    if (_length - offset < length) {
         length = _length - offset;
     }
 
@@ -188,7 +188,7 @@ SpanList SpanChain::takeSpans(qulonglong offset, qulonglong length) {
 
     if (offset >= _length) {
         return SpanList();
-    } else if (offset + length > _length) {
+    } else if (_length - offset < length) {
         length = _length - offset;
     }
 
@@ -206,7 +206,7 @@ std::shared_ptr<SpanChain> SpanChain::takeChain(qulonglong offset, qulonglong le
 
     if (offset >= _length) {
         return std::make_shared<SpanChain>();
-    } else if (offset + length > _length) {
+    } else if (_length - offset < length) {
         length = _length - offset;
     }
 

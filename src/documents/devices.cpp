@@ -94,7 +94,7 @@ QByteArray AbstractDevice::read(qulonglong position, qulonglong length) const {
         throw std::overflow_error("integer overflow");
     } else if (!length || position >= this->getLength()) {
         return QByteArray();
-    } else if (position + length >= this->getLength()) {
+    } else if (this->getLength() - position < length) {
         length = this->getLength() - position;
     }
 
@@ -156,7 +156,7 @@ qulonglong AbstractDevice::write(qulonglong position, const QByteArray &data) {
     // writes data at :position:, overwriting existing data. Returns number of bytes actually written.
     if (isReadOnly()) {
         throw ReadOnlyError();
-    } else if (isFixedSize() && (position >= getLength() || position + data.length() > getLength())) {
+    } else if (isFixedSize() && (position >= getLength() || getLength() - data.length() < position)) {
         throw FrozenSizeError();
     }
 
@@ -202,7 +202,7 @@ QList<std::shared_ptr<PrimitiveDeviceSpan> > AbstractDevice::getSpans() const {
 
 std::shared_ptr<PrimitiveDeviceSpan> AbstractDevice::createSpan(qulonglong position, qulonglong length) {
     ReadLocker locker(_lock);
-    if (position >= getLength() || position + length > getLength()) {
+    if (position >= getLength() || getLength() - length < position) {
         throw OutOfBoundsError();
     }
     auto new_span = std::shared_ptr<PrimitiveDeviceSpan>(new PrimitiveDeviceSpan(shared_from_this(),

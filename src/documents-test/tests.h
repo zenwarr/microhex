@@ -554,6 +554,13 @@ private slots:
         doc->endComplexAction();
     }
 
+    void test12() {
+        auto doc = std::make_shared<Document>();
+        doc->writeSpan(qulonglong(0xfffffffffffffffe), std::make_shared<DataSpan>("x"));
+        QCOMPARE(doc->getLength(), qulonglong(0xffffffffffffffff));
+        QCOMPARE(doc->read(qulonglong(0xfffffffffffffffe), 2), QByteArray("x"));
+    }
+
 private:
     void testDocument(const std::shared_ptr<Document> &document, const QByteArray &real_data) {
         QCOMPARE(document->getLength(), qulonglong(real_data.length()));

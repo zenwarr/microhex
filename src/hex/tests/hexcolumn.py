@@ -31,7 +31,7 @@ class HexColumnTest(unittest.TestCase):
         self.assertEqual(index_count, 256)
 
         self.assertEqual(model.realRowCount(), 256 // 16)
-        for row_index in (0, 10, 15, 16, 0x10000000000000000 // 16 - 1):
+        for row_index in (0, 10, 15, 16, 0x10000000000000000 // 16 - 2):
             self.assertEqual(model.columnCount(row_index), 16)
             if row_index >= 16:
                 self.assertEqual(model.realColumnCount(row_index), 0)
@@ -47,6 +47,8 @@ class HexColumnTest(unittest.TestCase):
                     self.assertEqual(index.documentData, b'')
                 else:
                     self.assertEqual(index.documentData, struct.pack('B', row_index * 16 + column_index))
+
+        self.assertEqual(model.columnCount(0x10000000000000000 // 16 - 1), 15)
 
         self.assertEqual(model.realColumnCount(-1), -1)
         self.assertEqual(model.columnCount(-1), -1)
