@@ -4,6 +4,3 @@
 rename freezeSize to fixedSize
 do not change document read-only flag when device read-onlyness was changed
 cover alternate branches with tests
-
-BUG: crash after writing into last allowed position - 1 and - 2 (without overflow)
-BUG: remove -> undo -> write -> removed bytes are marked as modified

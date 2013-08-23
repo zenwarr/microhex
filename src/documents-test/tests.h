@@ -561,6 +561,15 @@ private slots:
         QCOMPARE(doc->read(qulonglong(0xfffffffffffffffe), 2), QByteArray("x"));
     }
 
+    void test13() {
+        auto dev = deviceFromData("Lorem ipsum");
+        auto doc = std::make_shared<Document>(dev);
+        doc->remove(2, 2);
+        doc->undo();
+        doc->appendSpan(std::make_shared<FillSpan>(10, 0));
+        QVERIFY(!doc->isRangeModified(2, 1));
+    }
+
 private:
     void testDocument(const std::shared_ptr<Document> &document, const QByteArray &real_data) {
         QCOMPARE(document->getLength(), qulonglong(real_data.length()));

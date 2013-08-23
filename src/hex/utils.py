@@ -171,7 +171,3 @@ def isNone(obj):
 def isClone(obj1, obj2):
     return obj1 is obj2 or (hasattr(obj1, 'isClone') and obj1.isClone(obj2)) or (hasattr(obj2, 'isClone') and obj2.isClone(obj1))
 
-
-class IntWrapper(object):
-    def __init__(self, value):
-        self.value = value

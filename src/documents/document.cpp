@@ -469,7 +469,7 @@ void Document::_remove(qulonglong position, qulonglong length, bool from_undo, i
         length = this->getLength() - position;
     }
 
-    auto removed = SpanChain::fromSpans(_spanChain->takeSpans(position, length));
+    auto removed = _spanChain->takeChain(position, length);
 
     _incrementAtomicOperationIndex(op_increment);
     _spanChain->remove(position, length);
