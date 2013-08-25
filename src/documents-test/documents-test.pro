@@ -1,8 +1,17 @@
-QT       += core testlib
+QT       = core gui testlib
+CONFIG -= debug_and_release debug_and_release_target
 
 TARGET = documents-test
 CONFIG   += console qtestlib
 TEMPLATE = app
+
+*g++* {
+    QMAKE_CXXFLAGS += -std=c++0x
+}
+
+DESTDIR = ../documents
+
+INCLUDEPATH += ../documents/
 
 SOURCES += main.cpp \
     ../documents/spans.cpp \
@@ -30,10 +39,3 @@ HEADERS += \
 OTHER_FILES += \
     ../documents/TODO.txt
 
-INCLUDEPATH += ../documents/
-
-*g++* {
-    QMAKE_CXXFLAGS += -std=c++0x
-}
-
-DESTDIR = ../documents

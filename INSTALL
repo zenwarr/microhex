@@ -1,16 +1,25 @@
-Ensure that Python 3.3 or greater and PyQt4 (based on Qt 4.8 or greater, but not Qt5) is installed
-on your system. On Linux, you should refer to distribution manuals to find out which packages are
-required (for example, on Ubuntu you should install python3 and python3-pyqt4 packages).
-If Windows is your OS of choice, you can download Python from official site:
-    http://python.org/download
-and PyQt from here:
-    http://www.riverbankcomputing.co.uk/software/pyqt/download
+Before building application, make sure that all required programs and components are installed on you
+system. Currently Microhex requires:
+    - Python version 3.2 or greater (http://python.org/download)
+    - Qt version 4.8.x or greater (http://qt-project.org/downloads)
+    - PyQt (based on Qt 4.8 or greater, but not Qt 5.x) (http://www.riverbankcomputing.co.uk/software/pyqt/download)
+    - gcc or MinGW C++ compiler with support for C++11 standard (g++ version 4.6 or greater)
+      (http://sourceforge.net/projects/mingw)
+    - SIP bindings generator (http://www.riverbankcomputing.co.uk/software/sip/download)
 
-After all requirements are met, go to "src" subdirectory of Microhex and run the following command in terminal:
-    python3 ./build.py ./
+Next step is to set proper values in config.pri file. Beware of installing application into /usr/bin (or another
+system directory) as it can lead to problems when you want to uninstall software. Instead of this, use a package
+manager (if you are reading this text in far future and i had made package for your favourite distro ;) ) or install
+Microhex into your profile directory and create soft link in /usr/bin pointing to installed microhex.py.
 
-Now you can run Microhex application with:
-    python3 ./run.py
+And final step. Open a console in source root directory and type commands:
+    mkdir build && cd build
+    qmake ..
+    make install
+Depending on configuration, last command may be different (for example, mingw32-make when you are using MinGW).
 
-On some system you will need to replace "python3" with "python" or another name, depending on Python
-configuration.
+After all, you can start Microhex by command executed in installation directory:
+    python3 ./microhex.py
+or double-clicking on microhex.py icon if you are using Windows and .py files are associated with Python 3.x
+interpreter.
+
