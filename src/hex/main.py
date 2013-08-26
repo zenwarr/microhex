@@ -88,7 +88,7 @@ class GarbageCollector(object):
         gc.disable()
         self.timer = QTimer()
         self.timer.timeout.connect(self._doCollect)
-        self.timer.start(5000)
+        self.timer.start(1000)
 
     def _doCollect(self):
         gc.collect()

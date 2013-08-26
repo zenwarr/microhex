@@ -380,6 +380,7 @@ class MainWindow(QMainWindow):
 
         self.tabsWidget.removeTab(tab_index)
         self.subWidgets = [w for w in self.subWidgets if w is not subWidget]
+        subWidget.setParent(None)
         return True
 
     def openFileDialog(self):
