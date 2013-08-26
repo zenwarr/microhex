@@ -96,6 +96,8 @@ class BinaryMatcher(AbstractMatcher):
 
             self._updateState(current_position)
 
+        self.setProgressText(utils.tr('search completed: {0} matches found').format(len(self.allMatches)))
+
     def _doFind(self, from_position, limit, is_reversed):
         if limit is None:
             if is_reversed:

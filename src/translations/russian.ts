@@ -246,92 +246,92 @@
         <translation>не удалось сохранить настройки: {0}</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="235"/>
+        <location filename="mainwin.py" line="241"/>
         <source>File</source>
         <translation>Файл</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="93"/>
+        <location filename="mainwin.py" line="94"/>
         <source>Open file...</source>
         <translation>Открыть файл...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="107"/>
+        <location filename="mainwin.py" line="108"/>
         <source>Close</source>
         <translation>Закрыть</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="111"/>
+        <location filename="mainwin.py" line="112"/>
         <source>Exit</source>
         <translation>Выход</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="328"/>
+        <location filename="mainwin.py" line="335"/>
         <source>Edit</source>
         <translation>Правка</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="114"/>
+        <location filename="mainwin.py" line="115"/>
         <source>Undo</source>
         <translation>Отменить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="119"/>
+        <location filename="mainwin.py" line="120"/>
         <source>Redo</source>
         <translation>Повторить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="124"/>
+        <location filename="hexwidget.py" line="971"/>
         <source>Copy</source>
         <translation>Копировать</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="129"/>
+        <location filename="mainwin.py" line="135"/>
         <source>Paste</source>
         <translation>Вставить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="134"/>
+        <location filename="mainwin.py" line="140"/>
         <source>Clear selection</source>
         <translation>Убрать выделение</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="139"/>
+        <location filename="mainwin.py" line="145"/>
         <source>Select all</source>
         <translation>Выделить все</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="271"/>
+        <location filename="mainwin.py" line="278"/>
         <source>View</source>
         <translation>Вид</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="157"/>
+        <location filename="mainwin.py" line="163"/>
         <source>Show header</source>
         <translation>Показывать заголовок</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="288"/>
+        <location filename="mainwin.py" line="295"/>
         <source>?</source>
         <translation>?</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="182"/>
+        <location filename="mainwin.py" line="188"/>
         <source>About program...</source>
         <translation>О программе...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="379"/>
+        <location filename="mainwin.py" line="387"/>
         <source>Open file</source>
         <translation>Открыть файл</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="283"/>
+        <location filename="mainwin.py" line="290"/>
         <source>Tools</source>
         <translation>Инструменты</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="179"/>
+        <location filename="mainwin.py" line="185"/>
         <source>Settings...</source>
         <translation>Настройки...</translation>
     </message>
@@ -376,32 +376,32 @@
         <translation>Вы действительно хотите сбросить настройки приложения? Это действие не может быть отменено</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="144"/>
+        <location filename="mainwin.py" line="150"/>
         <source>Insert mode</source>
         <translation>Режим вставки</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="149"/>
+        <location filename="mainwin.py" line="155"/>
         <source>Remove selected</source>
         <translation>Удалить выделенное</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="153"/>
+        <location filename="mainwin.py" line="159"/>
         <source>Fill selected with zeros</source>
         <translation>Заполнить выделенное нулями</translation>
     </message>
     <message>
-        <location filename="charcolumn.py" line="174"/>
+        <location filename="charcolumn.py" line="180"/>
         <source>Character column</source>
         <translation>Колонка символов</translation>
     </message>
     <message>
-        <location filename="charcolumn.py" line="193"/>
+        <location filename="charcolumn.py" line="199"/>
         <source>Encoding:</source>
         <translation>Кодировка:</translation>
     </message>
     <message>
-        <location filename="charcolumn.py" line="205"/>
+        <location filename="charcolumn.py" line="211"/>
         <source>Bytes on row:</source>
         <translation>Байт в строке:</translation>
     </message>
@@ -481,12 +481,12 @@
         <translation type="obsolete">Колонок в строке</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="163"/>
+        <location filename="mainwin.py" line="169"/>
         <source>Setup column...</source>
         <translation>Настроить колонку...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="167"/>
+        <location filename="mainwin.py" line="173"/>
         <source>Add column...</source>
         <translation>Добавить колонку...</translation>
     </message>
@@ -546,7 +546,7 @@
         <translation>Настроить колонку {0}</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="171"/>
+        <location filename="mainwin.py" line="177"/>
         <source>Remove column</source>
         <translation>Удалить колонку</translation>
     </message>
@@ -576,7 +576,7 @@
         <translation>Положение:</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="175"/>
+        <location filename="mainwin.py" line="181"/>
         <source>Add address bar to column...</source>
         <translation>Добавить панель адреса для колонки...</translation>
     </message>
@@ -616,52 +616,52 @@
         <translation type="obsolete">начальное состояние</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="89"/>
+        <location filename="mainwin.py" line="90"/>
         <source>Create...</source>
         <translation>Создать...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="364"/>
+        <location filename="mainwin.py" line="371"/>
         <source>Save</source>
         <translation>Сохранить</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="296"/>
+        <location filename="mainwin.py" line="303"/>
         <source>Read-only</source>
         <translation>Только чтение</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="296"/>
+        <location filename="mainwin.py" line="303"/>
         <source>Read-write</source>
         <translation>Чтение и запись</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="307"/>
+        <location filename="mainwin.py" line="314"/>
         <source>Insert</source>
         <translation>Вставка</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="307"/>
+        <location filename="mainwin.py" line="314"/>
         <source>Overwrite</source>
         <translation>Перезапись</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="360"/>
+        <location filename="mainwin.py" line="367"/>
         <source>Close editor</source>
         <translation>Закрыть редактор</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="362"/>
+        <location filename="mainwin.py" line="369"/>
         <source>Document {0} has unsaved changed. Do you want to save it?</source>
         <translation>В документе {0} есть несохраненные изменения. Сохранить их?</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="365"/>
+        <location filename="mainwin.py" line="372"/>
         <source>Do not save</source>
         <translation>Не сохранять</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="425"/>
+        <location filename="mainwin.py" line="433"/>
         <source>New document</source>
         <translation>Новый документ</translation>
     </message>
@@ -671,12 +671,12 @@
         <translation type="obsolete">не удалось сохранить {0}: не все данные были записаны</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="102"/>
+        <location filename="mainwin.py" line="103"/>
         <source>Save as...</source>
         <translation>Сохранить как...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="416"/>
+        <location filename="mainwin.py" line="424"/>
         <source>Save file as</source>
         <translation>Сохранить файл как</translation>
     </message>
@@ -711,17 +711,17 @@
         <translation>зафиксировать размер загруженных документов</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="185"/>
+        <location filename="mainwin.py" line="191"/>
         <source>Increase font</source>
         <translation>Увеличить шрифт</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="189"/>
+        <location filename="mainwin.py" line="195"/>
         <source>Decrease font</source>
         <translation>Уменьшить шрифт</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="193"/>
+        <location filename="mainwin.py" line="199"/>
         <source>Reset original font size</source>
         <translation>Восстановить исходный размер шрифта</translation>
     </message>
@@ -741,12 +741,12 @@
         <translation>без диалога параметров загрузки</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="322"/>
+        <location filename="mainwin.py" line="329"/>
         <source>General</source>
         <translation>Общее</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="197"/>
+        <location filename="mainwin.py" line="203"/>
         <source>Goto...</source>
         <translation>Перейти к...</translation>
     </message>
@@ -766,12 +766,12 @@
         <translation>Закладка: {0}</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="202"/>
+        <location filename="mainwin.py" line="208"/>
         <source>Add bookmark...</source>
         <translation>Добавить закладку...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="206"/>
+        <location filename="mainwin.py" line="212"/>
         <source>Remove bookmark</source>
         <translation>Удалить закладку</translation>
     </message>
@@ -791,7 +791,7 @@
         <translation>Введите шестнадцатиричные значения, которые нужно найти:</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="629"/>
+        <location filename="mainwin.py" line="641"/>
         <source>Nothing had been found</source>
         <translation>Ничего не было найдено</translation>
     </message>
@@ -910,7 +910,7 @@
         <translation>Не все операции удалось отменить. Приложение останется запущенным.</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="230"/>
+        <location filename="mainwin.py" line="236"/>
         <source>Show operation manager...</source>
         <translation>Показать менеджер операций...</translation>
     </message>
@@ -1000,12 +1000,12 @@
         <translation type="obsolete">не удалось переместить {0} в {1}: {2}</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="396"/>
+        <location filename="mainwin.py" line="404"/>
         <source>Error opening file</source>
         <translation>Ошибка открытия файла</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="398"/>
+        <location filename="mainwin.py" line="406"/>
         <source>Failed to open file&lt;br&gt;&lt;b&gt;{0}&lt;/b&gt;&lt;br&gt;due to following error:&lt;br&gt;&lt;b&gt;{1}&lt;/b&gt;</source>
         <translation>Не удалось открыть файл&lt;br&gt;&lt;b&gt;{0}&lt;/b&gt;&lt;br&gt;из-за следующей ошибки:&lt;br&gt;&lt;b&gt;{1}&lt;/b&gt;</translation>
     </message>
@@ -1045,27 +1045,27 @@
         <translation>MicroHex версии {0}, (c) 2013 zenwarr&lt;br&gt;&lt;a href=&quot;{1}&quot;&gt;{1}&lt;/a&gt;</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="210"/>
+        <location filename="mainwin.py" line="216"/>
         <source>Find...</source>
         <translation>Найти...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="215"/>
+        <location filename="mainwin.py" line="221"/>
         <source>Find next</source>
         <translation>Найти следующее</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="220"/>
+        <location filename="mainwin.py" line="226"/>
         <source>Find previous</source>
         <translation>Найди предыдущее</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="225"/>
+        <location filename="mainwin.py" line="231"/>
         <source>Find all...</source>
         <translation>Найти все...</translation>
     </message>
     <message>
-        <location filename="mainwin.py" line="629"/>
+        <location filename="mainwin.py" line="641"/>
         <source>Find</source>
         <translation>Найти</translation>
     </message>
@@ -1128,6 +1128,41 @@
         <location filename="settingsdialog.py" line="288"/>
         <source>Value</source>
         <translation>Значение</translation>
+    </message>
+    <message>
+        <location filename="hexwidget.py" line="2001"/>
+        <source>Paste from clipboard</source>
+        <translation>Вставка из буфера обмена</translation>
+    </message>
+    <message>
+        <location filename="hexwidget.py" line="2002"/>
+        <source>Clipboard contains text data - do you want to interpret it as plain hex values (like &quot;aa bb cc&quot;) and insert raw data or insert data in format specific for current column?</source>
+        <translation type="unfinished">Буфер обмена содержит текст - интерпретировать его как hex-значения (&quot;aa bb cc&quot;) и вставить как данные, или вставить текст в специфичном для колонки формате?</translation>
+    </message>
+    <message>
+        <location filename="hexwidget.py" line="2006"/>
+        <source>As raw data</source>
+        <translation>Как данные</translation>
+    </message>
+    <message>
+        <location filename="hexwidget.py" line="2007"/>
+        <source>As text</source>
+        <translation>Как текст</translation>
+    </message>
+    <message>
+        <location filename="mainwin.py" line="125"/>
+        <source>Copy as data</source>
+        <translation>Копировать как данные</translation>
+    </message>
+    <message>
+        <location filename="mainwin.py" line="130"/>
+        <source>Copy as text</source>
+        <translation>Копировать как текст</translation>
+    </message>
+    <message>
+        <location filename="matchers.py" line="99"/>
+        <source>search completed: {0} matches found</source>
+        <translation>поиск завершен - найдено {0} совпадений</translation>
     </message>
 </context>
 </TS>
