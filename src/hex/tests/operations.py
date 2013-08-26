@@ -59,9 +59,6 @@ class TestOperation(unittest.TestCase):
             op.setProgress(100.0)
             self.assertEqual(op.state.progress, 100.0)
 
-            self.assertRaises(TypeError, op.setProgress, 120.0)
-            self.assertEqual(op.state.progress, 100.0)
-
             op.setProgressText('working')
             self.assertEqual(op.state.progressText, 'working')
 
