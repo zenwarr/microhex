@@ -1,4 +1,4 @@
-Microhex is crossplatform hex-editing software based on Python and Qt.
+Microhex is crossplatform (Windows and Linux) hex-editing software based on Python and Qt.
 
 In actual version the following features are available:
 -   loading and saving files
@@ -13,11 +13,11 @@ In actual version the following features are available:
 -   loading file in read-only and read-write mode
 -   loading very large files without memory and time overhead
 -   files can be loaded into RAM (to keep data safe from changes made by another applications) or file data fill be read only when necessary.
--   copy and paste (only data copied from Microhex yet)
+-   copy and paste
 -   undo and redo operations not limited to state where file was saved (you can undo changes even after you have saved it to disk)
 -   translation support (English and Russian translations are provided)
 -   hex view zooming (Ctrl+Wheel)
--   hex view theming (not available via GUI yet)
+-   hex view theming
 -   bookmarks
 -   search for binary values
 

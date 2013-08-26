@@ -1,4 +1,4 @@
-Before building application, make sure that all required programs and components are installed on you
+Before building application, make sure that all required programs and components are installed on your
 system. Currently Microhex requires:
     - Python version 3.2 or greater (http://python.org/download)
     - Qt version 4.8.x or greater (http://qt-project.org/downloads)
@@ -7,7 +7,8 @@ system. Currently Microhex requires:
       (http://sourceforge.net/projects/mingw)
     - SIP bindings generator (http://www.riverbankcomputing.co.uk/software/sip/download)
 
-Next step is to set proper values in config.pri file. Beware of installing application into /usr/bin (or another
+Next step is to set proper values in config.pri file.
+Note for Linux users: beware of installing application into /usr/bin (or another
 system directory) as it can lead to problems when you want to uninstall software. Instead of this, use a package
 manager (if you are reading this text in far future and i had made package for your favourite distro ;) ) or install
 Microhex into your profile directory and create soft link in /usr/bin pointing to installed microhex.py.
@@ -16,10 +17,10 @@ And final step. Open a console in source root directory and type commands:
     mkdir build && cd build
     qmake ..
     make install
-Depending on configuration, last command may be different (for example, mingw32-make when you are using MinGW).
+Depending on system configuration, last command may be different (for example, mingw32-make when you are using MinGW).
 
-After all, you can start Microhex by command executed in installation directory:
+After all, you can start Microhex by executing command in installation directory:
     python3 ./microhex.py
-or double-clicking on microhex.py icon if you are using Windows and .py files are associated with Python 3.x
+or by double-clicking on microhex.py icon if you are using Windows and .py files are associated with Python 3.x
 interpreter.
 
