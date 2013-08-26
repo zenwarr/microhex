@@ -90,6 +90,7 @@ class IntegerFormatter(object):
         return value
 
     def _undecorate(self, value):
+        value = value.lower()
         if self.style == self.StyleC:
             if self.base == 16:
                 if value.startswith('0x'):
