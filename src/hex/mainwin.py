@@ -61,6 +61,7 @@ class MainWindow(QMainWindow):
         self.buildToolbar()
 
         self.dockSearch = SearchDockWidget(self)
+        self.dockSearch.hide()
         self.addDockWidget(Qt.BottomDockWidgetArea, self.dockSearch)
 
         geom = globalQuickSettings['mainWindow.geometry']
