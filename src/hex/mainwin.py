@@ -367,7 +367,7 @@ class MainWindow(QMainWindow):
             msgbox.setWindowTitle(utils.tr('Close editor'))
             msgbox.setIcon(QMessageBox.Question)
             msgbox.setText(utils.tr('Document {0} has unsaved changed. Do you want to save it?')
-                                        .format(subWidget.title))
+                           .format(utils.htmlEscape(subWidget.title)))
             msgbox.addButton(utils.tr('Save'), QMessageBox.YesRole)
             msgbox.addButton(utils.tr('Do not save'), QMessageBox.NoRole)
             msgbox.addButton(QMessageBox.Cancel)
@@ -403,7 +403,7 @@ class MainWindow(QMainWindow):
             msgbox.setWindowTitle(utils.tr('Error opening file'))
             msgbox.setTextFormat(Qt.RichText)
             msgbox.setText(utils.tr('Failed to open file<br><b>{0}</b><br>due to following error:<br><b>{1}</b>')
-                           .format(filename, err))
+                           .format(utils.htmlEscape(filename), utils.htmlEscape(str(err))))
             msgbox.addButton(QMessageBox.Ok)
             msgbox.exec_()
             return

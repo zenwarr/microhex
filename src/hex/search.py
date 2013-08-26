@@ -1,6 +1,6 @@
 import threading
 from PyQt4.QtCore import Qt, QAbstractListModel, QModelIndex
-from PyQt4.QtGui import QVBoxLayout, QHBoxLayout, QDialogButtonBox, QLabel, QPushButton, QMessageBox, QWidget, QTreeView, \
+from PyQt4.QtGui import QVBoxLayout, QHBoxLayout, QDialogButtonBox, QLabel, QPushButton, QWidget, QTreeView, \
                         QSizePolicy, qApp
 import hex.utils as utils
 import hex.hexlineedit as hexlineedit

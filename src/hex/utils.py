@@ -4,6 +4,7 @@ import os
 import contextlib
 import random
 import re
+import html
 
 
 applicationPath = ''
@@ -179,3 +180,7 @@ _blacklisted = re.compile(r'[\\/|\?\*<>":\+]')
 def isValidFilename(filename):
     """Checks if given text is valid filename and does not contain any directory separators"""
     return re.search(_blacklisted, filename) is None
+
+
+def htmlEscape(text):
+    return html.escape(text).replace(' ', '&nbsp;')

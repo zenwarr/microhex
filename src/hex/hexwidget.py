@@ -760,8 +760,7 @@ class Column(QObject):
                 if flags & ColumnModel.FlagBroken:
                     cell_classes.append('cell-broken')
 
-                prepared_text = html.escape(index_text)
-                prepared_text = prepared_text.replace(' ', '&nbsp;')
+                prepared_text = utils.htmlEscape(index_text)
                 if cell_classes:
                     # unfortunately, HTML subset supported by Qt does not include multiclasses
                     for css_class in cell_classes:
