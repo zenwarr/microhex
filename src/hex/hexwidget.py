@@ -992,7 +992,7 @@ class HexWidget(QWidget):
         self.appendColumn(hex_column)
         self.insertColumn(address_bar, 0)
 
-        self.appendColumn(CharColumnModel(self.document, encodings.getCodec('ISO 8859-1'), self.font()))
+        self.appendColumn(CharColumnModel(self.document, encodings.getCodec('ISO-8859-1'), self.font()))
         self.appendColumn(CharColumnModel(self.document, encodings.getCodec('UTF-16le'), self.font()))
         self.leadingColumn = self._columns[1]
 

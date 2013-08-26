@@ -199,7 +199,7 @@ class CharColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConfi
         self.layout().addRow(utils.tr('Encoding:'), self.cmbEncoding)
         for encoding in sorted(encodings.encodings.keys()):
             self.cmbEncoding.addItem(encoding)
-            if column is not None and column.codec.name == encoding:
+            if column is not None and column.codec.name.lower() == encoding.lower():
                 self.cmbEncoding.setCurrentIndex(self.cmbEncoding.count() - 1)
         if column is None:
             self.cmbEncoding.setCurrentIndex(self.cmbEncoding.findText('Windows-1251'))

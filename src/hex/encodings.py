@@ -90,8 +90,8 @@ class AbstractCodec(object):
 
 class QtProxyCodec(AbstractCodec):
     """Codec that encapsulates QTextCodec class"""
-    def __init__(self, qcodec):
-        AbstractCodec.__init__(self, qcodec.name())
+    def __init__(self, qcodec, name):
+        AbstractCodec.__init__(self, name)
         self._qcodec = qcodec
 
     def canEncode(self, text):
@@ -99,8 +99,8 @@ class QtProxyCodec(AbstractCodec):
 
 
 class SingleByteEncodingCodec(QtProxyCodec):
-    def __init__(self, codec):
-        QtProxyCodec.__init__(self, codec)
+    def __init__(self, codec, name):
+        QtProxyCodec.__init__(self, codec, name)
 
     @property
     def fixedSize(self):
@@ -137,7 +137,8 @@ class SingleByteEncodingCodec(QtProxyCodec):
 
 class Utf16Codec(QtProxyCodec):
     def __init__(self, little_endian=True):
-        QtProxyCodec.__init__(self, QTextCodec.codecForName('utf-16le' if little_endian else 'utf-16be'))
+        enc_name = 'utf-16le' if little_endian else 'utf-16be'
+        QtProxyCodec.__init__(self, QTextCodec.codecForName(enc_name), enc_name)
         self.littleEndian = little_endian
 
     @property
@@ -211,7 +212,8 @@ class Utf16Codec(QtProxyCodec):
 
 class Utf32Codec(QtProxyCodec):
     def __init__(self, little_endian=True):
-        QtProxyCodec.__init__(self, QTextCodec.codecForName('utf-32le' if little_endian else 'utf-32be'))
+        enc_name = 'utf-32le' if little_endian else 'utf-32be'
+        QtProxyCodec.__init__(self, QTextCodec.codecForName(enc_name), enc_name)
         self.littleEndian = little_endian
 
     @property
@@ -250,7 +252,7 @@ class Utf32Codec(QtProxyCodec):
 
 class Utf8Codec(QtProxyCodec):
     def __init__(self):
-        QtProxyCodec.__init__(self, QTextCodec.codecForName('utf-8'))
+        QtProxyCodec.__init__(self, QTextCodec.codecForName('utf-8'), 'utf-8')
 
     @property
     def fixedSize(self):
@@ -322,20 +324,20 @@ class Utf8Codec(QtProxyCodec):
 
 
 singlebyte_encodings = (
-    'ISO 8859-1',
-    'ISO 8859-2',
-    'ISO 8859-3',
-    'ISO 8859-4',
-    'ISO 8859-5',
-    'ISO 8859-6',
-    'ISO 8859-7',
-    'ISO 8859-8',
-    'ISO 8859-9',
-    'ISO 8859-10',
-    'ISO 8859-13',
-    'ISO 8859-14',
-    'ISO 8859-15',
-    'ISO 8859-16',
+    'ISO-8859-1',
+    'ISO-8859-2',
+    'ISO-8859-3',
+    'ISO-8859-4',
+    'ISO-8859-5',
+    'ISO-8859-6',
+    'ISO-8859-7',
+    'ISO-8859-8',
+    'ISO-8859-9',
+    'ISO-8859-10',
+    'ISO-8859-13',
+    'ISO-8859-14',
+    'ISO-8859-15',
+    'ISO-8859-16',
     'Windows-1250',
     'Windows-1251',
     'Windows-1252',
@@ -365,7 +367,7 @@ encodings = {
 for encoding in singlebyte_encodings:
     qcodec = QTextCodec.codecForName(encoding)
     if qcodec is not None:
-        encodings[encoding] = SingleByteEncodingCodec(qcodec)
+        encodings[encoding] = SingleByteEncodingCodec(qcodec, encoding)
 
 
 def getCodec(name):
