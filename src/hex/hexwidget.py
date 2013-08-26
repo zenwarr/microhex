@@ -1188,13 +1188,13 @@ class HexWidget(QWidget):
         painter.setClipRect(self._absoluteToWidget(column.geometry))
         painter.translate(self._absoluteToWidget(column.geometry.topLeft()))
 
+        column.paint(pd)
+
         for bookmark in self._bookmarks:
             column.paintHighlight(pd, bookmark, True)
 
         if self._leadingColumn is column and self._emphasizeRange is not None:
             column.paintHighlight(pd, self._emphasizeRange, False)
-
-        column.paint(pd)
 
         column.paintCaret(pd, self._caretPosition, (self.editMode and self._leadingColumn is column))
 
