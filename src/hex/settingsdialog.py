@@ -209,7 +209,7 @@ class ThemeConfigurationWidget(QWidget):
             theme_name, ok = QInputDialog.getText(self, utils.tr('Copy theme'), utils.tr('Name for copy of theme:'))
             if not ok:
                 break
-            if not theme_name or hexwidget.Theme.themeFromName(theme_name) is not None:
+            if (not theme_name or hexwidget.Theme.themeFromName(theme_name) is not None or not utils.isValidFilename(theme_name)):
                 QMessageBox.information(self, utils.tr('Wrong name for theme'), utils.tr('Name for theme is invalid'))
             else:
                 break

@@ -3,6 +3,7 @@ from PyQt4.QtGui import QDialog, QFontDatabase, QColor, QIcon
 import os
 import contextlib
 import random
+import re
 
 
 applicationPath = ''
@@ -171,3 +172,10 @@ def isNone(obj):
 def isClone(obj1, obj2):
     return obj1 is obj2 or (hasattr(obj1, 'isClone') and obj1.isClone(obj2)) or (hasattr(obj2, 'isClone') and obj2.isClone(obj1))
 
+
+_blacklisted = re.compile(r'[\\/|\?\*<>":\+]')
+
+
+def isValidFilename(filename):
+    """Checks if given text is valid filename and does not contain any directory separators"""
+    return re.search(_blacklisted, filename) is None
