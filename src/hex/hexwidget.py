@@ -1363,6 +1363,7 @@ class HexWidget(QWidget):
             column.geometry.moveLeft(dx)
             dx += column.geometry.width()
 
+        self._updateScrollBars()
         self.view.update()
 
     _edit_keys = (Qt.Key_Backspace, Qt.Key_Delete)
