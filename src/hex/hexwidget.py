@@ -4,7 +4,8 @@ from PyQt4.QtGui import QColor, QFont, QFontMetricsF, QPolygonF, QWidget, QScrol
                         QPainter, QBrush, QPalette, QPen, QApplication, QRegion, QLineEdit, QValidator, \
                         QTextEdit, QTextOption, QSizePolicy, QStyle, QStyleOptionFrameV2, QTextCursor, QTextDocument, \
                         QTextBlockFormat, QPlainTextDocumentLayout, QAbstractTextDocumentLayout, QTextCharFormat, \
-                        QTextTableFormat, QRawFont, QKeyEvent, QFontDatabase, QMenu, QToolTip, QPixmap, QIcon
+                        QTextTableFormat, QRawFont, QKeyEvent, QFontDatabase, QMenu, QToolTip, QPixmap, QIcon, \
+                        QMessageBox
 import math
 import html
 import os
@@ -18,7 +19,7 @@ import hex.settings as settings
 import hex.appsettings as appsettings
 import hex.resources.qrc_main
 import hex.formatters as formatters
-from hex.models import ModelIndex, ColumnModel, FrameModel, StandardEditDelegate
+from hex.models import ModelIndex, ColumnModel, FrameModel, StandardEditDelegate, index_range
 
 
 class Theme(object):
@@ -1947,16 +1948,71 @@ class HexWidget(QWidget):
             documents.Clipboard.setData(self.document, self._selections[0].startPosition, self._selections[0].size)
 
     def copyAsText(self):
-        pass
+        if self._leadingColumn is not None and len(self._selections) and self._selections[0]:
+            selection = self._selections[0]
+            first_index = self._leadingColumn.dataModel.indexFromPosition(selection.startPosition)
+            last_index = self._leadingColumn.dataModel.indexFromPosition(selection.startPosition + selection.size - 1)
+            if first_index and last_index and last_index > first_index:
+                sep = ' ' if self._leadingColumn.spaced else ''
+
+                if first_index.column:
+                    first_row_index = self._leadingColumn.dataModel.index(first_index.row, 0)
+                    text = sep.join(' ' * len(index.data()) for index in index_range(first_row_index, first_index))
+                    text += sep
+                else:
+                    text = ''
+
+                text += sep.join('\n' * int(not index.column) + index.data() for index in index_range(first_index,
+                                                                                                      last_index,
+                                                                                                      include_last=True))
+                if text.startswith('\n'):
+                    text = text[len('\n'):]
+                text = text.replace(' \n', '\n')
+
+                QApplication.clipboard().setText(text)
 
     def pasteAsData(self):
-        pass
+        if 0 <= self.caretPosition < self._document.length:
+            chain = documents.Clipboard.getData()
+            if not utils.isNone(chain):
+                self.document.insertChain(self.caretPosition, chain)
 
     def pasteAsText(self):
-        pass
+        if self._leadingColumn is not None and not self.readOnly and not self.fixedSize and self._leadingColumn:
+            if not (0 <= self.caretPosition < self._document.length):
+                return
+            text = QApplication.clipboard().mimeData().text()
+            if text:
+                data = self._leadingColumn.dataModel.parseTextInput(text)
+                if data:
+                    self._document.insertSpan(self.caretPosition, documents.DataSpan(data))
 
     def paste(self):
-        pass
+        if 0 < self.caretPosition < self._document.length:
+            if documents.Clipboard.hasBinaryData():
+                self.pasteAsData()
+            else:
+                if not QApplication.clipboard().mimeData().hasText():
+                    return
+
+                # ask user if he want to insert this as data or text...
+                msgbox = QMessageBox(self)
+                msgbox.setWindowTitle(utils.tr('Paste from clipboard'))
+                msgbox.setText(utils.tr('Clipboard contains text data - do you want to interpret it as plain '
+                                        'hex values (like "aa bb cc") and insert raw data or insert data in '
+                                        'format specific for current column?'))
+                msgbox.setIcon(QMessageBox.Question)
+                button_as_data = msgbox.addButton(utils.tr('As raw data'), QMessageBox.AcceptRole)
+                button_as_text = msgbox.addButton(utils.tr('As text'), QMessageBox.AcceptRole)
+                msgbox.addButton(QMessageBox.Cancel)
+                msgbox.setDefaultButton(QMessageBox.Cancel)
+                if msgbox.exec_() == QMessageBox.Accepted:
+                    if msgbox.standardButton(msgbox.clickedButton()) == QMessageBox.Cancel:
+                        return
+                    if msgbox.clickedButton() is button_as_data:
+                        self.pasteAsData()
+                    else:
+                        self.pasteAsText()
 
     def undo(self):
         try:

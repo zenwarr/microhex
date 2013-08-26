@@ -394,6 +394,10 @@ inline bool sharedHasMicrohexData() {
     return hasMicrohexData();
 }
 
+inline bool sharedHasBinaryData() {
+    return hasBinaryData();
+}
+
 }
 
 #endif

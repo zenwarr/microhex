@@ -548,6 +548,9 @@ class ColumnModel(AbstractModel):
         None, all values will be considered valid."""
         return None
 
+    def parseTextInput(self, text):
+        raise NotImplementedError()
+
 
 class RegularColumnModel(ColumnModel):
     def __init__(self, document, delegate_type=StandardEditDelegate):
@@ -766,6 +769,12 @@ class RegularValueColumnModel(RegularColumnModel):
             if raw_data != current_data:
                 self.document.writeSpan(position, documents.DataSpan(raw_data))
             return True
+
+    def parseTextInput(self, text):
+        try:
+            return b''.join(self.valuecodec.encode(self.formatter.parse(part)) for part in text.split())
+        except (ValueError, struct.error):
+            return b''
 
 
 def index_range(start_index, end_index, include_last=False):

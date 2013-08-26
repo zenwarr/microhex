@@ -121,10 +121,15 @@ class MainWindow(QMainWindow):
         self.actionRedo.setShortcut(QKeySequence('Ctrl+Y'))
         self.actionRedo.triggered.connect(self.redo)
 
-        self.actionCopy = ObservingAction(getIcon('edit-copy'), utils.tr('Copy'),
-                                          PropertyObserver(self, 'activeSubWidget.hexWidget'))
-        self.actionCopy.setShortcut(QKeySequence('Ctrl+C'))
-        self.actionCopy.triggered.connect(self.copy)
+        self.actionCopyAsData = ObservingAction(getIcon('edit-copy'), utils.tr('Copy as data'),
+                                                PropertyObserver(self, 'activeSubWidget.hexWidget'))
+        self.actionCopyAsData.setShortcut(QKeySequence('Ctrl+C'))
+        self.actionCopyAsData.triggered.connect(self.copyAsData)
+
+        self.actionCopyAsText = ObservingAction(QIcon(), utils.tr('Copy as text'),
+                                                PropertyObserver(self, 'activeSubWidget.hexWidget'))
+        self.actionCopyAsText.setShortcut(QKeySequence('Ctrl+Shift+C'))
+        self.actionCopyAsText.triggered.connect(self.copyAsText)
 
         self.actionPaste = ObservingAction(getIcon('edit-paste'), utils.tr('Paste'),
                                            PropertyObserver(self, 'activeSubWidget.hexWidget'))
@@ -247,7 +252,8 @@ class MainWindow(QMainWindow):
         self.editMenu.addAction(self.actionUndo)
         self.editMenu.addAction(self.actionRedo)
         self.editMenu.addSeparator()
-        self.editMenu.addAction(self.actionCopy)
+        self.editMenu.addAction(self.actionCopyAsData)
+        self.editMenu.addAction(self.actionCopyAsText)
         self.editMenu.addAction(self.actionPaste)
         self.editMenu.addSeparator()
         self.editMenu.addAction(self.actionClearSelection)
@@ -329,7 +335,7 @@ class MainWindow(QMainWindow):
         self.editToolBar.setObjectName('toolbar_edit')
         self.editToolBar.addAction(self.actionUndo)
         self.editToolBar.addAction(self.actionRedo)
-        self.editToolBar.addAction(self.actionCopy)
+        self.editToolBar.addAction(self.actionCopyAsData)
         self.editToolBar.addAction(self.actionPaste)
         self.editToolBar.addAction(self.actionFind)
 
@@ -484,8 +490,12 @@ class MainWindow(QMainWindow):
         self.activeSubWidget.hexWidget.selectAll()
 
     @forActiveWidget
-    def copy(self):
-        self.activeSubWidget.hexWidget.copy()
+    def copyAsData(self):
+        self.activeSubWidget.hexWidget.copyAsData()
+
+    @forActiveWidget
+    def copyAsText(self):
+        self.activeSubWidget.hexWidget.copyAsText()
 
     @forActiveWidget
     def paste(self):

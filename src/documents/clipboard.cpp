@@ -155,3 +155,14 @@ bool Clipboard::hasMicrohexData() {
     const QMimeData *data = QApplication::clipboard()->mimeData();
     return data->hasFormat(MicrohexDataMimeType) && data->hasFormat(MicrohexMarkMimeType);
 }
+
+
+bool Clipboard::hasBinaryData() {
+    if (!Clipboard::hasMicrohexData()) {
+        const QMimeData *data = QApplication::clipboard()->mimeData();
+        if (!data->hasFormat(OctetStreamMimeType)) {
+            return false;
+        }
+    }
+    return true;
+}

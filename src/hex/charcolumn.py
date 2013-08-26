@@ -113,6 +113,12 @@ class CharColumnModel(models.RegularColumnModel):
     def createValidator(self):
         return CharColumnValidator(self.codec)
 
+    def parseTextInput(self, text):
+        try:
+            return self.codec.encodeString(text)
+        except encodings.EncodingError:
+            return b''
+
 
 class CharColumnEditDelegate(models.StandardEditDelegate):
     @property

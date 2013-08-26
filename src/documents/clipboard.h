@@ -12,6 +12,7 @@ namespace Clipboard {
 void setData(const std::shared_ptr<const Document> &document, qulonglong position, qulonglong length);
 std::shared_ptr<SpanChain> getData();
 bool hasMicrohexData();
+bool hasBinaryData();
 
 }
 

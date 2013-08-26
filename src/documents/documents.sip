@@ -325,5 +325,6 @@ namespace Clipboard {
 void sharedSetData(const SharedDocument &document, qulonglong position, qulonglong length) throw (std::exception) /PyName=setData/;
 SharedSpanChain sharedGetData() throw (std::exception) /PyName=getData/;
 bool sharedHasMicrohexData() throw (std::exception) /PyName=hasMicrohexData/;
+bool sharedHasBinaryData() throw (std::exception) /PyName=hasBinaryData/;
 
 };
