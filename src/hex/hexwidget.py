@@ -7,6 +7,7 @@ from PyQt4.QtGui import QColor, QFont, QFontMetricsF, QPolygonF, QWidget, QScrol
                         QTextTableFormat, QRawFont, QKeyEvent, QFontDatabase, QMenu, QToolTip, QPixmap, QIcon
 import math
 import html
+import os
 from hex.valuecodecs import IntegerCodec
 from hex.formatters import IntegerFormatter
 import hex.documents as documents
@@ -21,7 +22,19 @@ from hex.models import ModelIndex, ColumnModel, FrameModel, StandardEditDelegate
 
 
 class Theme(object):
+    Components = ('background', 'text', 'border', 'inactiveText', 'caretBackground', 'caretBorder',
+                  'selectionBackground', 'selectionBorder', 'cursorBackground', 'cursorBorder',
+                  'modifiedText', 'brokenText', 'headerBackground', 'headerText', 'headerInactiveText',
+                  'alternateRow')
+
+    StandardAlpha = {
+        'caretBackgroundColor': 100,
+        'selectionBackgroundColor': 100,
+        'cursorBackgroundColor': 100,
+    }
+
     def __init__(self):
+        self.name = ''
         self.backgroundColor = QColor(250, 250, 245)
         self.textColor = QColor(Qt.black)
         self.borderColor = QColor(Qt.black)
@@ -39,31 +52,42 @@ class Theme(object):
         self.headerInactiveTextColor = self.inactiveTextColor
         self.alternateRowColor = QColor(225, 225, 210)
 
-    def load(self, settings, name):
-        theme_obj = settings[name]
-        for key in theme_obj.keys():
+    def load(self, s):
+        s.load()
+        for key in s.allSettings.keys():
             attr = utils.underscoreToCamelCase(key)
-            if not hasattr(self, attr) or not callable(getattr(self, attr)):
-                stored_value = theme_obj[key]
+            if attr[:-5] in self.Components:
+                stored_value = s[key]
                 if isinstance(stored_value, str):
-                    color = self.colorFromName(theme_obj[key])
+                    color = self.colorFromName(key, s[key])
                     if color.isValid():
                         setattr(self, attr, color)
 
-    def save(self, settings, name):
-        theme_obj = dict()
-        for attr_name in dir(self):
-            if not attr_name.startswith('_') and isinstance(getattr(self, attr_name), QColor):
-                color = getattr(self, attr_name)
-                color_name = color.name()
-                if color.alpha() != 255:
-                    color_name += ':' + str(color.alpha())
-                theme_obj[utils.camelCaseToUnderscore(attr_name)] = color_name
-        settings[name] = theme_obj
+    def save(self, name=None):
+        if name is None:
+            name = self.name
+        if not name:
+            return
+
+        os.makedirs(Theme.themesDirectory(), exist_ok=True)
+        s = settings.Settings(os.path.join(Theme.themesDirectory(), name + appsettings.ThemeExtension))
+
+        for component in self.Components:
+            color = getattr(self, component + 'Color')
+            color_name = color.name()
+            if color.alpha() != 255:
+                color_name += ':' + str(color.alpha())
+            s[utils.camelCaseToUnderscore(component + 'Color')] = color_name
+
+        s.save()
 
     @staticmethod
-    def colorFromName(name):
-        alpha = 255
+    def colorFromName(component, name):
+        if utils.underscoreToCamelCase(component) in Theme.StandardAlpha:
+            alpha = Theme.StandardAlpha[utils.underscoreToCamelCase(component)]
+        else:
+            alpha = 255
+
         if ':' in name:
             # extract alpha-channel value
             colon_index = name.index(':')
@@ -77,9 +101,32 @@ class Theme(object):
         color.setAlpha(alpha)
         return color
 
+    @staticmethod
+    def availableThemes():
+        themes = list()
+        themes_dir = Theme.themesDirectory()
+        if os.path.exists(themes_dir):
+            for filename in os.listdir(themes_dir):
+                basename, ext = os.path.splitext(filename)
+                if ext.lower() == appsettings.ThemeExtension:
+                    themes.append(basename)
+        return themes
+
+    @staticmethod
+    def themeFromName(theme_name):
+        theme_file = os.path.join(Theme.themesDirectory(), theme_name + appsettings.ThemeExtension)
+        if os.path.exists(theme_file):
+            theme = Theme()
+            theme.load(settings.Settings(theme_file))
+            theme.name = theme_name
+            return theme
+
+    @staticmethod
+    def themesDirectory():
+        return os.path.join(settings.defaultSettingsDirectory, 'themes')
+
 
 VisualSpace = 10
-DefaultTheme = None
 
 
 class RowData(object):
@@ -335,7 +382,7 @@ class Column(QObject):
         self._geom = QRectF()
         self._font = QFont()
         self._fontMetrics = QFontMetricsF(self._font)
-        self._theme = DefaultTheme
+        self._theme = Theme()
 
         self._fullVisibleRows = 0
         self._visibleRows = 0
@@ -875,11 +922,6 @@ class HexWidget(QWidget):
 
         globalSettings = settings.globalSettings()
 
-        global DefaultTheme
-        if DefaultTheme is None:
-            DefaultTheme = Theme()
-            DefaultTheme.load(globalSettings, appsettings.HexWidget_DefaultTheme)
-
         self.view = QWidget(self)
         self.view.installEventFilter(self)
         self.view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -900,7 +942,7 @@ class HexWidget(QWidget):
         self.m_layout.addWidget(self.vScrollBar)
         self.m_layout.setContentsMargins(0, 0, 0, 0)
 
-        self._theme = DefaultTheme
+        self._theme = Theme()
         self._document = document
         self._columns = []
         self._leadingColumn = None
@@ -934,9 +976,7 @@ class HexWidget(QWidget):
         self._actionSetup = self._contextMenu.addAction(utils.tr('Setup column...'))
         self._actionSetup.triggered.connect(self.setupActiveColumn)
 
-        palette = QPalette(self.view.palette())
-        palette.setColor(QPalette.Background, self._theme.backgroundColor)
-        self.view.setPalette(palette)
+        self.setTheme(Theme.themeFromName(globalSettings[appsettings.HexWidget_Theme]) or Theme())
         self.view.setAutoFillBackground(True)
 
         self.setFont(appsettings.getFontFromSetting(globalSettings[appsettings.HexWidget_Font]))
@@ -973,6 +1013,20 @@ class HexWidget(QWidget):
             self.view.update()
         elif name == appsettings.HexWidget_Font:
             self.setFont(appsettings.getFontFromSetting(value))
+        elif name == appsettings.HexWidget_Theme:
+            self.setTheme(value)
+
+    def setTheme(self, theme):
+        if isinstance(theme, str):
+            theme = Theme.themeFromName(theme) or Theme()
+
+        self._theme = theme
+        palette = QPalette(self.view.palette())
+        palette.setColor(QPalette.Background, self._theme.backgroundColor)
+        self.view.setPalette(palette)
+        for column in self._columns:
+            column._theme = self._theme
+        self.view.update()
 
     @property
     def document(self):
@@ -1030,6 +1084,7 @@ class HexWidget(QWidget):
         if model is not None:
             column = Column(model)
             column.font = self.font()
+            column._theme = self._theme
 
             column.geometry = QRectF(QPointF(0, 0), QSizeF(200, self.view.height()))
             column.showHeader = self.showHeader

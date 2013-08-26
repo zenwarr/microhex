@@ -16,6 +16,9 @@ HexWidget_Font = 'hexwidget.font'
 HexWidget_BlockCursor = 'hexwidget.block_cursor'
 HexWidget_HighlightAlpha = 'hexwidget.highlight_alpha'
 HexWidget_RandomColorDistance = 'hexwidget.random_color_distance'
+HexWidget_Theme = 'hexwidget.theme'
+
+ThemeExtension = '.mixth'
 
 
 def doRegister():
@@ -34,11 +37,12 @@ def doRegister():
             (HexWidget_DefaultTheme, dict(), dict),
             (HexWidget_AlternatingRows, True, bool),
             (HexWidget_Font, ('Ubuntu Mono,13,-1,5,50,0,0,0,0,0',
-                                     'Consolas,13,-1,5,50,0,0,0,0,0',
-                                     'Courier New,10,-1,5,50,0,0,0,0,0'), (list, tuple, str)),
+                              'Consolas,13,-1,5,50,0,0,0,0,0',
+                              'Courier New,10,-1,5,50,0,0,0,0,0'), (list, tuple, str)),
             (HexWidget_BlockCursor, False, bool),
             (HexWidget_HighlightAlpha, 150, int),
-            (HexWidget_RandomColorDistance, 100, int)
+            (HexWidget_RandomColorDistance, 100, int),
+            (HexWidget_Theme, '', str)
         )
 
         s = settings.globalSettings()

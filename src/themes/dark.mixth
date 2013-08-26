@@ -1,0 +1,18 @@
+{
+    "caret_background_color": "#bbbbbb:100", 
+    "broken_text_color": "#e6c9c9", 
+    "header_inactive_text_color": "#808080", 
+    "cursor_border_color": "#bbbbbb", 
+    "selection_background_color": "#214283:100", 
+    "alternate_row_color": "#323b3e", 
+    "inactive_text_color": "#808080", 
+    "header_background_color": "#22282a", 
+    "header_text_color": "#a9b7c6", 
+    "background_color": "#22282a", 
+    "text_color": "#a9b7c6", 
+    "caret_border_color": "#bbbbbb", 
+    "cursor_background_color": "#bbbbbb:100", 
+    "border_color": "#585858", 
+    "selection_border_color": "#274f9d", 
+    "modified_text_color": "#db1518"
+}
