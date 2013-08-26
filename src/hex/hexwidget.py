@@ -1692,7 +1692,8 @@ class HexWidget(QWidget):
         elif self._draggingColumn is not None:
             threshold = 15
             if column is None:
-                self._columnInsertIndex = len(self._columns)
+                middle = self._totalWidth / 2
+                self._columnInsertIndex = len(self._columns) if mouse_pos.x() > middle else 0
             else:
                 column_pos = self._absoluteToColumn(column, mouse_pos)
                 if column_pos.x() <= threshold:
