@@ -13,11 +13,15 @@ system directory) as it can lead to problems when you want to uninstall software
 manager (if you are reading this text in far future and i had made package for your favourite distro ;) ) or install
 Microhex into your profile directory and create soft link in /usr/bin pointing to installed microhex.py.
 
-And final step. Open a console in source root directory and type commands:
+Open a console in source root directory. If you want to compile all available translations, run the following command:
+    lrelease microhex.pro
+or go to src/translations directory and compile only desired translation files.
+
+And final step. To build and install application, run following commands:
     mkdir build && cd build
     qmake ..
     make install
-Depending on system configuration, last command may be different (for example, mingw32-make when you are using MinGW).
+Depending on system configuration, last command may be different (for example, mingw32-make if you are using MinGW).
 
 After all, you can start Microhex by executing command in installation directory:
     python3 ./microhex.py
