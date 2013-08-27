@@ -37,7 +37,7 @@ def doRegister():
             (HexWidget_DefaultTheme, dict(), dict),
             (HexWidget_AlternatingRows, True, bool),
             (HexWidget_Font, ('Ubuntu Mono,13,-1,5,50,0,0,0,0,0',
-                              'Consolas,13,-1,5,50,0,0,0,0,0',
+                              'Consolas,12,-1,5,50,0,0,0,0,0',
                               'Courier New,10,-1,5,50,0,0,0,0,0'), (list, tuple, str)),
             (HexWidget_BlockCursor, False, bool),
             (HexWidget_HighlightAlpha, 150, int),

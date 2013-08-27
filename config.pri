@@ -8,7 +8,7 @@ unix {
     MAKE = make
     PYUIC = pyuic4
     PYRCC = pyrcc4
-    INSTALL_PATH =   # NOTE: you should manually define this
+    INSTALL_PATH = /home/victor/develop/microhex/installed  # NOTE: you should manually define this
 }
 win32 {
     PYTHON3 = python

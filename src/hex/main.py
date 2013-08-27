@@ -4,6 +4,7 @@ import sys
 import argparse
 import gc
 import threading
+import shutil
 from PyQt4.QtCore import QTimer
 from PyQt4.QtGui import QApplication
 import hex.settings as settings
@@ -25,6 +26,12 @@ class Application(QApplication):
         appsettings.doRegister()
 
         utils.guiThread = threading.current_thread()
+
+        try:
+            if not os.path.exists(settings.defaultSettingsDirectory):
+                shutil.copytree(os.path.join(utils.applicationPath, 'settings-default'), settings.defaultSettingsDirectory)
+        except OSError as err:
+            print('failed to install default settings - {0}'.format(err))
 
         for s in (settings.globalSettings(), settings.globalQuickSettings()):
             try:

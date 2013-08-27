@@ -39,10 +39,12 @@ python_modules.path = $$INSTALL_PATH/hex
 python_modules.CONFIG += no_check_exist
 INSTALLS += python_modules
 
+python_resources.files += $$PWD/resources/__init__.py
 python_resources.path = $$INSTALL_PATH/hex/resources
 python_resources.CONFIG += no_check_exist
 INSTALLS += python_resources
 
+python_forms.files += $$PWD/forms/__init__.py
 python_forms.path = $$INSTALL_PATH/hex/forms
 python_forms.CONFIG += no_check_exist
 INSTALLS += python_forms
