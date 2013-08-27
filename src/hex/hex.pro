@@ -20,7 +20,6 @@ pyqt_uic.input = PYQT_FORMS
 pyqt_uic.output = ${QMAKE_FILE_PATH}/ui_${QMAKE_FILE_BASE}.py
 pyqt_uic.commands = $$PYUIC -i 0 -o ${QMAKE_FILE_OUT} ${QMAKE_FILE_IN}
 pyqt_uic.CONFIG += no_link target_predeps
-pyqt_uic.variable_out = python_forms.files
 QMAKE_EXTRA_COMPILERS += pyqt_uic
 
 PYQT_RESOURCES = $$PWD/resources/main.qrc
@@ -30,7 +29,6 @@ pyqt_rcc.input = PYQT_RESOURCES
 pyqt_rcc.output = ${QMAKE_FILE_PATH}/qrc_${QMAKE_FILE_BASE}.py
 pyqt_rcc.commands = $$PYRCC -py3 -o ${QMAKE_FILE_OUT} ${QMAKE_FILE_IN}
 pyqt_rcc.CONFIG += no_link target_predeps
-pyqt_rcc.variable_out = python_resources.files
 QMAKE_EXTRA_COMPILERS += pyqt_rcc
 
 
@@ -39,12 +37,12 @@ python_modules.path = $$INSTALL_PATH/hex
 python_modules.CONFIG += no_check_exist
 INSTALLS += python_modules
 
-python_resources.files += $$PWD/resources/__init__.py
+python_resources.files += $$PWD/resources/qrc_*.py $$PWD/resources/__init__.py
 python_resources.path = $$INSTALL_PATH/hex/resources
 python_resources.CONFIG += no_check_exist
 INSTALLS += python_resources
 
-python_forms.files += $$PWD/forms/__init__.py
+python_forms.files += $$PWD/forms/ui_*.py $$PWD/forms/__init__.py
 python_forms.path = $$INSTALL_PATH/hex/forms
 python_forms.CONFIG += no_check_exist
 INSTALLS += python_forms
