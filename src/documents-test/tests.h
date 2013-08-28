@@ -570,6 +570,12 @@ private slots:
         QVERIFY(!doc->isRangeModified(2, 1));
     }
 
+    void testOpenZeroSizeDevice() {
+        auto dev = deviceFromData("");
+        auto doc = std::make_shared<Document>(dev);
+        QCOMPARE(doc->getLength(), qulonglong(0));
+    }
+
 private:
     void testDocument(const std::shared_ptr<Document> &document, const QByteArray &real_data) {
         QCOMPARE(document->getLength(), qulonglong(real_data.length()));

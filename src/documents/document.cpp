@@ -223,9 +223,11 @@ Document::Document(const std::shared_ptr<AbstractDevice> &device) : _spanChain(s
         _fixedSize = _device->isFixedSize();
         _readOnly = _device->isReadOnly();
 
-        auto span = device->createSpan(0, _device->getLength());
-        _spanChain->setSpans(SpanList() << span);
-        _spanChain->setCommonSavepoint(0);
+        if (device->getLength()) {
+            auto span = device->createSpan(0, _device->getLength());
+            _spanChain->setSpans(SpanList() << span);
+            _spanChain->setCommonSavepoint(0);
+        }
 
         connect(_device.get(), SIGNAL(readOnlyChanged(bool)), this, SLOT(_onDeviceReadOnlyChanged(bool)));
     }
