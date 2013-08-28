@@ -367,7 +367,7 @@ class MainWindow(QMainWindow):
             msgbox.setWindowTitle(utils.tr('Close editor'))
             msgbox.setIcon(QMessageBox.Question)
             msgbox.setText(utils.tr('Document {0} has unsaved changed. Do you want to save it?')
-                           .format(utils.htmlEscape(subWidget.title)))
+                           .format(subWidget.title))
             msgbox.addButton(utils.tr('Save'), QMessageBox.YesRole)
             msgbox.addButton(utils.tr('Do not save'), QMessageBox.NoRole)
             msgbox.addButton(QMessageBox.Cancel)
