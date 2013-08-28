@@ -89,6 +89,13 @@ class Application(QApplication):
             except settings.SettingsError as err:
                 print(utils.tr('failed to save settings: {0}').format(err))
 
+    def notify(self, receiver, event):
+        try:
+            return QApplication.notify(self, receiver, event)
+        except Exception as exc:
+            print('critical error occurred: {0}. Please save your data and restart application'.format(exc))
+            return False
+
 
 class GarbageCollector(object):
     def __init__(self):

@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!DOCTYPE TS>
-<TS version="2.0" language="ru_RU">
+<!DOCTYPE TS><TS version="2.0" language="ru_RU" sourcelanguage="">
 <context>
     <name>AddBookmarkDialog</name>
     <message>
@@ -236,12 +235,12 @@
         <translation>Будет загружено {0}</translation>
     </message>
     <message>
-        <location filename="main.py" line="33"/>
+        <location filename="main.py" line="40"/>
         <source>failed to load settings: {0}</source>
         <translation>не удалось загрузить настройки: {0}</translation>
     </message>
     <message>
-        <location filename="main.py" line="83"/>
+        <location filename="main.py" line="90"/>
         <source>failed to save settings: {0}</source>
         <translation>не удалось сохранить настройки: {0}</translation>
     </message>
@@ -686,27 +685,27 @@
         <translation>Редактор</translation>
     </message>
     <message>
-        <location filename="main.py" line="45"/>
+        <location filename="main.py" line="52"/>
         <source>Crossplatform hex-editing software</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="main.py" line="47"/>
+        <location filename="main.py" line="54"/>
         <source>show application version and exit</source>
         <translation>показать версию и выйти</translation>
     </message>
     <message>
-        <location filename="main.py" line="50"/>
+        <location filename="main.py" line="57"/>
         <source>reset application settings to defaults</source>
         <translation>сбросить настройки приложения на умолчания</translation>
     </message>
     <message>
-        <location filename="main.py" line="52"/>
+        <location filename="main.py" line="59"/>
         <source>load files in read-only mode</source>
         <translation>загрузить файлы только для чтения</translation>
     </message>
     <message>
-        <location filename="main.py" line="54"/>
+        <location filename="main.py" line="61"/>
         <source>freeze size of loaded documents</source>
         <translation>зафиксировать размер загруженных документов</translation>
     </message>
@@ -736,7 +735,7 @@
         <translation type="obsolete">без диалога параметров загрузки</translation>
     </message>
     <message>
-        <location filename="main.py" line="56"/>
+        <location filename="main.py" line="63"/>
         <source>do not invoke load options dialog</source>
         <translation>без диалога параметров загрузки</translation>
     </message>
@@ -1137,7 +1136,7 @@
     <message>
         <location filename="hexwidget.py" line="2002"/>
         <source>Clipboard contains text data - do you want to interpret it as plain hex values (like &quot;aa bb cc&quot;) and insert raw data or insert data in format specific for current column?</source>
-        <translation type="unfinished">Буфер обмена содержит текст - интерпретировать его как hex-значения (&quot;aa bb cc&quot;) и вставить как данные, или вставить текст в специфичном для колонки формате?</translation>
+        <translation>Буфер обмена содержит текст - интерпретировать его как hex-значения (&quot;aa bb cc&quot;) и вставить как данные, или вставить текст в специфичном для колонки формате?</translation>
     </message>
     <message>
         <location filename="hexwidget.py" line="2006"/>
@@ -1163,6 +1162,16 @@
         <location filename="matchers.py" line="99"/>
         <source>search completed: {0} matches found</source>
         <translation>поиск завершен - найдено {0} совпадений</translation>
+    </message>
+    <message>
+        <location filename="hexwidget.py" line="2140"/>
+        <source>Operation is not allowed</source>
+        <translation>Операция недопустима</translation>
+    </message>
+    <message>
+        <location filename="hexwidget.py" line="2140"/>
+        <source>Operation is not allowed on this document ({0})</source>
+        <translation>Операция недопустима для этого документа ({0})</translation>
     </message>
 </context>
 </TS>

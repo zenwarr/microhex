@@ -2123,13 +2123,22 @@ class HexWidget(QWidget):
             self.insertModeChanged.emit(mode)
 
     def removeSelected(self):
-        for selection in self._selections:
-            self.document.remove(selection.startPosition, selection.size)
+        try:
+            for selection in self._selections:
+                self.document.remove(selection.startPosition, selection.size)
+        except RuntimeError as err:
+            self._reportOperationNotAllowed(str(err))
 
     def fillSelected(self, fill_byte):
-        for selection in self._selections:
-            self.document.writeSpan(selection.startPosition, documents.FillSpan(selection.size, fill_byte))
-        self.view.update()
+        try:
+            for selection in self._selections:
+                self.document.writeSpan(selection.startPosition, documents.FillSpan(selection.size, fill_byte))
+        except RuntimeError as err:
+            self._reportOperationNotAllowed(str(err))
+
+    def _reportOperationNotAllowed(self, err_desc):
+        QMessageBox.information(self, utils.tr('Operation is not allowed'),
+                                    utils.tr('Operation is not allowed on this document ({0})').format(err_desc))
 
     def removeActiveColumn(self):
         if self._leadingColumn is not None:
