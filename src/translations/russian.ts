@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!DOCTYPE TS><TS version="2.0" language="ru_RU" sourcelanguage="">
+<!DOCTYPE TS>
+<TS version="2.0" language="ru_RU">
 <context>
     <name>AddBookmarkDialog</name>
     <message>
@@ -137,14 +138,19 @@
         <translation>Чередующиеся цвета строк</translation>
     </message>
     <message>
-        <location filename="settingsdialog.ui" line="124"/>
+        <location filename="settingsdialog.ui" line="131"/>
         <source>Font:</source>
         <translation>Шрифт:</translation>
     </message>
     <message>
-        <location filename="settingsdialog.ui" line="149"/>
+        <location filename="settingsdialog.ui" line="156"/>
         <source>Choose...</source>
         <translation>Выбрать...</translation>
+    </message>
+    <message>
+        <location filename="settingsdialog.ui" line="119"/>
+        <source>Automatic edit mode</source>
+        <translation>Автоматический режим редактирования</translation>
     </message>
 </context>
 <context>
@@ -280,7 +286,7 @@
         <translation>Повторить</translation>
     </message>
     <message>
-        <location filename="hexwidget.py" line="971"/>
+        <location filename="hexwidget.py" line="976"/>
         <source>Copy</source>
         <translation>Копировать</translation>
     </message>
@@ -365,12 +371,12 @@
         <translation>Ассемблер</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="139"/>
+        <location filename="settingsdialog.py" line="141"/>
         <source>Restore defaults</source>
         <translation>Сбросить</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="139"/>
+        <location filename="settingsdialog.py" line="141"/>
         <source>Do you really want to reset all application settings right now? This action cannot be undone</source>
         <translation>Вы действительно хотите сбросить настройки приложения? Это действие не может быть отменено</translation>
     </message>
@@ -420,7 +426,7 @@
         <translation type="obsolete">Настроить колонку</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="125"/>
+        <location filename="hexcolumn.py" line="152"/>
         <source>Integer column</source>
         <translation>Колонка целых чисел</translation>
     </message>
@@ -440,12 +446,12 @@
         <translation type="obsolete">Порядок байт</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="155"/>
+        <location filename="hexcolumn.py" line="182"/>
         <source>Little endian</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="156"/>
+        <location filename="hexcolumn.py" line="183"/>
         <source>Big endian</source>
         <translation></translation>
     </message>
@@ -455,22 +461,22 @@
         <translation type="obsolete">Система счисления</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="173"/>
+        <location filename="hexcolumn.py" line="200"/>
         <source>Hex</source>
         <translation>Шестнадцатиричная</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="173"/>
+        <location filename="hexcolumn.py" line="200"/>
         <source>Dec</source>
         <translation>Десятичная</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="173"/>
+        <location filename="hexcolumn.py" line="200"/>
         <source>Oct</source>
         <translation>Восьмиричная</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="173"/>
+        <location filename="hexcolumn.py" line="200"/>
         <source>Bin</source>
         <translation>Двоичная</translation>
     </message>
@@ -515,27 +521,27 @@
         <translation>Учетверенное слово</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="144"/>
+        <location filename="hexcolumn.py" line="171"/>
         <source>Binary format:</source>
         <translation>Двоичный формат:</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="148"/>
+        <location filename="hexcolumn.py" line="175"/>
         <source>Signed values:</source>
         <translation>Со знаком:</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="154"/>
+        <location filename="hexcolumn.py" line="181"/>
         <source>Endianess:</source>
         <translation>Порядок байт:</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="172"/>
+        <location filename="hexcolumn.py" line="199"/>
         <source>Base:</source>
         <translation>Система счисления:</translation>
     </message>
     <message>
-        <location filename="hexcolumn.py" line="182"/>
+        <location filename="hexcolumn.py" line="209"/>
         <source>Columns on row:</source>
         <translation>Колонок в строке:</translation>
     </message>
@@ -725,7 +731,7 @@
         <translation>Восстановить исходный размер шрифта</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="105"/>
+        <location filename="settingsdialog.py" line="106"/>
         <source>Choose font for hex view</source>
         <translation>Выбрать шрифт для редактора</translation>
     </message>
@@ -760,7 +766,7 @@
         <translation>Выбор цвета для закладки</translation>
     </message>
     <message>
-        <location filename="hexwidget.py" line="1766"/>
+        <location filename="hexwidget.py" line="1774"/>
         <source>Bookmark: {0}</source>
         <translation>Закладка: {0}</translation>
     </message>
@@ -1079,72 +1085,72 @@
         <translation>Тема</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="161"/>
+        <location filename="settingsdialog.py" line="163"/>
         <source>Copy theme...</source>
         <translation>Копировать тему...</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="189"/>
+        <location filename="settingsdialog.py" line="191"/>
         <source>Default (unmodifiable)</source>
         <translation>Тема по умолчанию (неизменяема)</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="209"/>
+        <location filename="settingsdialog.py" line="211"/>
         <source>Copy theme</source>
         <translation>Копировать тему</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="209"/>
+        <location filename="settingsdialog.py" line="211"/>
         <source>Name for copy of theme:</source>
         <translation>Имя для копии темы:</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="213"/>
+        <location filename="settingsdialog.py" line="215"/>
         <source>Wrong name for theme</source>
         <translation>Неверное имя для темы</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="213"/>
+        <location filename="settingsdialog.py" line="215"/>
         <source>Name for theme is invalid</source>
         <translation>Имя темы не корректно</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="223"/>
+        <location filename="settingsdialog.py" line="225"/>
         <source>Save theme</source>
         <translation>Сохранить тему</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="223"/>
+        <location filename="settingsdialog.py" line="225"/>
         <source>Do you want to save &quot;{0}&quot;?</source>
         <translation>Вы хотите сохранить &quot;{0}&quot;?</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="286"/>
+        <location filename="settingsdialog.py" line="288"/>
         <source>Theme component</source>
         <translation>Компонент</translation>
     </message>
     <message>
-        <location filename="settingsdialog.py" line="288"/>
+        <location filename="settingsdialog.py" line="290"/>
         <source>Value</source>
         <translation>Значение</translation>
     </message>
     <message>
-        <location filename="hexwidget.py" line="2001"/>
+        <location filename="hexwidget.py" line="2035"/>
         <source>Paste from clipboard</source>
         <translation>Вставка из буфера обмена</translation>
     </message>
     <message>
-        <location filename="hexwidget.py" line="2002"/>
+        <location filename="hexwidget.py" line="2036"/>
         <source>Clipboard contains text data - do you want to interpret it as plain hex values (like &quot;aa bb cc&quot;) and insert raw data or insert data in format specific for current column?</source>
         <translation>Буфер обмена содержит текст - интерпретировать его как hex-значения (&quot;aa bb cc&quot;) и вставить как данные, или вставить текст в специфичном для колонки формате?</translation>
     </message>
     <message>
-        <location filename="hexwidget.py" line="2006"/>
+        <location filename="hexwidget.py" line="2040"/>
         <source>As raw data</source>
         <translation>Как данные</translation>
     </message>
     <message>
-        <location filename="hexwidget.py" line="2007"/>
+        <location filename="hexwidget.py" line="2041"/>
         <source>As text</source>
         <translation>Как текст</translation>
     </message>
@@ -1164,12 +1170,12 @@
         <translation>поиск завершен - найдено {0} совпадений</translation>
     </message>
     <message>
-        <location filename="hexwidget.py" line="2140"/>
+        <location filename="hexwidget.py" line="2174"/>
         <source>Operation is not allowed</source>
         <translation>Операция недопустима</translation>
     </message>
     <message>
-        <location filename="hexwidget.py" line="2140"/>
+        <location filename="hexwidget.py" line="2174"/>
         <source>Operation is not allowed on this document ({0})</source>
         <translation>Операция недопустима для этого документа ({0})</translation>
     </message>
