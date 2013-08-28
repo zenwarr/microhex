@@ -1105,7 +1105,7 @@ class HexWidget(QWidget):
             if self._leadingColumn is None:
                 self._leadingColumn = column
             else:
-                self.syncColumnsFrames(self.caretIndex(self._leadingColumn).row)
+                self.syncColumnFrame(column, 0)
 
             if hasattr(model, 'linkedModel'):
                 column.selectionProxy = self.columnFromModel(model.linkedModel)
