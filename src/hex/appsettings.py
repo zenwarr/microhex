@@ -17,6 +17,7 @@ HexWidget_BlockCursor = 'hexwidget.block_cursor'
 HexWidget_HighlightAlpha = 'hexwidget.highlight_alpha'
 HexWidget_RandomColorDistance = 'hexwidget.random_color_distance'
 HexWidget_Theme = 'hexwidget.theme'
+HexWidget_AutoEditMode = 'hexwidget.auto_edit_mode'
 
 ThemeExtension = '.mixth'
 
@@ -42,7 +43,8 @@ def doRegister():
             (HexWidget_BlockCursor, False, bool),
             (HexWidget_HighlightAlpha, 150, int),
             (HexWidget_RandomColorDistance, 100, int),
-            (HexWidget_Theme, '', str)
+            (HexWidget_Theme, '', str),
+            (HexWidget_AutoEditMode, True, bool)
         )
 
         s = settings.globalSettings()

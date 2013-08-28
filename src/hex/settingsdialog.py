@@ -98,6 +98,7 @@ class SettingsDialog(utils.Dialog):
             self._hexWidgetFont = appsettings.getFontFromSetting(globalSettings[appsettings.HexWidget_Font])
             self._updateHexWidgetFont()
             self.ui.btnChooseFont.clicked.connect(self._chooseHexWidgetFont)
+            self.ui.chkAutoEditMode.setChecked(globalSettings[appsettings.HexWidget_AutoEditMode])
         elif page_data.page is self.pageTheme:
             self.pageTheme.loadThemes()
 
@@ -131,6 +132,7 @@ class SettingsDialog(utils.Dialog):
         elif page_data.page is self.ui.pageHex:
             globalSettings[appsettings.HexWidget_AlternatingRows] = self.ui.chkAlternatingRows.isChecked()
             globalSettings[appsettings.HexWidget_Font] = self._hexWidgetFont.toString()
+            globalSettings[appsettings.HexWidget_AutoEditMode] = self.ui.chkAutoEditMode.isChecked()
         elif page_data.page is self.pageTheme:
             self.pageTheme.saveCurrentTheme()
             globalSettings[appsettings.HexWidget_Theme] = self.pageTheme.themeName

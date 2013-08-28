@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>679</width>
-    <height>415</height>
+    <width>677</width>
+    <height>413</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -110,6 +110,13 @@
           <widget class="QCheckBox" name="chkAlternatingRows">
            <property name="text">
             <string>Alternating row colors</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="chkAutoEditMode">
+           <property name="text">
+            <string>Automatic edit mode</string>
            </property>
           </widget>
          </item>

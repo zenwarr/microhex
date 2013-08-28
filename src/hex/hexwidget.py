@@ -1372,8 +1372,6 @@ class HexWidget(QWidget):
         self._updateScrollBars()
         self.view.update()
 
-    _edit_keys = (Qt.Key_Backspace, Qt.Key_Delete)
-
     def _keyPress(self, event):
         if self._activeDelegate is not None:
             if self._activeDelegate.handleEvent(event):
@@ -1398,6 +1396,16 @@ class HexWidget(QWidget):
                 method = self.NavMethod_RowStart
             elif event.key() == Qt.Key_End:
                 method = self.NavMethod_RowEnd
+            elif event.text() and event.key() not in StandardEditDelegate.InputBlockKeys:
+                globalSettings = settings.globalSettings()
+                if globalSettings[appsettings.HexWidget_AutoEditMode]:
+                    if not self.editMode and self.caretIndex(self._leadingColumn):
+                        if self.insertMode:
+                            self.beginEditNewIndex(event.text(), self.caretIndex(self._leadingColumn))
+                        else:
+                            self.beginEditIndex(self.caretIndex(self._leadingColumn))
+                            if self._activeDelegate is not None:
+                                self._activeDelegate.handleEvent(event)
         elif utils.checkMask(event.modifiers(), bitmask | Qt.ControlModifier):
             if event.key() == Qt.Key_Home:
                 method = self.NavMethod_DocumentStart
@@ -1425,8 +1433,6 @@ class HexWidget(QWidget):
             self.endEditIndex(save=False)
         elif event.key() in (Qt.Key_Return, Qt.Key_Enter):
             self.endEditIndex(save=True)
-        elif self.editMode and (event.text() or event.key() in self._edit_keys):
-            self._textInputEvent(event)
         elif event.key() == Qt.Key_Insert:
             self._insertMode = not self._insertMode
             self.insertModeChanged.emit(self._insertMode)
@@ -1853,6 +1859,10 @@ class HexWidget(QWidget):
         if index is None:
             index = self.caretIndex(self._leadingColumn)
 
+        new_delegate = index.model.delegateForIndex(index, index_insert_mode=self.insertMode)
+        if new_delegate is None:
+            return
+
         if index and index.flags & ColumnModel.FlagEditable:
             if self._activeDelegate is not None:
                 if self._activeDelegate.index == index:
@@ -1860,9 +1870,10 @@ class HexWidget(QWidget):
                 else:
                     self.endEdit(self._activeDelegate.shouldSave)
 
-            self._setDelegate(index.model.delegateForIndex(index))
+            self._setDelegate(new_delegate)
             if self._activeDelegate is not None:
-                self._startCursorTimer()
+                if not self._handleDelegateRedirect(True, self._activeDelegate.redirectTo):
+                    self._startCursorTimer()
 
     def beginEditNewIndex(self, input_text, before_index, model=None):
         """Starts editing new index before given one. If :before_index: is invalid (but not None), and :model:
@@ -1877,12 +1888,36 @@ class HexWidget(QWidget):
         if model is None:
             return
 
+        new_delegate = model.delegateForNewIndex(input_text, before_index, index_insert_mode=self.insertMode)
+        if new_delegate is None:
+            return
+
         if self._activeDelegate is not None:
             self.endEditIndex(self._activeDelegate.shouldSave)
 
-        self._setDelegate(model.delegateForNewIndex(input_text, before_index))
+        self._setDelegate(new_delegate)
         if self._activeDelegate is not None:
-            self._startCursorTimer()
+            if not self._handleDelegateRedirect(True, self._activeDelegate.redirectTo):
+                self._startCursorTimer()
+
+    def _handleDelegateRedirect(self, save, redirect_to):
+        delegate = self._activeDelegate
+        if delegate is not None:
+            if redirect_to == StandardEditDelegate.EditNextIndex and not delegate.hasNextEditIndex:
+                return False
+            elif redirect_to == StandardEditDelegate.EditPreviousIndex and not delegate.hasPreviousEditIndex:
+                return False
+            elif redirect_to == StandardEditDelegate.EditNone:
+                return False
+
+            self.endEditIndex(save)
+
+            if redirect_to == StandardEditDelegate.EditNextIndex:
+                self.beginEditIndex(delegate.nextEditIndex)
+                return True
+            elif redirect_to == StandardEditDelegate.EditPreviousIndex:
+                self.beginEditIndex(delegate.previousEditIndex)
+                return True
 
     def _setDelegate(self, delegate):
         if self._activeDelegate is not delegate:
@@ -1895,6 +1930,7 @@ class HexWidget(QWidget):
                 delegate.finished.connect(self._onDelegateFinished)
                 delegate.cursorMoved.connect(self._updateCursorOffset)
                 delegate.requestFinish.connect(self._onDelegateFinishRequested)
+                delegate.requestInsertIndex.connect(self._onDelegateInsertRequested)
 
             if self._leadingColumn is not None:
                 self._leadingColumn.frameModel.activeDelegate = delegate
@@ -1904,25 +1940,19 @@ class HexWidget(QWidget):
 
         # and stop cursor update timer
         self._cursorVisible = False
-        self._cursorTimer.stop()
-        self._cursorTimer = None
+        if self._cursorTimer is not None:
+            self._cursorTimer.stop()
+            self._cursorTimer = None
 
         self.view.update()
 
     def _onDelegateFinishRequested(self, save, next_index):
         if self._activeDelegate is self.sender():
-            delegate = self._activeDelegate
-            if next_index == StandardEditDelegate.EditNextIndex and not delegate.hasNextEditIndex:
-                return
-            elif next_index == StandardEditDelegate.EditPreviousIndex and not delegate.hasPreviousEditIndex:
-                return
+            self._handleDelegateRedirect(save, next_index)
 
-            self.endEditIndex(save)
-
-            if next_index == StandardEditDelegate.EditNextIndex:
-                self.beginEditIndex(delegate.nextEditIndex)
-            elif next_index == StandardEditDelegate.EditPreviousIndex:
-                self.beginEditIndex(delegate.previousEditIndex)
+    def _onDelegateInsertRequested(self, input_text):
+        if self._activeDelegate is not None:
+            self.beginEditNewIndex(input_text, self._activeDelegate.index)
 
     def _startCursorTimer(self):
         """Starts timer that updates blinking cursor"""

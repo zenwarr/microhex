@@ -258,6 +258,7 @@ class StandardEditDelegate(QObject):
     finished = pyqtSignal(bool)
     cursorMoved = pyqtSignal(int)
     requestFinish = pyqtSignal(bool, int)   # (should_be_saved, next_index_to_edit)
+    requestInsertIndex = pyqtSignal(str)
 
     EditNextIndex, EditPreviousIndex, EditNone = range(3)
 
@@ -265,7 +266,8 @@ class StandardEditDelegate(QObject):
             # text input, but we do not want them to have such behaviour as these character have special meaning
             # for widget.
 
-    def __init__(self, index, is_inserted, init_text=None, insert_mode=False, cursor_offset=0, should_save=False):
+    def __init__(self, index, is_inserted, init_text=None, insert_mode=False, cursor_offset=None, should_save=False,
+                 index_insert_mode=False):
         QObject.__init__(self)
         self.index = index
         self.insertMode = insert_mode
@@ -274,17 +276,23 @@ class StandardEditDelegate(QObject):
         self.isInserted = is_inserted
         self._text = init_text if init_text is not None else index.data(Qt.EditRole)
         self._shouldSave = should_save
+        self.indexInsertMode = index_insert_mode
+        self.redirectTo = self.EditNone
 
-        if cursor_offset < self.minimalCursorOffset:
+        if cursor_offset is None:
             self._cursorOffset = self.minimalCursorOffset
+        elif cursor_offset < self.minimalCursorOffset:
+            self._cursorOffset = self.minimalCursorOffset
+            self.redirectTo = self.EditPreviousIndex
         elif cursor_offset > self.maximalCursorOffset:
-            self._cursorOffset  = self.maximalCursorOffset
+            self._cursorOffset = self.maximalCursorOffset
+            self.redirectTo = self.EditNextIndex
         else:
             self._cursorOffset = cursor_offset
 
         validator = self.createValidator()
         if validator is not None:
-            status = validator.validate(self._text, cursor_offset)
+            status = validator.validate(self._text, self._cursorOffset)
             if status == QValidator.Invalid:
                 raise ValueError()
 
@@ -435,10 +443,13 @@ class StandardEditDelegate(QObject):
                     return True
                 elif event.key() in self.InputBlockKeys:
                     return False
-                elif event.text():
+            if utils.checkMask(event.modifiers(), Qt.NoModifier | Qt.KeypadModifier | Qt.ShiftModifier):
+                if event.text():
                     if self.insertMode:
                         self.insertText(event.text())
                     else:
+                        if self.cursorOffset == self.minimalCursorOffset and self.indexInsertMode:
+                            self.requestInsertIndex.emit(event.text())
                         self.overwriteText(event.text())
                     return True
         return False
@@ -541,12 +552,12 @@ class ColumnModel(AbstractModel):
         (except last one) and same data size for each cell. Text length for cells can differ."""
         return False
 
-    def delegateForIndex(self, index) -> StandardEditDelegate:
+    def delegateForIndex(self, index, index_insert_mode=False) -> StandardEditDelegate:
         """Should return delegate to edit given index. If None is returned, HexWidget cancels editing.
         """
         raise NotImplementedError()
 
-    def delegateForNewIndex(self, input_text, before_index) -> StandardEditDelegate:
+    def delegateForNewIndex(self, input_text, before_index, index_insert_mode=False) -> StandardEditDelegate:
         """Should return delegate to edit new index. After calling this function, new index should be already
         inserted into model.
         """
@@ -594,7 +605,7 @@ class RegularColumnModel(ColumnModel):
 
     def virtualIndexData(self, index, role=Qt.DisplayRole):
         """Return data for virtual index. Default implementation handles DocumentDataRole."""
-        if role == Qt.DisplayRole:
+        if role == Qt.DisplayRole or role == Qt.EditRole:
             return '.' * max(1, self.regularTextLength)
         elif role == self.DocumentDataRole:
             return bytes()
@@ -692,11 +703,12 @@ class RegularColumnModel(ColumnModel):
     def regular(self):
         return True
 
-    def delegateForIndex(self, index):
+    def delegateForIndex(self, index, index_insert_mode=False):
         if not self.document.readOnly and index.flags & self.FlagEditable:
-            return self._delegateType(index, is_inserted=False, insert_mode=self.defaultInsertMode)
+            return self._delegateType(index, is_inserted=False, insert_mode=self.defaultInsertMode,
+                                      index_insert_mode=index_insert_mode)
 
-    def delegateForNewIndex(self, input_text, before_index):
+    def delegateForNewIndex(self, input_text, before_index, index_insert_mode=False):
         if not self.document.readOnly and not self.document.fixedSize:
             data_to_insert, index_text, cursor_offset = self._dataForNewIndex(input_text, before_index)
             position = before_index.data(self.DocumentPositionRole) if before_index else self.document.length
@@ -706,9 +718,9 @@ class RegularColumnModel(ColumnModel):
                     data_to_insert = bytes(data_to_insert, encoding='latin')
                 self.document.insertSpan(position, documents.DataSpan(data_to_insert))
                 new_index = self.indexFromPosition(position)
-                return self._delegateType(new_index, is_inserted=True, init_text=index_text,
+                return self._delegateType(new_index, is_inserted=True,
                                           cursor_offset=cursor_offset, insert_mode=self.defaultInsertMode,
-                                          should_save=input_text is not None)
+                                          should_save=input_text is not None, index_insert_mode=index_insert_mode)
 
     @property
     def defaultInsertMode(self) -> bool:
