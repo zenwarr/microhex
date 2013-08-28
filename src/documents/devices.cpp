@@ -128,18 +128,23 @@ QByteArray AbstractDevice::readAll() const {
 
 void AbstractDevice::_encache(qulonglong from_position, bool center) const {
     ReadLocker locker(_lock);
-    assert(_cacheBoundary <= _cacheSize);
+    assert(!_cacheBoundary || _cacheBoundary <= _cacheSize);
 
     qulonglong cache_start;
     if (center) {
         cache_start = from_position > _cacheSize / 2 ? from_position - _cacheSize / 2 : qulonglong(0);
-        cache_start -= cache_start % _cacheBoundary;
-        if (cache_start + _cacheSize <= from_position) {
-            // byte at :from_position: is not in cache?
-            cache_start = from_position - from_position % _cacheBoundary;
+        if (_cacheBoundary) {
+            cache_start -= cache_start % _cacheBoundary;
+            if (cache_start + _cacheSize <= from_position) {
+                // byte at :from_position: is not in cache?
+                cache_start = from_position - from_position % _cacheBoundary;
+            }
         }
     } else {
-        cache_start = from_position - from_position % _cacheBoundary;
+        cache_start = from_position;
+        if (_cacheBoundary) {
+            cache_start -= from_position % _cacheBoundary;
+        }
     }
 
     _cache = _read(cache_start + _loadOptions->rangeStart, _cacheSize);
@@ -190,6 +195,7 @@ std::shared_ptr<AbstractSaver> AbstractDevice::createSaver(const std::shared_ptr
 
 void AbstractDevice::setCacheSize(qulonglong size) {
     _cacheSize = size;
+    _cacheBoundary = 0;
 }
 
 QList<std::shared_ptr<PrimitiveDeviceSpan> > AbstractDevice::getSpans() const {

@@ -93,6 +93,16 @@ private slots:
         QVERIFY(deviceFromFile(file.fileName(), options).get());
     }
 
+    void testCustomCacheSize() {
+        QTemporaryFile file;
+        file.open();
+        file.write("Lorem ipsum dolor sit amet");
+
+        FileLoadOptions options;
+        options.memoryLoad = true;
+        auto dev = deviceFromFile(file.fileName(), options);
+    }
+
 private:
     void testDevice(const std::shared_ptr<AbstractDevice> &device, const QByteArray &realData) {
         QCOMPARE(device->getLength(), qulonglong(realData.length()));
