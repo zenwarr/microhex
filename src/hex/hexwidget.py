@@ -1,4 +1,4 @@
-from PyQt4.QtCore import pyqtSignal, QObject, Qt, QPointF, QRectF, QPoint, QSizeF, QEvent, QTimer, QLineF, QUrl, \
+from PyQt4.QtCore import pyqtSignal, QObject, Qt, QPointF, QRectF, QPoint, QSize, QSizeF, QEvent, QTimer, QLineF, QUrl, \
                         QEasingCurve, QSequentialAnimationGroup, pyqtProperty, QPropertyAnimation
 from PyQt4.QtGui import QColor, QFont, QFontMetricsF, QPolygonF, QWidget, QScrollBar, QVBoxLayout, QHBoxLayout, \
                         QPainter, QBrush, QPalette, QPen, QApplication, QRegion, QLineEdit, QValidator, \
@@ -7,7 +7,6 @@ from PyQt4.QtGui import QColor, QFont, QFontMetricsF, QPolygonF, QWidget, QScrol
                         QTextTableFormat, QRawFont, QKeyEvent, QFontDatabase, QMenu, QToolTip, QPixmap, QIcon, \
                         QMessageBox
 import math
-import html
 import os
 from hex.valuecodecs import IntegerCodec
 from hex.formatters import IntegerFormatter
@@ -234,6 +233,8 @@ class TextDocumentBackend(ColumnDocumentBackend):
                 block_format = self._documentBlockFormat
                 for row_index in range(self._column.visibleRows):
                     row_data = self._column.getRowCachedData(row_index)
+                    if row_data is None:
+                        break
                     cursor.movePosition(QTextCursor.End)
                     cursor.insertHtml(row_data.html)
                     cursor.insertBlock()
@@ -333,7 +334,7 @@ class TextDocumentBackend(ColumnDocumentBackend):
             return QPointF()
 
         index_data = self._column.getIndexCachedData(index)
-        if cursor_offset < 0 or cursor_offset > len(index_data.text):
+        if index_data is None or cursor_offset < 0 or cursor_offset > len(index_data.text):
             return QPointF()
 
         block = self._document.findBlockByLineNumber(index.row)
@@ -726,11 +727,14 @@ class Column(QObject):
     def _renderDocumentData(self):
         """Document will contain actual data after calling this method"""
         if self._documentDirty:
-            for row_index in range(len(self._cache)):
-                # update only invalidated rows
+            # we cannot simply iterate over all cached rows, because call to DocumentBackend.updateRow can
+            # cause number of rows on screen to be changed
+            row_index = 0
+            while row_index < len(self._cache):
                 if self._cache[row_index] is None:
                     self._updateCachedRow(row_index)
                     self._documentBackend.updateRow(row_index, self._cache[row_index])
+                row_index += 1
             self._documentDirty = False
 
     def _onDocumentUpdated(self):
@@ -925,6 +929,7 @@ class HexWidget(QWidget):
         self.view = QWidget(self)
         self.view.installEventFilter(self)
         self.view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.view.setMinimumSize(QSize(50, 50))
         self.setFocusProxy(self.view)
 
         self.vScrollBar = BigIntScrollBar(Qt.Vertical, self)
