@@ -1369,39 +1369,34 @@ class HexWidget(QWidget):
     _edit_keys = (Qt.Key_Backspace, Qt.Key_Delete)
 
     def _keyPress(self, event):
+        if self._activeDelegate is not None:
+            if self._activeDelegate.handleEvent(event):
+                return
+
         method = None
-        if event.key() == Qt.Key_Right:
-            if self._activeDelegate is not None:
-                self._activeDelegate.handleEvent(event)
-            else:
+        bitmask = Qt.NoModifier | Qt.ShiftModifier | Qt.KeypadModifier
+        if utils.checkMask(event.modifiers(), bitmask):
+            if event.key() == Qt.Key_Right:
                 method = self.NavMethod_NextCell
-        elif event.key() == Qt.Key_Left:
-            if self._activeDelegate is not None:
-                self._activeDelegate.handleEvent(event)
-            else:
+            elif event.key() == Qt.Key_Left:
                 method = self.NavMethod_PrevCell
-        elif event.key() == Qt.Key_Up:
-            method = self.NavMethod_RowUp
-        elif event.key() == Qt.Key_Down:
-            method = self.NavMethod_RowDown
-        elif event.key() == Qt.Key_PageUp:
-            method = self.NavMethod_ScreenUp
-        elif event.key() == Qt.Key_PageDown:
-            method = self.NavMethod_ScreenDown
-        elif event.key() == Qt.Key_Home:
-            if event.modifiers() & Qt.ControlModifier:
-                method = self.NavMethod_DocumentStart
-            elif self.editMode:
-                self._activeDelegate.handleEvent(event)
-            else:
+            elif event.key() == Qt.Key_Up:
+                method = self.NavMethod_RowUp
+            elif event.key() == Qt.Key_Down:
+                method = self.NavMethod_RowDown
+            elif event.key() == Qt.Key_PageUp:
+                method = self.NavMethod_ScreenUp
+            elif event.key() == Qt.Key_PageDown:
+                method = self.NavMethod_ScreenDown
+            elif event.key() == Qt.Key_Home:
                 method = self.NavMethod_RowStart
-        elif event.key() == Qt.Key_End:
-            if event.modifiers() & Qt.ControlModifier:
-                method = self.NavMethod_DocumentEnd
-            elif self.editMode:
-                self._activeDelegate.handleEvent(event)
-            else:
+            elif event.key() == Qt.Key_End:
                 method = self.NavMethod_RowEnd
+        elif utils.checkMask(event.modifiers(), bitmask | Qt.ControlModifier):
+            if event.key() == Qt.Key_Home:
+                method = self.NavMethod_DocumentStart
+            elif event.key() == Qt.Key_End:
+                method = self.NavMethod_DocumentEnd
 
         if method is not None:
             self._navigate(method, event.modifiers() & Qt.ShiftModifier)

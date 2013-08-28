@@ -261,6 +261,10 @@ class StandardEditDelegate(QObject):
 
     EditNextIndex, EditPreviousIndex, EditNone = range(3)
 
+    InputBlockKeys = (Qt.Key_Escape, Qt.Key_Backspace, Qt.Key_Enter, Qt.Key_Return, Qt.Key_Tab)  # these keys generate
+            # text input, but we do not want them to have such behaviour as these character have special meaning
+            # for widget.
+
     def __init__(self, index, is_inserted, init_text=None, insert_mode=False, cursor_offset=0):
         QObject.__init__(self)
         self.index = index
@@ -402,26 +406,35 @@ class StandardEditDelegate(QObject):
 
     def handleEvent(self, event):
         if event.type() == QEvent.KeyPress:
-            if event.key() == Qt.Key_Right:
-                self.moveCursorRight()
-            elif event.key() == Qt.Key_Left:
-                self.moveCursorLeft()
-            elif event.key() == Qt.Key_Home:
-                self.cursorOffset = self.minimalCursorOffset
-            elif event.key() == Qt.Key_End:
-                self.cursorOffset = self.maximalCursorOffset
-            elif event.key() == Qt.Key_Delete:
-                if self.insertMode:
-                    return self.deleteChar()
-            elif event.key() == Qt.Key_Backspace:
-                if self.insertMode:
-                    return self.backspaceChar()
-            elif event.text():
-                if self.insertMode:
-                    self.insertText(event.text())
-                else:
-                    self.overwriteText(event.text())
-                return True
+            if utils.checkMask(event.modifiers(), Qt.NoModifier | Qt.KeypadModifier):
+                if event.key() == Qt.Key_Right:
+                    self.moveCursorRight()
+                    return True
+                elif event.key() == Qt.Key_Left:
+                    self.moveCursorLeft()
+                    return True
+                elif event.key() == Qt.Key_Home:
+                    self.cursorOffset = self.minimalCursorOffset
+                    return True
+                elif event.key() == Qt.Key_End:
+                    self.cursorOffset = self.maximalCursorOffset
+                    return True
+                elif event.key() == Qt.Key_Delete:
+                    if self.insertMode:
+                        self.deleteChar()
+                    return True
+                elif event.key() == Qt.Key_Backspace:
+                    if self.insertMode:
+                        self.backspaceChar()
+                    return True
+                elif event.key() in self.InputBlockKeys:
+                    return False
+                elif event.text():
+                    if self.insertMode:
+                        self.insertText(event.text())
+                    else:
+                        self.overwriteText(event.text())
+                    return True
         return False
 
     def moveCursorRight(self):

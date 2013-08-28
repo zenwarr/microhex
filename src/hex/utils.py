@@ -184,3 +184,10 @@ def isValidFilename(filename):
 
 def htmlEscape(text):
     return html.escape(text).replace(' ', '&nbsp;')
+
+
+def checkMask(value, mask):
+    """Return False if there is at least one bit in :value: that is not set in :mask:
+    """
+    return bool(value | mask == mask)
+

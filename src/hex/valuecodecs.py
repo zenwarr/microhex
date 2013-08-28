@@ -36,11 +36,11 @@ class IntegerCodec(GenericCodec):
 
     @property
     def maximal(self):
-        return 255 ** self.dataSize // (2 if self.signed else 1)
+        return (256 ** self.dataSize // (2 if self.signed else 1)) - 1
 
     @property
     def minimal(self):
-        return -self.maximal if self.signed else 0
+        return -self.maximal - 1 if self.signed else 0
 
     @staticmethod
     def formatName(fmt):

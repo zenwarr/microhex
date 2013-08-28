@@ -1,4 +1,4 @@
-from PyQt4.QtCore import Qt
+from PyQt4.QtCore import Qt, QEvent
 from PyQt4.QtGui import QValidator, QWidget, QFormLayout, QComboBox, QCheckBox, QSpinBox, QSizePolicy
 import hex.models as models
 import hex.columnproviders as columnproviders
@@ -95,6 +95,33 @@ class HexColumnDelegate(models.StandardEditDelegate):
                 return True
 
         return models.StandardEditDelegate.overwriteText(self, text)
+
+    def handleEvent(self, event):
+        # subclass allows increasing/decreasing values with Ctrl+Up/Ctrl+Down keys and quick access to min/max
+        # possible values with Ctrl+Shift+Down/Ctrl+Shift+Up keys.
+        if event.type() == QEvent.KeyPress:
+            bitmask = Qt.NoModifier | Qt.KeypadModifier | Qt.ControlModifier | Qt.ShiftModifier
+            if utils.checkMask(event.modifiers(), bitmask) and event.modifiers() & Qt.ControlModifier:
+                if event.key() == Qt.Key_Up or event.key() == Qt.Key_Down:
+                    model = self.index.model
+                    current_value = model.formatter.parse(self.data())
+                    if event.key() == Qt.Key_Up:
+                        if event.modifiers() & Qt.ShiftModifier:
+                            new_value = model.valuecodec.maximal
+                        else:
+                            new_value = current_value + 1
+                    else:
+                        if event.modifiers() & Qt.ShiftModifier:
+                            new_value = model.valuecodec.minimal
+                        else:
+                            new_value = current_value - 1
+                    if new_value != current_value:
+                        formatted = model.formatter.format(new_value)
+                        if model.valuecodec.signed and new_value >= 0:
+                            formatted = '+' + formatted
+                        self._setData(formatted)
+                    return True
+        return models.StandardEditDelegate.handleEvent(self, event)
 
 
 class HexColumnValidator(QValidator):
