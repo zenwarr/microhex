@@ -265,7 +265,7 @@ class StandardEditDelegate(QObject):
             # text input, but we do not want them to have such behaviour as these character have special meaning
             # for widget.
 
-    def __init__(self, index, is_inserted, init_text=None, insert_mode=False, cursor_offset=0):
+    def __init__(self, index, is_inserted, init_text=None, insert_mode=False, cursor_offset=0, should_save=False):
         QObject.__init__(self)
         self.index = index
         self.insertMode = insert_mode
@@ -273,6 +273,7 @@ class StandardEditDelegate(QObject):
         self.modified = is_inserted or (init_text is not None and init_text != index.data(Qt.EditRole))
         self.isInserted = is_inserted
         self._text = init_text if init_text is not None else index.data(Qt.EditRole)
+        self._shouldSave = should_save
 
         if cursor_offset < self.minimalCursorOffset:
             self._cursorOffset = self.minimalCursorOffset
@@ -286,6 +287,10 @@ class StandardEditDelegate(QObject):
             status = validator.validate(self._text, cursor_offset)
             if status == QValidator.Invalid:
                 raise ValueError()
+
+    @property
+    def shouldSave(self):
+        return self._shouldSave
 
     @property
     def cursorOffset(self):
@@ -340,6 +345,7 @@ class StandardEditDelegate(QObject):
         if validator is None or validator.validate(value, self.cursorOffset):
             self._text = value
             self.modified = True
+            self._shouldSave = True
             self.dataChanged.emit()
             return True
         return False
@@ -440,14 +446,14 @@ class StandardEditDelegate(QObject):
     def moveCursorRight(self):
         new_offset = self.cursorOffset + 1
         if new_offset > self.maximalCursorOffset:
-            self.requestFinish.emit(True, self.EditNextIndex)
+            self.requestFinish.emit(self.shouldSave, self.EditNextIndex)
         else:
             self.cursorOffset = new_offset
 
     def moveCursorLeft(self):
         new_offset = self.cursorOffset - 1
         if new_offset < self.minimalCursorOffset:
-            self.requestFinish.emit(True, self.EditPreviousIndex)
+            self.requestFinish.emit(self.shouldSave, self.EditPreviousIndex)
         else:
             self.cursorOffset = new_offset
 
@@ -701,7 +707,8 @@ class RegularColumnModel(ColumnModel):
                 self.document.insertSpan(position, documents.DataSpan(data_to_insert))
                 new_index = self.indexFromPosition(position)
                 return self._delegateType(new_index, is_inserted=True, init_text=index_text,
-                                          cursor_offset=cursor_offset, insert_mode=self.defaultInsertMode)
+                                          cursor_offset=cursor_offset, insert_mode=self.defaultInsertMode,
+                                          should_save=input_text is not None)
 
     @property
     def defaultInsertMode(self) -> bool:
@@ -836,19 +843,13 @@ class FrameModel(AbstractModel):
     def activeDelegate(self, new_delegate):
         if new_delegate is not self._activeDelegate:
             if self._activeDelegate is not None:
-                self._activeDelegate.dataChanged.disconnect(self._onDelegateUpdated)
-                self._activeDelegate.finished.disconnect(self._onDelegateFinished)
-
-            if self._activeDelegate is not None:
-                del_index = self.toFrameIndex(self._activeDelegate.index)
-                if del_index:
-                    self._onDataChanged(del_index, del_index)
+                self._unsetDelegate()
 
             self._activeDelegate = new_delegate
 
             if new_delegate is not None:
                 new_delegate.dataChanged.connect(self._onDelegateUpdated)
-                new_delegate.finished.connect(self._onDelegateFinished)
+                new_delegate.finished.connect(self._unsetDelegate)
 
                 self._onDelegateUpdated()
 
@@ -946,10 +947,13 @@ class FrameModel(AbstractModel):
             if frame_index:
                 self._onDataChanged(index, index)
 
-    def _onDelegateFinished(self):
+    def _unsetDelegate(self):
         delegate = self._activeDelegate
-        self.activeDelegate = None
+        self._activeDelegate = None
         if delegate is not None:
+            delegate.dataChanged.disconnect(self._onDelegateUpdated)
+            delegate.finished.disconnect(self._unsetDelegate)
+
             frame_index = self.toFrameIndex(delegate.index)
             if frame_index:
                 self._onDataChanged(delegate.index, delegate.index)

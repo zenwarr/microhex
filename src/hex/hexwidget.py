@@ -1076,7 +1076,8 @@ class HexWidget(QWidget):
             if self.editMode:
                 new_caret_index = self.caretIndex(self._leadingColumn)
                 if new_caret_index != old_caret_index:
-                    self.endEditIndex(save=True)
+                    if self._activeDelegate is not None:
+                        self.endEditIndex(self._activeDelegate.shouldSave)
                     self.beginEditIndex(new_caret_index)
             self.view.update()
 
@@ -1598,7 +1599,7 @@ class HexWidget(QWidget):
 
             if 0 <= column_index < len(self._columns):
                 if self.editMode:
-                    self.endEditIndex(True)
+                    self.endEditIndex(self._activeDelegate.shouldSave)
                 self.leadingColumn = self._columns[column_index]
 
     def _mousePress(self, event):
@@ -1618,7 +1619,8 @@ class HexWidget(QWidget):
                         if cursor_offset <= self._activeDelegate.maximalCursorOffset:
                             self._activeDelegate.cursorOffset = cursor_offset
                     else:
-                        self.endEditIndex(True)
+                        if self._activeDelegate is not None:
+                            self.endEditIndex(self._activeDelegate.shouldSave)
                         self.caretPosition = activated_index.data(ColumnModel.DocumentPositionRole)
 
                         if not activated_index.virtual and event.button() == Qt.LeftButton:
@@ -1856,7 +1858,7 @@ class HexWidget(QWidget):
                 if self._activeDelegate.index == index:
                     return
                 else:
-                    self.endEdit(save=True)
+                    self.endEdit(self._activeDelegate.shouldSave)
 
             self._setDelegate(index.model.delegateForIndex(index))
             if self._activeDelegate is not None:
@@ -1875,7 +1877,8 @@ class HexWidget(QWidget):
         if model is None:
             return
 
-        self.endEditIndex(save=True)
+        if self._activeDelegate is not None:
+            self.endEditIndex(self._activeDelegate.shouldSave)
 
         self._setDelegate(model.delegateForNewIndex(input_text, before_index))
         if self._activeDelegate is not None:
@@ -1892,8 +1895,9 @@ class HexWidget(QWidget):
                 delegate.finished.connect(self._onDelegateFinished)
                 delegate.cursorMoved.connect(self._updateCursorOffset)
                 delegate.requestFinish.connect(self._onDelegateFinishRequested)
-            for column in self._columns:
-                column.frameModel.activeDelegate = delegate
+
+            if self._leadingColumn is not None:
+                self._leadingColumn.frameModel.activeDelegate = delegate
 
     def _onDelegateFinished(self):
         self._setDelegate(None)
