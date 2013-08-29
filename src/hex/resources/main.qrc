@@ -55,5 +55,10 @@
         <file>images/media-playback-start32.png</file>
         <file>images/media-playback-stop16.png</file>
         <file>images/media-playback-stop32.png</file>
+        <file>images/plus.png</file>
+        <file>images/minus.png</file>
+        <file>images/pencil.png</file>
+        <file>images/edit-code.png</file>
+        <file>images/type.png</file>
     </qresource>
 </RCC>

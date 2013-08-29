@@ -27,7 +27,7 @@ bool checkRangesIntersect(qulonglong start1, qulonglong length1, qulonglong star
         qSwap(start1, start2);
         qSwap(length1, length2);
     }
-    return start2 - start1 <= length1;
+    return start2 - start1 < length1;
 }
 
 const char *postfixes[] = {"TB", "GB", "MB", "KB"};

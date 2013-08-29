@@ -49,5 +49,6 @@ qrc_*
 ui_*
 *.qm
 *.pro.user
+*.dia
 
 lupdate.sh

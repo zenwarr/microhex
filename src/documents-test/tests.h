@@ -586,6 +586,17 @@ private slots:
         QCOMPARE(doc->getLength(), qulonglong(0));
     }
 
+    void testFrameDocument() {
+        auto dev = deviceFromData("Lorem ipsum");
+        auto doc = std::make_shared<Document>(dev);
+        doc->writeSpan(2, std::make_shared<DataSpan>("fuck"));
+        QCOMPARE(doc->readAll(), QByteArray("Lofuckipsum"));
+        auto frame_doc = doc->createConstantFrame(2, 6);
+        QCOMPARE(frame_doc->readAll(), QByteArray("fuckip"));
+        QCOMPARE(frame_doc->getLength(), qulonglong(6));
+        QCOMPARE(frame_doc->isReadOnly(), true);
+    }
+
 private:
     void testDocument(const std::shared_ptr<Document> &document, const QByteArray &real_data) {
         QCOMPARE(document->getLength(), qulonglong(real_data.length()));

@@ -1,7 +1,7 @@
 import os
 from PyQt4.QtCore import QAbstractTableModel, Qt, QModelIndex
-from PyQt4.QtGui import QDialogButtonBox, QListWidgetItem, QMessageBox, QFont, QFontDialog, QWidget, QVBoxLayout, \
-                        QHBoxLayout, QComboBox, QPushButton, QListWidget, QTableView, QSizePolicy, QItemDelegate, \
+from PyQt4.QtGui import QDialogButtonBox, QListWidgetItem, QMessageBox, QFontDialog, QWidget, QVBoxLayout, \
+                        QHBoxLayout, QComboBox, QPushButton, QTableView, QSizePolicy, QItemDelegate, \
                         QColorDialog, QColor, QInputDialog
 from hex.forms.ui_settingsdialog import Ui_SettingsDialog
 import hex.utils as utils
@@ -82,7 +82,7 @@ class SettingsDialog(utils.Dialog):
                 self.ui.cmbIntegerEditStyle.addItem(style_data[0], style_data[1])
 
             self.ui.cmbIntegerEditStyle.setCurrentIndex(self.ui.cmbIntegerEditStyle.findData(
-                                globalSettings[appsettings.IntegerEdit_DefaultStyle]))
+                                                        globalSettings[appsettings.IntegerEdit_DefaultStyle]))
         elif page_data.page is self.ui.pageTranslation:
             self.ui.cmbTranslations.clear()
 
@@ -289,7 +289,8 @@ class ThemeModel(QAbstractTableModel):
             elif section == 1:
                 return utils.tr('Value')
 
-    def _componentToDisplayName(self, comp):
+    @staticmethod
+    def _componentToDisplayName(comp):
         return utils.tr(''.join((' ' + c.lower() if c.isupper() else c) for c in comp).capitalize())
 
 

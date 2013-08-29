@@ -1,9 +1,7 @@
 from PyQt4.QtCore import QFileInfo, QSize
 from hex.forms.ui_loadfiledialog import Ui_LoadFileDialog
 import hex.utils as utils
-import hex.formatters as formatters
 import hex.settings as settings
-import hex.appsettings as appsettings
 import hex.documents as documents
 
 

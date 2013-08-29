@@ -4,7 +4,6 @@ from PyQt4.QtCore import Qt, QObject, pyqtSignal, QEvent
 from PyQt4.QtGui import QValidator
 import hex.utils as utils
 import hex.formatters as formatters
-import hex.valuecodecs as valuecodecs
 import hex.documents as documents
 
 # Why we need to make different model classes? Why not to use existing ones?
@@ -473,7 +472,7 @@ class ColumnModel(AbstractModel):
     dataChanged = pyqtSignal(ModelIndex, ModelIndex)  # first argument is first changed index, second is last one
     dataResized = pyqtSignal(ModelIndex)              # argument is new last real index
     indexesInserted = pyqtSignal(ModelIndex, object)     # first argument is first inserted index
-    indexesRemoved = pyqtSignal(ModelIndex, object)      # first argument is index BEFORE which indexes was removed, or
+    indexesRemoved = pyqtSignal(ModelIndex, object)      # first argument is index BEFORE removed indexes, or
                                                       # ModelIndex() if indexes was removed from model beginning
     modelReset = pyqtSignal()                         # emitted when model is resetted
     headerDataChanged = pyqtSignal()
@@ -694,7 +693,11 @@ class RegularColumnModel(ColumnModel):
 
     def _onDocumentDataChanged(self, start, length):
         length = length if length >= 0 else self.document.length - start
-        self.dataChanged.emit(self.indexFromPosition(start), self.indexFromPosition(start + length - 1))
+        first_index = self.indexFromPosition(start)
+        if first_index:
+            last_index = self.indexFromPosition(start + length - 1) or self.lastRealIndex
+            if last_index:
+                self.dataChanged.emit(first_index, last_index)
 
     def _onDocumentDataResized(self, new_size):
         self.dataResized.emit(self.lastRealIndex)

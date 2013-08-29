@@ -11,6 +11,7 @@ import hex.settings as settings
 import hex.appsettings as appsettings
 import hex.utils as utils
 import hex.translate as translate
+import hex.resources.qrc_main  # to make resources available for Qt
 
 
 class Application(QApplication):
@@ -104,7 +105,8 @@ class GarbageCollector(object):
         self.timer.timeout.connect(self._doCollect)
         self.timer.start(1000)
 
-    def _doCollect(self):
+    @staticmethod
+    def _doCollect():
         gc.collect()
 
 

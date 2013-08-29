@@ -11,8 +11,8 @@ import struct
 class FloatColumnModel(models.RegularValueColumnModel):
     def __init__(self, document, valuecodec=None, formatter=None, columns_on_row=4):
         models.RegularValueColumnModel.__init__(self, document, valuecodec or valuecodecs.FloatCodec(),
-                                                   formatter or formatters.FloatFormatter(), columns_on_row,
-                                                   delegate_type=FloatColumnEditDelegate)
+                                                formatter or formatters.FloatFormatter(), columns_on_row,
+                                                delegate_type=FloatColumnEditDelegate)
 
     @property
     def regularTextLength(self):
@@ -133,4 +133,3 @@ class FloatColumnConfigurationWidget(QWidget, columnproviders.AbstractColumnConf
         column.formatter = self._formatter
         column.columnsOnRow = self.spnColumnsOnRow.value()
         column.reset()
-

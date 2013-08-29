@@ -3,9 +3,9 @@ from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QColor, QPixmap, QIcon, QColorDialog, QDialogButtonBox, QButtonGroup
 import hex.utils as utils
 import hex.hexwidget as hexwidget
-from hex.forms.ui_addbookmarkdialog import Ui_AddBookmarkDialog
 import hex.settings as settings
 import hex.appsettings as appsettings
+from hex.forms.ui_addbookmarkdialog import Ui_AddBookmarkDialog
 
 
 currentBookmarkIndex = 1
@@ -33,12 +33,11 @@ class AddBookmarkDialog(utils.Dialog):
         else:
             self.ui.btnMarkCaret.setChecked(True)
 
-        self._groupBind = QButtonGroup()
-        self._groupBind.addButton(self.ui.btnBoundToPosition)
-        self._groupBind.addButton(self.ui.btnBoundToData)
-        self.ui.btnBoundToData.setChecked(True)
-
+        self.ui.chkDynamic.setChecked(True)
+        self.ui.chkAllowResize.setChecked(True)
         self._bookmarkColor = QColor(Qt.red)
+
+        self.setFixedHeight(self.height())
 
         self.ui.btnMarkCaret.toggled.connect(self._updateOk)
         self.ui.btnMarkSelection.toggled.connect(self._updateOk)
@@ -53,11 +52,11 @@ class AddBookmarkDialog(utils.Dialog):
         if self._canCreateBookmark:
             bookmark_range = self.createBookmark()
             # find existing bookmarks that contain this one
-            c_bookmarks = [b for b in self.hexWidget.bookmarks if b.contains(bookmark_range)]
+            c_bookmarks = [b for b in self.hexWidget.bookmarks if b.bufferRange.contains(bookmark_range.bufferRange)]
 
             if c_bookmarks:
                 c_bookmark = min(c_bookmarks, key=lambda x: x.size)
-                bookmark_name = c_bookmark.name + '.'
+                bookmark_name = c_bookmark.name + '.' if not c_bookmark.name.endswith('.') else c_bookmark.name
 
         if bookmark_name:
             self.ui.txtName.setText(bookmark_name)
@@ -86,10 +85,11 @@ class AddBookmarkDialog(utils.Dialog):
         if self._canCreateBookmark and not self._isColorChoosen:
             bookmark_range = self.createBookmark()
 
-            i_bookmarks = [b for b in self.hexWidget.bookmarks if b.intersectsWith(bookmark_range)]
+            i_bookmarks = [b for b in self.hexWidget.bookmarks if b.bufferRange.intersectsWith(bookmark_range.bufferRange)]
             distance = settings.globalSettings()[appsettings.HexWidget_RandomColorDistance]
             used_colors = [b.backgroundColor for b in i_bookmarks] + [self.hexWidget.theme.backgroundColor,
                                                                       self.hexWidget.theme.textColor]
+
             for i in range(100):
                 bookmark_color = utils.generateRandomColor()
                 if all(colorsDistance(bookmark_color, color) >= distance for color in used_colors):
@@ -109,30 +109,31 @@ class AddBookmarkDialog(utils.Dialog):
             self._updateColorButton()
 
     def createBookmark(self):
-        bookmark = None
+        b_range = None
         if self.ui.btnMarkCaret.isChecked():
             caret_pos = self.hexWidget.caretPosition
             if caret_pos >= 0:
-                bookmark = hexwidget.BookmarkedRange(self.hexWidget, caret_pos, 1, hexwidget.DataRange.UnitBytes,
-                                                     self._boundTo)
-        elif self.hexWidget.selectionRanges:
-            select_range = self.hexWidget.selectionRanges[0]
+                b_range = utils.DocumentRange(self.hexWidget.document, caret_pos, 1,
+                                              fixed=self._isFixed, allow_resize=self._allowResize)
+        elif self.hexWidget.selections:
+            select_range = self.hexWidget.selections[0]
             if select_range:
-                bookmark = hexwidget.BookmarkedRange(self.hexWidget, select_range.start, select_range.length,
-                                                     select_range.unit, self._boundTo)
+                b_range = utils.DocumentRange(self.hexWidget.document, select_range.bufferRange.startPosition,
+                                              select_range.bufferRange.size, fixed=self._isFixed,
+                                              allow_resize=self._allowResize)
 
-        if bookmark is not None:
-            bookmark.name = self.ui.txtName.text()
-            bookmark.backgroundColor = self._bookmarkColor
-
-        return bookmark
+        if b_range is not None:
+            return hexwidget.BookmarkRange(self.ui.txtName.text(), self._bookmarkColor, b_range)
 
     @property
-    def _boundTo(self):
-        return hexwidget.DataRange.BoundToPosition if self.ui.btnBoundToPosition.isChecked() else hexwidget.DataRange.BoundToData
+    def _isFixed(self):
+        return not self.ui.chkDynamic.isChecked()
+
+    @property
+    def _allowResize(self):
+        return self.ui.chkAllowResize.isChecked()
 
     def accept(self):
         global currentBookmarkIndex
         currentBookmarkIndex += 1
         utils.Dialog.accept(self)
-

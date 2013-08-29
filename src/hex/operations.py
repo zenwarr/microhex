@@ -4,7 +4,8 @@ import copy
 import logging
 import time
 import itertools
-from PyQt4.QtCore import QObject, pyqtSignal, Qt, QEvent, QSize, QAbstractListModel, QAbstractTableModel, QModelIndex
+from PyQt4.QtCore import QObject, pyqtSignal, Qt, QEvent, QSize, QAbstractListModel, QAbstractTableModel, QModelIndex, \
+                         QTimer
 from PyQt4.QtGui import QWidget, QPushButton, QToolButton, QProgressBar, QHBoxLayout, QLabel, QMessageBox, qApp, \
                         QListView, QDialogButtonBox, QVBoxLayout, QTreeView, QItemDelegate, QStyleOptionProgressBarV2, \
                         QStyle
@@ -91,30 +92,19 @@ class _CallbackRequestEvent(QEvent):
         self._callbackKwArgs = callback_kwargs
 
     def __call__(self):
-        if self._operation is not None and self._callback is not None and callable(self._callback):
+        if self._operation is not None and self._callback is not None and utils.isCallable(self._callback):
             result = self._callback(*self._callbackArgs, **self._callbackKwArgs)
             self.accept()
             self._operation._reportCallbackProcessed(True, result)
 
 
 class _GuiDispatcher(QObject):
-    def __init__(self):
-        QObject.__init__(self)
-        self.moveToThread(qApp.thread())
-
     def customEvent(self, event):
         if isinstance(event, _CallbackRequestEvent):
             event()
 
 
-_globalGuiDispatcher = None
-
-
-def globalGuiDispatcher():
-    global _globalGuiDispatcher
-    if _globalGuiDispatcher is None:
-        _globalGuiDispatcher = _GuiDispatcher()
-    return _globalGuiDispatcher
+globalGuiDispatcher = utils.createSingleton(_GuiDispatcher, force_app_thread=True)
 
 
 class Operation(QObject):
@@ -657,7 +647,7 @@ class Operation(QObject):
         if self._state.progressText:
             error_text += ' (' + self._state.progressText + ') '
         error_text += ('</b><br>' + utils.tr('the following error occupied:') + '<br><br><b>' + str(error) +
-                        utils.tr('</b><br><br>Do you want to try to cancel this operation?'))
+                       utils.tr('</b><br><br>Do you want to try to cancel this operation?'))
 
         msgbox = QMessageBox(globalMainWindow)
         msgbox.setWindowTitle(utils.tr('{0} operation error').format(self.title))
@@ -699,7 +689,6 @@ class OperationContext(QObject):
 
     def __init__(self):
         QObject.__init__(self)
-        self.moveToThread(qApp.thread())
         self.lock = threading.RLock()
         self._operations = {}
 
@@ -774,14 +763,7 @@ class OperationContext(QObject):
             return True, callback(**callback_args)
 
 
-_globalOperationContext = None
-
-
-def globalOperationContext():
-    global _globalOperationContext
-    if _globalOperationContext is None:
-        _globalOperationContext = OperationContext()
-    return _globalOperationContext
+globalOperationContext = utils.createSingleton(OperationContext)
 
 
 class WrapperOperation(Operation):
@@ -931,14 +913,7 @@ class OperationPool(QObject):
                 self._threadCount += 1
 
 
-_globalOperationPool = None
-
-
-def globalOperationPool():
-    global _globalOperationPool
-    if _globalOperationPool is None:
-        _globalOperationPool = OperationPool()
-    return _globalOperationPool
+globalOperationPool = utils.createSingleton(OperationPool)
 
 
 class OperationWidget(object):
@@ -1417,6 +1392,8 @@ class OperationsDialog(utils.Dialog):
         self.setLayout(QVBoxLayout())
         self.layout().addWidget(self.operationsList)
         self.layout().addWidget(self.buttonBox)
+
+        self.resize(500, 300)
 
     def _onItemDoubleClicked(self, index):
         operation = index.data(OperationsModel.OperationRole)

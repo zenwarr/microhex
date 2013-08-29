@@ -57,8 +57,8 @@ class CharColumnModel(models.RegularColumnModel):
         if role == Qt.DisplayRole or role == Qt.EditRole:
             try:
                 position = index.documentPosition
-                char_data = self.codec.getCharacterData(self.document, position)
-                if char_data.startPosition != position:
+                char_data = self.codec.getCharacterData(utils.DocumentCursor(self.document, position))
+                if char_data.bufferRange.startPosition != position:
                     return ' '
                 else:
                     return self._translateToVisualCharacter(char_data.unicode)
@@ -67,10 +67,11 @@ class CharColumnModel(models.RegularColumnModel):
 
     def indexFlags(self, index):
         flags = models.RegularColumnModel.indexFlags(self, index)
-        try:
-            self.codec.getCharacterData(self.document, index.documentPosition)
-        except encodings.EncodingError:
-            flags |= self.FlagBroken
+        if index.documentPosition < self.document.length:
+            try:
+                self.codec.getCharacterData(utils.DocumentCursor(self.document, index.documentPosition))
+            except encodings.EncodingError:
+                flags |= self.FlagBroken
         return flags
 
     def _dataForNewIndex(self, input_text, before_index):
@@ -130,14 +131,14 @@ class CharColumnEditDelegate(models.StandardEditDelegate):
         document = self.index.model.document
         position = self.index.documentPosition
         try:
-            char_data = codec.getCharacterData(document, position)
+            char_data = codec.getCharacterData(utils.DocumentCursor(document, position))
         except encodings.EncodingError:
             return self.index.next
 
-        if char_data.startPosition != position:
+        if char_data.bufferRange.startPosition != position:
             return self.index.next
         else:
-            return self.index.model.indexFromPosition(position + char_data.bytesCount)
+            return self.index.model.indexFromPosition(position + char_data.bufferRange.size)
 
     @property
     def previousEditIndex(self):
@@ -147,7 +148,7 @@ class CharColumnEditDelegate(models.StandardEditDelegate):
         codec = self.index.model.codec
         document = self.index.model.document
         try:
-            position = codec.findCharacterStart(document, self.index.documentPosition)
+            position = codec.findCharacterStart(utils.DocumentCursor(document, self.index.documentPosition))
             if position <= 0:
                 return models.ModelIndex()
             elif position != self.index.documentPosition:
@@ -157,7 +158,7 @@ class CharColumnEditDelegate(models.StandardEditDelegate):
         prev_char_byte = position - 1
 
         try:
-            character_start = codec.findCharacterStart(document, prev_char_byte)
+            character_start = codec.findCharacterStart(utils.DocumentCursor(document, prev_char_byte))
             return self.index.model.indexFromPosition(character_start)
         except encodings.EncodingError:
             return self.index.model.indexFromPosition(prev_char_byte)

@@ -1,9 +1,6 @@
 from PyQt4.QtGui import QWidget, QFormLayout, QVBoxLayout, QDialogButtonBox, QLineEdit, QSizePolicy, QComboBox
 from PyQt4.QtCore import Qt
 import hex.utils as utils
-import hex.valuecodecs as valuecodecs
-import hex.formatters as formatters
-import hex.encodings as encodings
 
 
 class AbstractColumnProvider(object):
@@ -74,7 +71,7 @@ class CreateColumnDialog(utils.Dialog):
 
         self.layout().addStretch()
 
-        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok|QDialogButtonBox.Cancel, Qt.Horizontal, self)
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, self)
         self.layout().addWidget(self.buttonBox)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
@@ -121,7 +118,7 @@ class ConfigureColumnDialog(utils.Dialog):
 
         self.txtColumnName.setEnabled(self.configWidget is not None)
 
-        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok|QDialogButtonBox.Cancel, Qt.Horizontal, self)
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, self)
         self.layout().addWidget(self.buttonBox)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)

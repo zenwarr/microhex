@@ -1,6 +1,5 @@
 #include "matcher.h"
 #include "document.h"
-#include <QDebug>
 
 int MATCHER_BUFFER_SIZE = 1024 * 1024;
 

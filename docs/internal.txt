@@ -1,7 +1,27 @@
-1. There is bug in sip (or PyQt, or both) due to which integer values are processed incorrectly - positive
-   values that are too big for int are trimmed and treated as negative (even if C++ type is unsigned).
-   This behaviour affects values returned from __len__ attribute implementation generated for wrapped C++ code
-   as well as Python values that are passed through signals. Fortunately, values returned from wrapped C++
-   function or plain variables are not affected (values from signal that was emitted in C++ are correct too).
-   Workaround is not to use __len__ in sip, and replace 'int' with 'object' in calls to pyqtSignal if integer
-   value can be too big.
+1.  There is bug in sip (or PyQt, or both) due to which integer values are processed incorrectly - positive
+    values that are too big for int are trimmed and can be treated as negative (even if C++ type is unsigned).
+    This behaviour affects values returned from __len__ attribute implementation generated for wrapped C++ code
+    as well as Python values that are passed through signals. Fortunately, values returned from wrapped C++
+    function or plain variables are not affected (values from signal that was emitted in C++ are correct too).
+    Workaround is not to use __len__ in sip, and replace 'int' with 'object' in calls to pyqtSignal if integer
+    value can be too big.
+
+2.  Be careful with strings passed from C++ from Python - there is strange behaviour on some platforms while processing
+    characters with unicode code points > 0xffff. Consider the following code, comparing results from QTextCodec
+    with results from Python codecs module:
+
+    In [1]: from PyQt4.QtCore import QTextCodec
+
+    In [2]: import codecs
+
+    In [3]: surrogate_raw = b'\x69\xd8\xd6\xde'
+
+    In [4]: QTextCodec.codecForName('utf-16le').toUnicode(surrogate_raw)
+    Out[4]: '\ud869\uded6'
+
+    In [5]: codecs.getdecoder('utf-16le')(surrogate_raw)
+    Out[5]: ('𪛖', 4)
+
+    As you can see, string converted from QTextCodec::toUnicode result contains surrogate values instead of
+    character values (Qt itself represents all text strings with UTF-16 and QChar is always 16-bit: so this
+    behaviour is normal for Qt where surrogates are represented with two QChars, but is wrong for Python).

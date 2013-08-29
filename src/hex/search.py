@@ -1,7 +1,7 @@
 import threading
 from PyQt4.QtCore import Qt, QAbstractListModel, QModelIndex
 from PyQt4.QtGui import QVBoxLayout, QHBoxLayout, QDialogButtonBox, QLabel, QPushButton, QWidget, QTreeView, \
-                        QSizePolicy, qApp
+                        QSizePolicy, QColor
 import hex.utils as utils
 import hex.hexlineedit as hexlineedit
 import hex.matchers as matchers
@@ -79,11 +79,9 @@ class SearchResultsWidget(QWidget):
 
     def _onResultClicked(self, index):
         if index.isValid():
-            rng = index.data(SearchResultsModel.MatchRangeRole)
-            self.hexWidget.emphasize(hexwidget.EmphasizedRange(self.hexWidget, rng.startPosition, rng.size,
-                                                                hexwidget.DataRange.UnitBytes))
-            self.hexWidget.selectionRanges = [hexwidget.SelectionRange(self.hexWidget, rng.startPosition, rng.size,
-                                                                        hexwidget.DataRange.UnitBytes)]
+            match_range = index.data(SearchResultsModel.MatchRangeRole)
+            self.hexWidget.emphasize(hexwidget.EmphasizeRange(QColor(Qt.red), match_range.clone()))
+            self.hexWidget.selections = [hexwidget.Selection(match_range.clone())]
 
 
 class SearchResultsModel(QAbstractListModel):
@@ -149,6 +147,7 @@ class SearchResultsModel(QAbstractListModel):
                 break
 
     def _createRange(self, match):
-        match_range = hexwidget.DataRange(self._hexWidget, match.position, match.length, hexwidget.DataRange.UnitBytes)
-        match_range.updated.connect(self._onRangeUpdated)
-        return match_range
+        rng = utils.DocumentRange(self._hexWidget.document, match.position, match.length, fixed=False,
+                                  allow_resize=False)
+        rng.updated.connect(self._onRangeUpdated)
+        return rng

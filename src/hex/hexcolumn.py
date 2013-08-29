@@ -14,8 +14,8 @@ class HexColumnModel(models.RegularValueColumnModel):
     def __init__(self, document, valuecodec, formatter, columns_on_row=16):
         self._cellTextSize = 0
         models.RegularValueColumnModel.__init__(self, document, valuecodec or valuecodecs.IntegerCodec(),
-                                                   formatter or formatters.IntegerFormatter(), columns_on_row,
-                                                   delegate_type=HexColumnDelegate)
+                                                formatter or formatters.IntegerFormatter(), columns_on_row,
+                                                delegate_type=HexColumnDelegate)
         self._updateCellTextSize()
 
     def virtualIndexData(self, index, role=Qt.DisplayRole):

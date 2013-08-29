@@ -79,6 +79,7 @@ import json
 import threading
 import copy
 from PyQt4.QtCore import QObject, pyqtSignal
+import hex.utils as utils
 
 
 class SettingsError(Exception):
@@ -274,7 +275,7 @@ class Settings(QObject):
         with self.lock:
             if setting_name in self.registered:
                 default = self.registered[setting_name].default
-                return default() if callable(default) else copy.deepcopy(default)
+                return default() if utils.isCallable(default) else copy.deepcopy(default)
             elif self.__strictControl:
                 raise SettingsError('reading unregistered setting %s' % setting_name)
             else:
@@ -320,7 +321,7 @@ class Settings(QObject):
                 self.registered[setting_name] = SettingData(default_value, required_type)
             elif self.registered[setting_name] != default_value:
                 raise SettingsError('cannot register setting {0}: another one registered with this name'
-                                   .format(setting_name))
+                                    .format(setting_name))
 
     def __getitem__(self, key):
         return self.get(key)

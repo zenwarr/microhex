@@ -1,7 +1,6 @@
 from PyQt4.QtGui import QDialog, QVBoxLayout, QTabWidget, QPushButton, QLabel, QTextBrowser
 from PyQt4.QtCore import QCoreApplication, QFile, Qt
 import hex.utils as utils
-import hex.resources.qrc_main
 
 
 class AboutDialog(QDialog):
@@ -16,7 +15,7 @@ class AboutDialog(QDialog):
         self.label = QLabel(self)
         self.label.setTextFormat(Qt.RichText)
         self.label.setText(utils.tr('MicroHex version {0}, (c) 2013 zenwarr<br><a href="{1}">{1}</a>')
-                                    .format(QCoreApplication.applicationVersion(), QCoreApplication.organizationDomain()))
+                           .format(QCoreApplication.applicationVersion(), QCoreApplication.organizationDomain()))
         self.label.setOpenExternalLinks(True)
 
         self.tabWidget = QTabWidget(self)

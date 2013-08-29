@@ -1,15 +1,14 @@
 from PyQt4.QtCore import QFileInfo, Qt, QByteArray, QObject, pyqtSignal, QUrl
-from PyQt4.QtGui import QMainWindow, QTabWidget, QFileDialog, QKeySequence, QMdiSubWindow, QApplication, QProgressBar, \
-                        QWidget, QVBoxLayout, QFileIconProvider, QApplication, QIcon, QDialog, QAction, QIcon, QLabel, \
+from PyQt4.QtGui import QMainWindow, QTabWidget, QFileDialog, QKeySequence, QApplication, \
+                        QWidget, QVBoxLayout, QFileIconProvider, QIcon, QDialog, QAction, QLabel, \
                         QMessageBox, QDockWidget, QColor
-from hex.hexwidget import HexWidget, EmphasizedRange, SelectionRange
+from hex.hexwidget import HexWidget, EmphasizeRange, Selection
 import hex.settings as settings
-import hex.appsettings as appsettings
 import hex.utils as utils
 import hex.documents as documents
 import hex.operations as operations
-import hex.resources.qrc_main
 import hex.search as search
+import hex.inspector as inspector
 
 
 def forActiveWidget(fn):
@@ -55,14 +54,17 @@ class MainWindow(QMainWindow):
 
         QApplication.instance().focusChanged.connect(self._onGlobalFocusChanged)
 
+        self.dockSearch = SearchDockWidget(self)
+        self.dockSearch.hide()
+        self.addDockWidget(Qt.BottomDockWidgetArea, self.dockSearch)
+
+        self.dockInspector = InspectorDockWidget(self)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.dockInspector)
+
         self.createActions()
         self.buildMenus()
         self.buildStatusbar()
         self.buildToolbar()
-
-        self.dockSearch = SearchDockWidget(self)
-        self.dockSearch.hide()
-        self.addDockWidget(Qt.BottomDockWidgetArea, self.dockSearch)
 
         geom = globalQuickSettings['mainWindow.geometry']
         if geom and isinstance(geom, str):
@@ -123,12 +125,12 @@ class MainWindow(QMainWindow):
         self.actionRedo.triggered.connect(self.redo)
 
         self.actionCopyAsData = ObservingAction(getIcon('edit-copy'), utils.tr('Copy as data'),
-                                                PropertyObserver(self, 'activeSubWidget.hexWidget'))
+                                                PropertyObserver(self, 'activeSubWidget.hexWidget.hasSelection'))
         self.actionCopyAsData.setShortcut(QKeySequence('Ctrl+C'))
         self.actionCopyAsData.triggered.connect(self.copyAsData)
 
         self.actionCopyAsText = ObservingAction(QIcon(), utils.tr('Copy as text'),
-                                                PropertyObserver(self, 'activeSubWidget.hexWidget'))
+                                                PropertyObserver(self, 'activeSubWidget.hexWidget.hasSelection'))
         self.actionCopyAsText.setShortcut(QKeySequence('Ctrl+Shift+C'))
         self.actionCopyAsText.triggered.connect(self.copyAsText)
 
@@ -179,7 +181,7 @@ class MainWindow(QMainWindow):
         self.actionRemoveColumn.triggered.connect(self.removeColumn)
 
         self.actionAddAddress = ObservingAction(QIcon(), utils.tr('Add address bar to column...'),
-                                                 PropertyObserver(self, 'activeSubWidget.hexWidget.leadingColumn'))
+                                                PropertyObserver(self, 'activeSubWidget.hexWidget.leadingColumn'))
         self.actionAddAddress.triggered.connect(self.addAddressColumn)
 
         self.actionShowSettings = QAction(getIcon('configure'), utils.tr('Settings...'), None)
@@ -236,6 +238,15 @@ class MainWindow(QMainWindow):
         self.actionShowOperationManager = QAction(QIcon(), utils.tr('Show operation manager...'), None)
         self.actionShowOperationManager.triggered.connect(self.showOperationManager)
 
+        # following actions for toggling dock windows will be updated by aboutToShow menu handler
+        self.actionShowSearchPanel = ObservingAction(QIcon(), utils.tr('Search'),
+                                                     checked_observer=PropertyObserver(self, 'dockSearch.isVisible'))
+        self.actionShowSearchPanel.toggled.connect(self.dockSearch.setVisible)
+
+        self.actionShowInspectorPanel = ObservingAction(QIcon(), utils.tr('Inspector'),
+                                                        checked_observer=PropertyObserver(self, 'dockInspector.isVisible'))
+        self.actionShowInspectorPanel.toggled.connect(self.dockInspector.setVisible)
+
     def buildMenus(self):
         menubar = self.menuBar()
         self.fileMenu = menubar.addMenu(utils.tr('File'))
@@ -286,6 +297,12 @@ class MainWindow(QMainWindow):
         self.viewMenu.addAction(self.actionAddColumn)
         self.viewMenu.addAction(self.actionRemoveColumn)
         self.viewMenu.addAction(self.actionAddAddress)
+        self.viewMenu.addSeparator()
+        self.docksMenu = self.viewMenu.addMenu(utils.tr('Tool windows'))
+        self.docksMenu.addAction(self.actionShowSearchPanel)
+        self.docksMenu.addAction(self.actionShowInspectorPanel)
+        self.docksMenu.aboutToShow.connect(self.actionShowSearchPanel.update)
+        self.docksMenu.aboutToShow.connect(self.actionShowInspectorPanel.update)
 
         self.toolsMenu = menubar.addMenu(utils.tr('Tools'))
         self.toolsMenu.addAction(self.actionShowOperationManager)
@@ -447,6 +464,9 @@ class MainWindow(QMainWindow):
             subWidget.setFocus()
 
         self._activeSubWidget = subWidget
+
+        self.dockInspector.hexWidget = subWidget.hexWidget if subWidget is not None else None
+
         self.activeSubWidgetChanged.emit(subWidget)
 
     def _onGlobalFocusChanged(self, old, new):
@@ -640,14 +660,13 @@ class MainWindow(QMainWindow):
             if not match.valid:
                 QMessageBox.information(self, utils.tr('Find'), utils.tr('Nothing had been found'))
             else:
-                emp_range = EmphasizedRange(hex_widget, match.position, match.length, EmphasizedRange.UnitBytes,
-                                            EmphasizedRange.BoundToPosition)
-                # emp_range.backgroundColor = hex_widget.theme.caretBackgroundColor
-                emp_range.backgroundColor = QColor(Qt.green)
+                emp_range = EmphasizeRange(QColor(Qt.green), utils.DocumentRange(hex_widget.document,
+                                                                         match.position, match.length))
                 hex_widget.emphasize(emp_range)
                 hex_widget.caretPosition = match.position
-                hex_widget.selectionRanges = [SelectionRange(hex_widget, match.position, match.length,
-                                                             SelectionRange.UnitBytes, SelectionRange.BoundToData)]
+                hex_widget.selections = [Selection(utils.DocumentRange(hex_widget.document,
+                                                                       match.position, match.length,
+                                                                       fixed=False, allow_resize=False))]
             self._lastMatch = match
 
     @forActiveWidget
@@ -680,14 +699,14 @@ class PropertyObserver(QObject):
         self._connectedSignals = []
         self._realValue = None
         self._transformFunction = transform_function
-        self._update()
+        self.update()
 
-    def _update(self):
+    def update(self):
         old_value = self.value
         self.value = None
         new_value = None
         for signal in self._connectedSignals:
-            signal.disconnect(self._update)
+            signal.disconnect(self.update)
         self._connectedSignals = []
         self._realValue = False
 
@@ -704,7 +723,7 @@ class PropertyObserver(QObject):
             if hasattr(parent, signal_name):
                 signal = getattr(parent, signal_name)
                 if hasattr(signal, 'connect'):
-                    signal.connect(self._update)
+                    signal.connect(self.update)
                     self._connectedSignals.append(signal)
 
             parent = prop_value
@@ -726,17 +745,23 @@ class PropertyObserver(QObject):
 
 
 class ObservingAction(QAction):
-    def __init__(self, icon, text, enabled_observer=None, checked_observed=None):
+    def __init__(self, icon, text, enabled_observer=None, checked_observer=None):
         QAction.__init__(self, icon, text, None)
         self.enabledObserver = enabled_observer
-        self.checkedObserver = checked_observed
+        self.checkedObserver = checked_observer
         if enabled_observer is not None:
             enabled_observer.valueChanged.connect(lambda f: self.setEnabled(bool(f)))
             self.setEnabled(bool(enabled_observer.value))
-        if checked_observed is not None:
+        if checked_observer is not None:
             self.setCheckable(True)
-            checked_observed.valueChanged.connect(lambda f: self.setChecked(bool(f)))
-            self.setChecked(bool(checked_observed.value))
+            checked_observer.valueChanged.connect(lambda f: self.setChecked(bool(f)))
+            self.setChecked(bool(checked_observer.value))
+
+    def update(self):
+        if self.enabledObserver is not None:
+            self.enabledObserver.update()
+        if self.checkedObserver is not None:
+            self.checkedObserver.update()
 
 
 class HexSubWindow(QWidget):
@@ -802,3 +827,58 @@ class SearchDockWidget(QDockWidget):
         self.searchResults.hexWidget = hex_widget
         self.searchResults.matchOperation = matchOperation
         self.setVisible(True)
+
+
+class InspectorDockWidget(QDockWidget):
+    def __init__(self, parent):
+        QDockWidget.__init__(self, utils.tr('Inspector'), parent)
+        self.setObjectName('dock-inspector')
+
+        self.inspector = inspector.InspectorWidget(self)
+        self.inspector.inspectorView.doubleClicked.connect(lambda index: self._selectFromIndex(index))
+        self.setWidget(self.inspector)
+
+        self._addDefaultTypes()
+
+        self._hexWidgetConnector = utils.SignalConnector(None, caretPositionChanged=self._updateCursor)
+
+    @property
+    def hexWidget(self):
+        return self._hexWidgetConnector.target
+
+    @hexWidget.setter
+    def hexWidget(self, new_widget):
+        self._hexWidgetConnector.target = new_widget
+        self.setEnabled(new_widget is not None)
+        self._updateCursor()
+
+    def _addDefaultTypes(self):
+        import hex.datatypes as datatypes
+
+        for type_name in ('int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64', 'float'):
+            self.inspector.inspectorModel.appendType(type_name)
+
+        self.inspector.inspectorModel.appendType('zero_string', datatypes.InstantiateContext.buildContext(limit=1024))
+
+        context = datatypes.InstantiateContext()
+        context.fields = [
+            datatypes.Structure.Field('a', datatypes.globalTypeManager().getTemplate('int8')),
+            datatypes.Structure.Field('b', datatypes.globalTypeManager().getTemplate('fixed_string'))
+        ]
+        context.links = [
+            datatypes.Structure.Link('a', 'b.size')
+        ]
+        self.inspector.inspectorModel.appendType('struct', context, 'struct_demo')
+
+    def _updateCursor(self):
+        new_cursor = None
+        if self._hexWidgetConnector.target is not None:
+            hex_widget = self._hexWidgetConnector.target
+            new_cursor = utils.DocumentCursor(hex_widget.document, hex_widget.caretPosition)
+        self.inspector.inspectorModel.cursor = new_cursor
+
+    def _selectFromIndex(self, index):
+        if index.isValid() and self.hexWidget is not None:
+            decoded = index.data(inspector.InspectorModel.DecodedValueRole)
+            if decoded is not None:
+                self.hexWidget.selections = [Selection(decoded.bufferRange)]

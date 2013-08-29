@@ -1,6 +1,4 @@
 #include "document.h"
-#include <cassert>
-#include <QDebug>
 #include "chain.h"
 #include "devices.h"
 #include "spans.h"
@@ -231,6 +229,10 @@ Document::Document(const std::shared_ptr<AbstractDevice> &device) : _spanChain(s
 
         connect(_device.get(), SIGNAL(readOnlyChanged(bool)), this, SLOT(_onDeviceReadOnlyChanged(bool)));
     }
+}
+
+Document::Document(const std::shared_ptr<SpanChain> &chain) : Document(std::shared_ptr<AbstractDevice>()) {
+    _spanChain = chain;
 }
 
 Document::~Document() {
@@ -647,6 +649,12 @@ const std::shared_ptr<SpanChain> Document::exportRange(qulonglong position, qulo
     return _spanChain->exportRange(position, length, ram_limit);
 }
 
+std::shared_ptr<Document> Document::createConstantFrame(qulonglong start, qulonglong length) {
+    std::shared_ptr<Document> frame_doc(new Document(_spanChain->exportRange(start, length, 0)));
+    frame_doc->setReadOnly(true);
+    return frame_doc;
+}
+
 void Document::_setSavepoint() {
     if (_savepoint != _currentAtomicOperationIndex) {
         _savepoint = _currentAtomicOperationIndex;
@@ -762,6 +770,7 @@ QList<std::shared_ptr<PrimitiveDeviceSpan> > Document::_prepareToUpdateDevice(co
     return spans_to_dissolve;
 }
 
+
 AbstractUndoAction::AbstractUndoAction(const std::shared_ptr<Document> &document, const QString &title)
     : _document(document), _title(title) {
 
@@ -786,4 +795,3 @@ std::shared_ptr<ComplexAction> AbstractUndoAction::getParentAction() const {
 void AbstractUndoAction::setParentAction(const std::shared_ptr<ComplexAction> &action) {
     _parentAction = action;
 }
-

@@ -1,6 +1,5 @@
 from PyQt4.QtGui import QWidget, QScrollBar, QHBoxLayout
 from PyQt4.QtCore import pyqtSignal, Qt
-import hex.utils as utils
 import math
 
 
@@ -81,11 +80,18 @@ class BigIntScrollBar(QWidget):
     @value.setter
     def value(self, new_value):
         if self._exactValue != new_value:
+            new_value = max(self._min, min(self._max, new_value))
             self._exactValue = new_value
             # do not touch Qt scrollbar if its value should not change
             if self._valueToTicks(new_value) != self._currentTicks:
                 self._update()
             self.valueChanged.emit(self._exactValue)
+
+    def update(self, value=None, minimum=None, maximum=None, pageStep=None, singleStep=None):
+        for param, param_value in (('minimum', minimum), ('maximum', maximum), ('pageStep', pageStep),
+                             ('singleStep', singleStep), ('value', value)):
+            if param_value is not None:
+                setattr(self, param, param_value)
 
     def _update(self):
         if self._max - self._min + 1 > MaximumTickCount:
