@@ -262,9 +262,9 @@ class StandardEditDelegate(QObject):
 
     EditNextIndex, EditPreviousIndex, EditNone = range(3)
 
-    InputBlockKeys = (Qt.Key_Escape, Qt.Key_Backspace, Qt.Key_Enter, Qt.Key_Return, Qt.Key_Tab)  # these keys generate
-            # text input, but we do not want them to have such behaviour as these character have special meaning
-            # for widget.
+    InputBlockKeys = (Qt.Key_Escape, Qt.Key_Backspace, Qt.Key_Enter, Qt.Key_Return, Qt.Key_Tab, Qt.Key_Delete)
+            # these keys generate text input, but we do not want them to have such behaviour as these character
+            # have special meaning for widget.
 
     def __init__(self, index, is_inserted, init_text=None, insert_mode=False, cursor_offset=None, should_save=False,
                  index_insert_mode=False):

@@ -1066,7 +1066,7 @@ class HexWidget(QWidget):
     def caretPosition(self, new_pos):
         """If widget is in edit mode and caret index in leading column is changed, changes are saved.
         """
-        if self.caretPosition != new_pos and self.caretPosition <= utils.MaximalPosition:
+        if self.caretPosition != new_pos and 0 <= new_pos < utils.MaximalPosition:
             # if we are in edit mode, we should end editing of index if caret index was changed. Note that
             # caret index in column being edited can stay the same even if caret position was changed.
 
@@ -1397,6 +1397,7 @@ class HexWidget(QWidget):
             elif event.key() == Qt.Key_End:
                 method = self.NavMethod_RowEnd
             elif event.text() and event.key() not in StandardEditDelegate.InputBlockKeys:
+                print('enter edit mode')
                 globalSettings = settings.globalSettings()
                 if globalSettings[appsettings.HexWidget_AutoEditMode]:
                     if not self.editMode and self.caretIndex(self._leadingColumn):
@@ -1413,12 +1414,12 @@ class HexWidget(QWidget):
                 method = self.NavMethod_DocumentEnd
 
         if method is not None:
-            self._navigate(method, event.modifiers() & Qt.ShiftModifier)
-            return
-        else:
-            # end keyboard selection
-            self._selectStartIndex = None
-            self._selectStartColumn = None
+            make_selection = not self.editMode and event.modifiers() & Qt.ShiftModifier
+            self._navigate(method, make_selection)
+            if not make_selection:
+                # end keyboard selection
+                self._selectStartIndex = None
+                self._selectStartColumn = None
 
         if event.key() == Qt.Key_Tab and event.modifiers() == Qt.NoModifier:
             self.loopLeadingColumn()
