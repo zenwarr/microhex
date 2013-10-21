@@ -38,6 +38,14 @@ class AboutDialog(QDialog):
         self.okButton.clicked.connect(self.close)
         self.okButton.setDefault(True)
 
+        self.message = QLabel(self)
+        self.message.setTextFormat(Qt.RichText)
+        self.message.setWordWrap(True)
+        self.message.setText('''Unfortunately, i have no enough time to support this project anymore. If you like this
+                             application and have free time, i'd be glad if you help this project by coding. You can
+                             contact me in order to get any information related to Microhex and its code.''')
+
         layout.addWidget(self.label)
         layout.addWidget(self.tabWidget)
+        layout.addWidget(self.message)
         layout.addWidget(self.okButton)

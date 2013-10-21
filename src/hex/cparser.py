@@ -160,8 +160,124 @@ class CParser:
             template = self._getTemplateWithContextChecked(parse_context, original_type.names[0])
             parse_context.templates[typedef.name] = template.clone()
 
+    def _extractMeta(self, parse_context, code):
+        """File can contain meta-information in comments. Each comment that contains meta information should start
+        with : char.
+            //: <meta-information>
+            /*: <meta-information>
+            **  <meta-information>
+            */
+        Meta properties:
+            property = ident, "=", value
+            ident = letter | "_", { letter | digit | "_" }
+            value = string-literal | number-literal | code-literal
+            string-literal = ('"', any character except \", "'") | ("'", any character except \', "'") | ident
+            number-literal = ("0x", { hex_digit} ) | ("0b", { bin_digit } ) | {dec_digit}
+            code-literal = ">>>", any python code, "<<<"
+            list-literal = "[", value, "]"
+
+            code-literal and list-literal can span on multiple lines. In this case, each line should be commented.
+            For example:
+                int a; //: list = [value1,
+                       //:         value2,
+                       //:         value3]
+
+            and multiline one:
+                int a; /*: list = [value1,
+                        *          value2,
+                        *          value3]
+                        */
+
+            You cannot place C comments inside meta-information comments.
+
+            In code-literal start of each line is considered to be at position of first code character of first line of
+            code-literal. For example, following meta-info contains valid (in meaning of whitespaces) Python code:
+
+            /*: my_code = >>>def func(a, b):
+             *                   return a + b
+             */
+
+        Example:
+            int a; //: name=some_name, text="some text", text2='some text', transform=>>>value.trim()<<<
+
+        Allowed meta-information:
+            Global scope: placed in top of file, before any declaration.
+                requires = list-literal | string-literal
+                Determines which type manager namespaces can be used. After specifying that namespace is required,
+                you can use templates from this namespace (without any name decorations).
+
+                mhversion = string-literal
+                Minimal required Microhex version that can load this file.
+
+                platform = string-literal
+                Determines which platform should be used by type manager. In fact, this directive results in
+                including additional namespace containing platform definitions in 'requires' with difference that
+                you cannot know name of this namespaces.
+
+            Top definition scope:
+                pass
+
+            Definition scope:
+                pass
+        """
+
+        lines = code.split('\n')  # does it work both for CR and CR-LF?
+        line_index = 0
+        while line_index < len(lines):
+            line = lines[line_index]
+
+            char_index = 0
+            current_width = 0
+
+            tab_width = settings.globalSettings()[appsettings.CParser_TabWidth]
+            def inc_char(char):
+                nonlocal char_index
+                nonlocal current_width
+                char_index += 1
+                current_width += 1 if char != '\t' else tab_width
+
+            while char_index < len(line):
+                char = line[char_index]
+                if char == '"':
+                    # ignore strings because ones can contain // or /*
+                    while char_index < len(line):
+                        if char == '\\':
+                            # escaping: ignore next character and continue
+                            inc_char(char)
+                        elif char == '"':
+                            # end of string literal
+                            inc_char(char)
+                            break
+                        inc_char(char)
+                        char = line[char_index]
+                elif char == '/':
+                    marker_cand = line[char_index:char_index+3]
+                    meta_lines = list()
+                    if marker_cand == '//:':
+                        # enter meta-info with single-line comment
+                        meta_lines.append((char_index + 3, line[char_index+3:]))
+                        line_index += 1
+                        while line_index < len(lines):
+                            line = lines[line_index].strip()
+                            if line:
+                                if not line.startswith('//:'):
+                                    # back to previous line: there is a code
+                                    line_index -= 1
+                                    break
+                                else:
+                                    # continue of spanned single-line comment
+                                    meta_start = line.index('\\:') + 3
+                                    meta_lines.append((meta_start, line[meta_start:]))
+                    elif marker_cand == '/*:':
+                        # enter meta-info with multi-line comment
+                        # we should scan line until comment close marker is met. There can be two or more meta-comments
+                        # in one line. Consecutive code lines should be scanned too.
+
+                inc_char(char)
+
+            line_index += 1
+
 
 globalCParser = utils.createSingleton(CParser)
 for attr_name, setting_name in dict(useCpp='UseCpp', cppPath='CppPath', cppArgs='CppArgs').items():
     setattr(globalCParser(), attr_name, settings.globalSettings().get(getattr(appsettings, 'CParser_' + setting_name)))
-

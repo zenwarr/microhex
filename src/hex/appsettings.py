@@ -21,6 +21,7 @@ HexWidget_AutoEditMode = 'hexwidget.auto_edit_mode'
 CParser_UseCpp = 'cparser.use_cpp'
 CParser_CppPath = 'cparser.cpp_path'
 CParser_CppArgs = 'cparser.cpp_args'
+CParser_TabWidth = 'cparser.tab_width'
 
 ThemeExtension = '.mixth'
 
@@ -50,7 +51,8 @@ def doRegister():
             (HexWidget_AutoEditMode, True, bool),
             (CParser_UseCpp, True, bool),
             (CParser_CppPath, 'cpp', str),
-            (CParser_CppArgs, '', str)
+            (CParser_CppArgs, '', str),
+            (CParser_TabWidth, 4, int),
         )
 
         s = settings.globalSettings()
