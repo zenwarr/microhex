@@ -132,6 +132,8 @@ class IntegerFormatter(object):
             undecorated = self._undecorate(text)
             if not undecorated:
                 return QValidator.Intermediate
+            elif undecorated != undecorated.strip():
+                return QValidator.Invalid
             self.parse(text)
             return QValidator.Acceptable
         except ValueError:
@@ -165,6 +167,8 @@ class FloatFormatter(object):
         return format_spec.format(value)
 
     def parse(self, value):
+        if value.strip() != value:
+            return QValidator.Invalid
         return float(value)
 
     @property
