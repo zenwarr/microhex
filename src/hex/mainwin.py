@@ -862,7 +862,7 @@ class InspectorDockWidget(QDockWidget):
 
         context = datatypes.InstantiateContext()
         context.fields = [
-            datatypes.Structure.Field('a', datatypes.globalTypeManager().getTemplate('int8')),
+            datatypes.Structure.Field('a', datatypes.globalTypeManager().getTemplate('uint8')),
             datatypes.Structure.Field('b', datatypes.globalTypeManager().getTemplate('fixed_string'))
         ]
         context.links = [

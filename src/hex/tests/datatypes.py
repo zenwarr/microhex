@@ -26,6 +26,9 @@ class TypeManagementTest(unittest.TestCase):
         manager = datatypes.TypeManager()
         self.assertIsNone(manager.getNamespace('unexisting.inner'))
 
+        manager._createNamespace('unexisting')
+        self.assertIsNone(manager.getNamespace('unexisting.inner'))
+
     def test_create_namespace(self):
         manager = datatypes.TypeManager()
         manager._createNamespace('new_ns')
@@ -63,11 +66,18 @@ class TypeManagementTest(unittest.TestCase):
         manager = datatypes.TypeManager()
         self.assertRaises(datatypes.TemplateNotFoundError, lambda: manager.decode('builtins.unexisted', None))
 
+    def test_get_builtins_template(self):
+        manager = datatypes.TypeManager()
+        manager.install('builtins.templ', self.DummyTemplate())
+        self.assertIsNotNone(manager.getTemplate('templ'))
+        self.assertIsNotNone(manager.getTemplate('.templ'))
+
     def test_platform_typedefs(self):
         profile = datatypes.PlatformProfile('my_plat')
         profile.primitiveTypes = {'platform_specific': ('int16', 20)}
         manager = datatypes.TypeManager(profile)
         manager.installBuiltins()
+        manager.installPlatform()
         platform_specific = manager.getTemplate('my_plat.platform_specific')
         self.assertIsNotNone(platform_specific)
         self.assertEqual(platform_specific.realName, 'int16')
@@ -92,7 +102,7 @@ class Int8Test(unittest.TestCase):
 
     def test_decode_zerosize(self):
         cursor = utils.DataCursor(b'')
-        self.assertRaises(ValueError, lambda: self.manager.decode('int8', cursor))
+        self.assertRaises(datatypes.DecodeError, lambda: self.manager.decode('int8', cursor))
 
     def test_decode_large(self):
         for d in ((b'\x33\x00\n', 0), (b'\x0a\xff\x00', -1), (b'\xff\x7f', 0x7f)):
@@ -154,8 +164,13 @@ class ZeroStringTest(unittest.TestCase):
         self.assertEqual(decoded.decodedValue, '')
 
     def test_decode_unterminated(self):
-        self.assertRaises(ValueError, lambda: self.manager.decode('zero_string', utils.DataCursor(b'hello')))
-        self.assertRaises(ValueError, lambda: self.manager.decode('zero_string', utils.DataCursor(b'')))
+        decoded = self.manager.decode('zero_string', utils.DataCursor(b'hello'))
+        self.assertEqual(decoded.decodeStatus, datatypes.Value.StatusWarning)
+        self.assertEqual(decoded.decodedValue, 'hello')
+
+        decoded = self.manager.decode('zero_string', utils.DataCursor(b''))
+        self.assertEqual(decoded.decodeStatus, datatypes.Value.StatusWarning)
+        self.assertEqual(decoded.decodedValue, '')
 
 
 class FixedStringTest(unittest.TestCase):
@@ -174,12 +189,12 @@ class FixedStringTest(unittest.TestCase):
 
     def test_decode_short(self):
         context = datatypes.InstantiateContext.buildContext(size=10)
-        self.assertRaises(ValueError, lambda: self.manager.decode('fixed_string', utils.DataCursor(b''), context))
+        self.assertRaises(datatypes.DecodeError, lambda: self.manager.decode('fixed_string', utils.DataCursor(b''), context))
 
     def test_decode_partial(self):
         context = datatypes.InstantiateContext.buildContext(size=4, encoding='utf-16le')
         cursor = utils.DataCursor(b'h\x00i\x00', override_buffer_length=3)
-        self.assertRaises(ValueError, lambda: self.manager.decode('fixed_string', cursor, context))
+        self.assertRaises(datatypes.DecodeError, lambda: self.manager.decode('fixed_string', cursor, context))
 
 
 class TypesModelTest(unittest.TestCase):

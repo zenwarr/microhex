@@ -179,7 +179,7 @@ class Settings(QObject):
 
         with self.lock:
             try:
-                os.makedirs(os.path.dirname(self.filename), exist_ok=True)
+                utils.makedirs(os.path.dirname(self.filename))
 
                 if self.__broken:
                     # if we failed to load settings from this file, it is possible that file syntax is incorrect.

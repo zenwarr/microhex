@@ -63,7 +63,7 @@ class Theme(object):
         if not name:
             return
 
-        os.makedirs(Theme.themesDirectory(), exist_ok=True)
+        utils.makedirs(Theme.themesDirectory())
         s = settings.Settings(os.path.join(Theme.themesDirectory(), name + appsettings.ThemeExtension))
 
         for component in self.Components:

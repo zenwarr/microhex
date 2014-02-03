@@ -18,7 +18,6 @@ HexWidget_HighlightAlpha = 'hexwidget.highlight_alpha'
 HexWidget_RandomColorDistance = 'hexwidget.random_color_distance'
 HexWidget_Theme = 'hexwidget.theme'
 HexWidget_AutoEditMode = 'hexwidget.auto_edit_mode'
-CParser_UseCpp = 'cparser.use_cpp'
 CParser_CppPath = 'cparser.cpp_path'
 CParser_CppArgs = 'cparser.cpp_args'
 CParser_TabWidth = 'cparser.tab_width'
@@ -49,7 +48,6 @@ def doRegister():
             (HexWidget_RandomColorDistance, 100, int),
             (HexWidget_Theme, '', str),
             (HexWidget_AutoEditMode, True, bool),
-            (CParser_UseCpp, True, bool),
             (CParser_CppPath, 'cpp', str),
             (CParser_CppArgs, '', str),
             (CParser_TabWidth, 4, int),

@@ -204,6 +204,16 @@ def checkMask(value, mask):
     return bool(value | mask == mask)
 
 
+def makedirs(path):
+    """Same as os.makedirs with exist_ok=True, but does not fail even if target directory access rights differ
+    from given ones.
+    """
+    try:
+        os.makedirs(path, exist_ok=True)
+    except FileExistsError:
+        pass
+
+
 class SignalConnector(object):
     def __init__(self, target=None, **kwargs):
         self._target = None
@@ -466,7 +476,7 @@ class AbstractCursor(object):
     sequences. If index is negative, cursor will access bytes from the left of current position. For example,
     if cursor is initialized with buffer containing bytestring b'hello', and current position points to 'o' byte,
     cursor[-3:-2] will return b'e'.
-    Access to data outside allowed range results in IndexError.
+    Access to data outside allowed range results in IndexError, but reading zero length sequence will be successful.
         cursor = utils.DataCursor(b'hello')  # current offset is 0
         x = cursor[0]  # ok
         x = cursor[-1]  # IndexError
@@ -477,6 +487,7 @@ class AbstractCursor(object):
         x = cursor[10:100]  # IndexError
         x = cursor[0:]  # b'hello'
         x = cursor[:]  # b'hello'
+        x = cursor[100:100]  # b''
     """
 
     def __init__(self, cursor_offset=0, writeable=True, override_buffer_length=-1):
@@ -645,7 +656,9 @@ class DocumentCursor(AbstractCursor):
         return self._document.length
 
     def _read(self, start, stop):
-        if 0 <= start < self.bufferLength and start <= stop <= self.bufferLength:
+        if start == stop:
+            return b''
+        elif 0 <= start < self.bufferLength and start <= stop <= self.bufferLength:
             return bytes(self._document.read(start, stop - start))
         else:
             raise IndexError()
@@ -723,6 +736,8 @@ class DataCursor(AbstractCursor):
         return self._data
 
     def _read(self, start, stop):
+        if start == stop:
+            return b''
         if 0 <= start < self.bufferLength and start <= stop <= self.bufferLength:
             return self._data[start:stop]
         else:

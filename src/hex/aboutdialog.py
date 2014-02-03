@@ -25,6 +25,9 @@ class AboutDialog(QDialog):
         self.creditsText = QTextBrowser(self)
         self.creditsText.setOpenExternalLinks(True)
         self.tabWidget.addTab(self.creditsText, utils.tr('Credits'))
+        self.donatesText = QTextBrowser(self)
+        self.donatesText.setOpenExternalLinks(True)
+        self.tabWidget.addTab(self.donatesText, utils.tr('Support Microhex'))
 
         l_file = QFile(':/main/data/COPYING.html')
         if l_file.open(QFile.ReadOnly | QFile.Text):
@@ -34,6 +37,10 @@ class AboutDialog(QDialog):
         if c_file.open(QFile.ReadOnly | QFile.Text):
             self.creditsText.setText(str(c_file.readAll(), encoding='utf-8'))
 
+        d_file = QFile(':/main/data/DONATE.html')
+        if d_file.open(QFile.ReadOnly | QFile.Text):
+            self.donatesText.setText(str(d_file.readAll(), encoding='utf-8'))
+
         self.okButton = QPushButton(utils.tr('OK'), self)
         self.okButton.clicked.connect(self.close)
         self.okButton.setDefault(True)
@@ -41,9 +48,10 @@ class AboutDialog(QDialog):
         self.message = QLabel(self)
         self.message.setTextFormat(Qt.RichText)
         self.message.setWordWrap(True)
-        self.message.setText('''Unfortunately, i have no enough time to support this project anymore. If you like this
-                             application and have free time, i'd be glad if you help this project by coding. You can
-                             contact me in order to get any information related to Microhex and its code.''')
+        self.message.setText('''Unfortunately, i have no enough time to support this project. If you like this
+                             application and have free time, i'd be glad if you help this project. You can
+                             <a href="mailto:zenw@yandex.ru">contact</a> me in order to get any information related
+                             to Microhex.''')
 
         layout.addWidget(self.label)
         layout.addWidget(self.tabWidget)

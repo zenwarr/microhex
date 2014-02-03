@@ -130,8 +130,8 @@ class SingleByteEncodingCodec(ProxyCodec):
 
         try:
             unicode = self._codecInfo.decode(data)[0]
-        except ValueError:
-            raise EncodingError()
+        except ValueError as err:
+            raise EncodingError(str(err))
 
         if len(unicode) != 1:
             print(unicode)

@@ -1,17 +1,27 @@
 from PyQt4.QtCore import QAbstractItemModel, Qt, QModelIndex
+from PyQt4.QtGui import QWidget, QVBoxLayout, QHBoxLayout, QTreeView, QToolButton, QIcon, QDialogButtonBox, QColor
+import hex.datatypes as datatypes
+import hex.utils as utils
+from PyQt4.QtCore import QAbstractItemModel, Qt, QModelIndex
 from PyQt4.QtGui import QWidget, QVBoxLayout, QHBoxLayout, QTreeView, QToolButton, QIcon, QDialogButtonBox
 import hex.datatypes as datatypes
 import hex.utils as utils
+import difflib
 
 
 class InspectorModel(QAbstractItemModel):
-    InstantiatedRole, DecodedValueRole = Qt.UserRole + 1, Qt.UserRole + 2
+    InstantiatedRole, DecodedValueRole, LabelRole = Qt.UserRole + 1, Qt.UserRole + 2, Qt.UserRole + 3
 
     class TypeData:
-        def __init__(self, name, instantiated):
-            self.name = name
+        def __init__(self, label, instantiated):
+            self.label = label
             self.instantiated = instantiated
             self.cachedValue = None
+
+        @property
+        def displayName(self):
+            return self.label or datatypes.TypeManager.splitQualifiedName(self.instantiated.template.qualifiedName)[1]
+
 
     def __init__(self):
         QAbstractItemModel.__init__(self)
@@ -42,16 +52,40 @@ class InspectorModel(QAbstractItemModel):
 
     @cursor.setter
     def cursor(self, new_cursor):
-        self._cursor = new_cursor
-        self.beginResetModel()
-        for td in self._types:
-            td.cachedValue = None
-        # well, emitting dataChanged is not sufficient: we should also recursively travel through all member
-        # fields of structures and check if number of rows should be changed.
-        #self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
-        self.endResetModel()
+        def compare_values(old_value, new_value, index):
+            if old_value is not None and new_value is not None:
+                try:
+                    matcher = difflib.SequenceMatcher(None, list(old_value.members.keys()),
+                                                      list(new_value.members.keys()), autojunk=False)
+                except TypeError:
+                    # in Python <3.2 there is no autojunk parameter
+                    matcher = difflib.SequenceMatcher(None, list(old_value.members.keys()),
+                                                      list(new_value.members.keys()))
 
-    def insertType(self, index, template, context=None, display_name=None, notify_model=True):
+                for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                    if tag == 'replace' or tag == 'equal':
+                        for i, j in zip(range(i1, i2), range(j1, j2)):
+                            i_name, j_name = tuple(old_value.members.keys())[i], tuple(new_value.members.keys())[j]
+                            compare_values(old_value.members[i_name], new_value.members[j_name],
+                                           self.index(j, 0, index))
+                    elif tag == 'delete':
+                        self.beginRemoveRows(index, i1, i2)
+                        self.endRemoveRows()
+                    elif tag == 'insert':
+                        self.beginInsertRows(index, j1, j2)
+                        self.endInsertRows()
+
+            index_parent = index.parent()
+            self.dataChanged.emit(index.sibling(index.row(), 0), index.sibling(index.row(),
+                                                                               self.columnCount(index_parent) - 1))
+
+        self._cursor = new_cursor
+        for row_index, td in enumerate(self._types):
+            old_value = td.cachedValue
+            td.cachedValue = None
+            compare_values(old_value, self._getDecodedValue(td), self.index(row_index, 0))
+
+    def insertType(self, index, template, context=None, label=None, notify_model=True):
         if isinstance(template, str):
             template = datatypes.globalTypeManager().getTemplateChecked(template)
         elif template is None:
@@ -63,12 +97,9 @@ class InspectorModel(QAbstractItemModel):
         if index is None:
             index = len(self._types)
 
-        if not display_name:
-            display_name = datatypes.TypeManager.splitQualifiedName(template.qualifiedName)[1]
-
         if notify_model:
             self.beginInsertRows(QModelIndex(), index, index)
-        self._types.insert(index, self.TypeData(display_name, datatypes.InstantiatedType(template, context)))
+        self._types.insert(index, self.TypeData(label, datatypes.InstantiatedType(template, context)))
         if notify_model:
             self.endInsertRows()
         return self.index(index, 0)
@@ -105,23 +136,44 @@ class InspectorModel(QAbstractItemModel):
                 parentValue = value.parentValue
 
                 if role == self.InstantiatedRole:
-                    if parentValue is None:
-                        return self._types[index.row()].instantiated
-                    else:
-                        return self.topParentIndex(index).data(role)
+                    return value.instantiatedType
                 elif role == self.DecodedValueRole:
                     return value
                 elif role == Qt.DisplayRole or role == Qt.EditRole:
                     if index.column() == 0:
                         if parentValue is None:
-                            return self._types[index.row()].name
+                            return self._types[index.row()].displayName
                         elif 0 <= index.row() < len(parentValue.members):
                             return tuple(parentValue.members.keys())[index.row()]
                     else:
                         if value.decodedValue is not None:
                             return self._sanitizeString(str(value.decodedValue))
+                        elif value.decodeStatus == datatypes.Value.StatusInvalid and value.decodeStatusText:
+                            return '[{0}]'.format(value.decodeStatusText)
                         else:
                             return None
+                elif role == Qt.ForegroundRole:
+                    if value.decodeStatus == datatypes.Value.StatusInvalid:
+                        return QColor(Qt.red)
+                elif role == Qt.ToolTipRole:
+                    type_name = value.instantiatedType.template.qualifiedName
+                    t = utils.tr('Label: {0}\nType: {1}').format(index.data(self.LabelRole) or '<none>', type_name)
+                    if value.comment:
+                        t += '\n' + value.comment
+                    if value.decodeStatusText:
+                        if value.decodeStatus == datatypes.Value.StatusInvalid:
+                            status_desc = utils.tr('Error')
+                        elif value.decodeStatus == datatypes.Value.StatusWarning:
+                            status_desc = utils.tr('Warning')
+                        else:
+                            status_desc = utils.tr('Decode message')
+                        t += '\n{0}: {1}'.format(status_desc, value.decodeStatusText)
+                    return t
+                elif role == self.LabelRole:
+                    if parentValue is None:
+                        return self._types[index.row()].label or ''
+                    elif 0 <= index.row() < len(parentValue.members):
+                        return tuple(parentValue.members.keys())[index.row()]
 
     def _getDecodedValue(self, td):
         if td.cachedValue is None and self._cursor is not None:
@@ -129,9 +181,8 @@ class InspectorModel(QAbstractItemModel):
                 template = td.instantiated.template
                 context = template.typeManager.prepareContext(td.instantiated.context, template, self._cursor)
                 td.cachedValue = td.instantiated.template.decode(context)
-            except ValueError as err:
-                td.cachedValue = datatypes.Value()
-                td.cachedValue.decodeStatusText = str(err)
+            except datatypes.DecodeError as err:
+                td.cachedValue = err.value
         return td.cachedValue
 
     def index(self, row, column, parent=QModelIndex()):
@@ -170,9 +221,18 @@ class InspectorModel(QAbstractItemModel):
                 return self.indexFromValue(value.parentValue)
         return QModelIndex()
 
+    _trans_dict = {'\x00': '\\0', '\x07': '\\a', '\x08': '\\b', '\x09': '\\t', '\x0a': '\\n', '\x0b': '\\v',
+                   '\x0c': '\\f', '\x0d': '\\r', '\x1b': '\\e', '\x7f': '\\x7f', '\u2028': '\\u2028',
+                   '\u2029': '\\u2029'}
+    for x in range(1, 32):
+        if x not in _trans_dict:
+            _trans_dict[chr(x)] = '\\x' + str(x)
+
+    _sanitize_trans_table = str.maketrans(_trans_dict)
+
     @staticmethod
     def _sanitizeString(text):
-        return text.replace('\n', '\\n')
+        return text.translate(InspectorModel._sanitize_trans_table)
 
     def topParentIndex(self, value):
         while value is not None and value.parentValue is not None:
@@ -272,7 +332,8 @@ class InspectorWidget(QWidget):
     def _editType(self):
         c_index = self.inspectorView.currentIndex()
         if c_index.isValid():
-            dlg = TypeReplaceDialog(self, c_index.data(InspectorModel.InstantiatedRole))
+            dlg = TypeReplaceDialog(self, c_index.data(InspectorModel.InstantiatedRole),
+                                    c_index.data(InspectorModel.LabelRole))
             if dlg.exec_() == TypeReplaceDialog.Accepted:
                 self.inspectorModel.replaceTypeAtIndex(c_index.row(), dlg.template, dlg.context, dlg.description)
 
@@ -322,8 +383,9 @@ class TypeChooseDialog(utils.Dialog):
 
 
 class TypeReplaceDialog(TypeChooseDialog):
-    def __init__(self, parent, instantiated):
+    def __init__(self, parent, instantiated, label=''):
         TypeChooseDialog.__init__(self, parent)
 
         self.setWindowTitle(utils.tr('Replace type'))
         self.typeChooser.instantiated = instantiated
+        self.typeChooser.description = label

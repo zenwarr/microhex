@@ -8,6 +8,7 @@ system. Currently Microhex requires:
     - SIP bindings generator (http://www.riverbankcomputing.co.uk/software/sip/download)
     - pycparser module (optional, required for parsing data type definitions from C-language headers)
       For Ubuntu, you should install python3-pycparser package or use pip.
+    - C preprocessor (cpp) tool (optional, required for parsing data type definitions from C-language headers)
 
 Next step is to set proper values in config.pri file.
 Note for Linux users: beware of installing application into /usr/bin (or another

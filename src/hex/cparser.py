@@ -1,4 +1,6 @@
 import random
+import re
+import tempfile
 import hex.datatypes as datatypes
 import hex.utils as utils
 import hex.settings as settings
@@ -7,6 +9,7 @@ import hex.appsettings as appsettings
 has_pycparser = False
 try:
     import pycparser
+    import ply.lex as lex
     has_pycparser = True
 except ImportError:
     print('pycparser module should be installed to parse C headers')
@@ -21,7 +24,6 @@ class CParser:
             self.templates = dict()
 
     def __init__(self, type_manager=None, namespaces=None):
-        self.useCpp = True
         self.cppPath = 'cpp'
         self.cppArgs = ''
         self.typeManager = type_manager or datatypes.globalTypeManager()
@@ -32,16 +34,28 @@ class CParser:
         """
         if not has_pycparser:
             raise ParseError('pycparser is not installed')
-
-        try:
-            ast = pycparser.CParser().parse(text, d_filename or '<none>')
-        except pycparser.plyparser.ParseError as err:
-            raise ParseError(str(err))
-
-        # note that we should first create header for typedefs of primitive types defined in all manager namespaces
-        # and include this header in parsed code.
+        elif not self.cppPath:
+            raise ParseError('cpp should be configured to parse headers, adjust cparser.cpp_path setting variable')
 
         parse_context = self.Context()
+
+        # before clearing code from preprocessor directives and comments we should extract meta-information from it
+        self._extractMeta(parse_context, text)
+
+        # now process code. Create temp file and write our code into it.
+        with tempfile.NamedTemporaryFile('w+t') as temp_file:
+            #todo
+            # note that we should first create header for typedefs of primitive types already known to manager
+            # and include this header in parsed code.
+
+            temp_file.write(text)
+            temp_file.flush()
+
+            try:
+                ast = pycparser.parse_file(temp_file.name, use_cpp=True, cpp_path=self.cppPath, cpp_args=self.cppArgs)
+            except pycparser.plyparser.ParseError as err:
+                raise ParseError(str(err))
+
         for ext in ast.ext:
             if isinstance(ext, pycparser.c_ast.Decl):
                 if ext.name is None:
@@ -53,7 +67,8 @@ class CParser:
         return parse_context
 
     def parseFile(self, filename):
-        pass
+        with open(filename, 'r+t') as f:
+            return self.parseText(f.read(), filename)
 
     def getTemplateChecked(self, templ_name):
         templ = self.getTemplate(templ_name)
@@ -219,8 +234,11 @@ class CParser:
 
             Definition scope:
                 pass
+
+        This method adds 'metas' attribute to parse context. 'metas' is
         """
 
+        tab_width = settings.globalSettings()[appsettings.CParser_TabWidth]
         lines = code.split('\n')  # does it work both for CR and CR-LF?
         line_index = 0
         while line_index < len(lines):
@@ -229,7 +247,6 @@ class CParser:
             char_index = 0
             current_width = 0
 
-            tab_width = settings.globalSettings()[appsettings.CParser_TabWidth]
             def inc_char(char):
                 nonlocal char_index
                 nonlocal current_width
@@ -265,19 +282,126 @@ class CParser:
                                     line_index -= 1
                                     break
                                 else:
-                                    # continue of spanned single-line comment
-                                    meta_start = line.index('\\:') + 3
+                                    # continuation of spanned single-line comment
+                                    meta_start = lines[line_index].index('\\:') + 3
                                     meta_lines.append((meta_start, line[meta_start:]))
-                    elif marker_cand == '/*:':
-                        # enter meta-info with multi-line comment
-                        # we should scan line until comment close marker is met. There can be two or more meta-comments
-                        # in one line. Consecutive code lines should be scanned too.
+                    #elif marker_cand == '/*:':
+                    #    # enter meta-info with multi-line comment
+                    #    # we should scan line until comment close marker is met. There can be two or more meta-comments
+                    #    # in one line. Consecutive code lines should be scanned too.
+
+                    if meta_lines:
+                        self._processMetaLines(parse_context, meta_lines, line_index)
 
                 inc_char(char)
 
             line_index += 1
 
+    def _processMetaLines(self, parse_context, meta_lines, first_line_index):
+        # meta_lines is list of tuples (start_offset, text)
+        # make text from these lines
+        meta_text = '\n'.join(d[1] for d in meta_lines)
+
+        lex = self.MetaLexer()
+        lex.build()
+        lex.lexer.input(meta_text)
+
+        result = {}
+        while True:
+            tok = lex.lexer.token()
+            if tok is None:
+                break
+            if tok.type == 'IDENT':
+                key = tok.value
+
+                tok = lex.lexer.token()
+                if tok is None or tok.type != 'EQUAL':
+                    raise ParseError('= expected after {0}'.format(key))
+
+                tok = lex.lexer.token()
+                if tok.type in ('IDENT', 'STRING_LITERAL', 'BINARY_LITERAL', 'HEX_LITERAL', 'DECIMAL_LITERAL'):
+                    value = tok.value
+                elif tok.type == 'CODE_LITERAL':
+                    # now adjust spaces in code. We should remove some leading whitespaces on each line. We should also
+                    # remove first line if it is empty
+                    tok.value = tok.value.replace('\t', ' ' * settings.globalSettings()[appsettings.CParser_TabWidth])
+
+                    code_lines = tok.value.split('\n')
+                    if len(code_lines) > 1:
+                        # get first line and determine space character count before actual code start
+                        align_space_count = meta_lines[tok.lineno][0] + (len(code_lines[0]) - len(code_lines[0].lstrip()))
+                        for code_line, code_line_index in zip(code_lines[1:], itertools.count()):
+                            leading_space_count = (len(code_line) - len(code_line.lstrip()))
+                            space_count = meta_lines[tok.lineno][0] + leading_space_count
+                            if space_count < align_space_count:
+                                raise ParseError('bad code indentation near {0}'.format(code_line))
+                            code_line[code_line_index] = ' ' * (space_count - align_space_count) + code_line.lstrip()
+                    else:
+                        code_lines[0] = tok.value.lstrip()
+
+                    value = self._CodeEvaluator('\n'.join(code_lines))
+                else:
+                    raise ParseError('value expected after =')
+
+                result[key] = value
+
+                tok = lex.lexer.token()
+                if tok is None:
+                    break
+                elif tok.type != 'COMMA':
+                    raise ParseError(', expected after property {0}'.format(key))
+
+        return result
+
+    class MetaLexer:
+        tokens = ('IDENT', 'STRING_LITERAL', 'BINARY_LITERAL', 'HEX_LITERAL', 'DECIMAL_LITERAL', 'CODE_LITERAL',
+                  'COMMA', 'EQUAL')
+
+        t_IDENT = '[a-zA-Z_][a-zA-Z_0-9]*'
+        t_COMMA = ','
+        t_EQUAL = '='
+
+        def t_STRING_LITERAL(self, t):
+            r'("(\\.|[^\"\n])*")|(\'(\\.|[^\\\'\n])*\')'  # fucking magic
+            t.value = t.value[1:-1]
+            return t
+
+        def t_BINARY_LITERAL(self, t):
+            '0[bB][01]+'
+            t.value = int(t.value[2:], base=2)
+            return t
+
+        def t_HEX_LITERAL(self, t):
+            '0[xX][0-9a-fA-F]+'
+            t.value = int(t.value[2:], base=16)
+            return t
+
+        def t_DECIMAL_LITERAL(self, t):
+            r'[0-9]+'
+            t.value = int(t.value)
+            return t
+
+        def t_CODE_LITERAL(self, t):
+            '(?i)>>>.*<<<'
+            t.value = t.value[3:-3]
+            return t
+
+        def t_error(self, t):
+            print('lexer error "{0}"'.format(t.value[0]))
+            t.lexer.skip(1)
+
+        t_ignore = ' \t'
+
+        def build(self, **kwargs):
+            if not has_pycparser:
+                raise ParseError('pycparser is not installed')
+            self.lexer = lex.lex(module=self, reflags=re.DOTALL, **kwargs)
+
+    class _CodeEvaluator:
+        def __init__(self, code):
+            self.code = code
+
 
 globalCParser = utils.createSingleton(CParser)
-for attr_name, setting_name in dict(useCpp='UseCpp', cppPath='CppPath', cppArgs='CppArgs').items():
+for attr_name, setting_name in dict(cppPath='CppPath', cppArgs='CppArgs').items():
     setattr(globalCParser(), attr_name, settings.globalSettings().get(getattr(appsettings, 'CParser_' + setting_name)))

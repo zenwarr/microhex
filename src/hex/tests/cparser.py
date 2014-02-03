@@ -71,3 +71,27 @@ class TestCParser(unittest.TestCase):
         self.assertIn('INT_ALIAS', parse_context.templates)
         self.assertNotIn('int', parse_context.templates)
         self.assertTrue(isinstance(parse_context.templates['INT_ALIAS'], datatypes.AbstractIntegerTemplate))
+
+
+class TestMetaLexer(unittest.TestCase):
+    def test_tokens(self):
+        lex = cparser.CParser.MetaLexer()
+        lex.build()
+        lex.lexer.input("09120 name='value', another=value, number=0x120, number=0b101010, yanum=1092, "
+                        "code=>>>print('hello!')<<<")
+        tokens = []
+        while True:
+            tok = lex.lexer.token()
+            if tok is None:
+                break
+            tokens.append(tok)
+
+        for d in zip(tokens, (('DECIMAL_LITERAL', 9120), ('IDENT', 'name'), ('EQUAL', '='), ('STRING_LITERAL', 'value'),
+                              ('COMMA', ','), ('IDENT', 'another'), ('EQUAL', '='), ('IDENT', 'value'),
+                              ('COMMA', ','), ('IDENT', 'number'), ('EQUAL', '='), ('HEX_LITERAL', 0x120),
+                              ('COMMA', ','), ('IDENT', 'number'), ('EQUAL', '='), ('BINARY_LITERAL', 0b101010),
+                              ('COMMA', ','), ('IDENT', 'yanum'), ('EQUAL', '='), ('DECIMAL_LITERAL', 1092),
+                              ('COMMA', ','), ('IDENT', 'code'), ('EQUAL', '='), ('CODE_LITERAL', "print('hello!')"))):
+            self.assertEqual(d[0].type, d[1][0])
+            self.assertEqual(d[0].value, d[1][1])
+
