@@ -354,7 +354,7 @@
         <translation>Колонка символов</translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="858"/>
+        <location filename="datatypes.py" line="853"/>
         <source>Encoding:</source>
         <translation>Кодировка:</translation>
     </message>
@@ -1008,17 +1008,17 @@
         <translation>Операция недопустима для этого документа ({0})</translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="1014"/>
+        <location filename="datatypes.py" line="1037"/>
         <source>invalid namespace name: {0}</source>
         <translation>недопустимое имя для пространства имен: {0}</translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="1019"/>
+        <location filename="datatypes.py" line="1042"/>
         <source>{0} is not a namespace</source>
         <translation>{0} не является пространством имен</translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="301"/>
+        <location filename="datatypes.py" line="288"/>
         <source>integers of width {0} are not supported</source>
         <translation>целые с шириной {0} байт не поддерживаются</translation>
     </message>
@@ -1049,67 +1049,67 @@ Data in clipboard:
         <translation></translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="470"/>
+        <location filename="datatypes.py" line="457"/>
         <source>{0} is not an adjustable context property</source>
         <translation>{0} не является изменяемым свойством контекста</translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="486"/>
+        <location filename="datatypes.py" line="473"/>
         <source>while updating property {0}: no field named {1}</source>
         <translation>во время обновления свойства {0}: нет поля с именем {1}</translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="571"/>
+        <location filename="datatypes.py" line="566"/>
         <source>no template for field {0}</source>
         <translation>нет шаблона для поля {0}</translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="726"/>
+        <location filename="datatypes.py" line="725"/>
         <source>Length limit (chars):</source>
         <translation>Ограничение длины (в символах):</translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="859"/>
+        <location filename="datatypes.py" line="854"/>
         <source>Size (bytes):</source>
         <translation>Размер (байт):</translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="921"/>
+        <location filename="datatypes.py" line="944"/>
         <source>failed to install type template</source>
         <translation>не удалось установить шаблон типа</translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="925"/>
+        <location filename="datatypes.py" line="948"/>
         <source>type templates cannot be installed to root namespace</source>
         <translation>шаблоны типов не могут устанавливаться в корневое пространство имен</translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="928"/>
+        <location filename="datatypes.py" line="951"/>
         <source>failed to install type template: name {0} is invalid</source>
         <translation>не удалось установить шаблон типа: {0} некорректно</translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="932"/>
+        <location filename="datatypes.py" line="955"/>
         <source>cannot install type template {0} - name already reserved</source>
         <translation>невозможно установить шаблон типа {0} - имя уже занято</translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="1143"/>
+        <location filename="datatypes.py" line="1167"/>
         <source>Description</source>
         <translation>Описание</translation>
     </message>
     <message>
-        <location filename="inspector.py" line="181"/>
+        <location filename="inspector.py" line="156"/>
         <source>Type</source>
         <translation>Тип</translation>
     </message>
     <message>
-        <location filename="inspector.py" line="307"/>
+        <location filename="inspector.py" line="376"/>
         <source>Choose type</source>
         <translation>Выбрать тип</translation>
     </message>
     <message>
-        <location filename="inspector.py" line="347"/>
+        <location filename="inspector.py" line="416"/>
         <source>Replace type</source>
         <translation>Заменить тип</translation>
     </message>
@@ -1129,54 +1129,66 @@ Data in clipboard:
         <translation>Поддержать Microhex</translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="423"/>
+        <location filename="datatypes.py" line="410"/>
         <source>no enough data available</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="274"/>
+        <location filename="datatypes.py" line="261"/>
         <source>None result from struct.unpack</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="416"/>
+        <location filename="datatypes.py" line="403"/>
         <source>padding with negative size ({0})</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="474"/>
+        <location filename="datatypes.py" line="461"/>
         <source>while updating context property {0}: type mismatch, value of {1} class provided, but {2} required</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="587"/>
+        <location filename="datatypes.py" line="582"/>
         <source>while processing link {0}-&gt;{1}: {2} is not a structure</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="595"/>
+        <location filename="datatypes.py" line="590"/>
         <source>while processing link {0}-&gt;{1}: no field called {2}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="datatypes.py" line="620"/>
+        <location filename="datatypes.py" line="615"/>
         <source>while decoding field &quot;{0}&quot;: {1}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="inspector.py" line="138"/>
+        <location filename="inspector.py" line="129"/>
         <source>Error</source>
         <translation>Ошибка</translation>
     </message>
     <message>
-        <location filename="inspector.py" line="140"/>
+        <location filename="inspector.py" line="131"/>
         <source>Warning</source>
         <translation>Предупреждение</translation>
     </message>
     <message>
-        <location filename="inspector.py" line="142"/>
+        <location filename="inspector.py" line="133"/>
         <source>Decode message</source>
         <translation>Сообщение декодера</translation>
+    </message>
+    <message>
+        <location filename="inspector.py" line="126"/>
+        <source>Label: {0}
+Type: {1}</source>
+        <translation>Метка: {0}
+Тип: {1}</translation>
+    </message>
+    <message>
+        <location filename="inspector.py" line="136"/>
+        <source>Comment: </source>
+        <translation>Комментарий: </translation>
     </message>
 </context>
 </TS>

@@ -2,49 +2,34 @@ from PyQt4.QtCore import QAbstractItemModel, Qt, QModelIndex
 from PyQt4.QtGui import QWidget, QVBoxLayout, QHBoxLayout, QTreeView, QToolButton, QIcon, QDialogButtonBox, QColor
 import hex.datatypes as datatypes
 import hex.utils as utils
-from PyQt4.QtCore import QAbstractItemModel, Qt, QModelIndex
-from PyQt4.QtGui import QWidget, QVBoxLayout, QHBoxLayout, QTreeView, QToolButton, QIcon, QDialogButtonBox
-import hex.datatypes as datatypes
-import hex.utils as utils
 import difflib
+import weakref
 
 
 class InspectorModel(QAbstractItemModel):
-    InstantiatedRole, DecodedValueRole, LabelRole = Qt.UserRole + 1, Qt.UserRole + 2, Qt.UserRole + 3
+    InstantiatedRole, ValueRole, DecodedValueRole, LabelRole = range(Qt.UserRole + 1, Qt.UserRole + 5)
 
-    class TypeData:
-        def __init__(self, label, instantiated):
+    class RowData:
+        def __init__(self, instantiated_type, label):
+            self.instantiatedType = instantiated_type
+            self.value = datatypes.Value()  # never none
             self.label = label
-            self.instantiated = instantiated
-            self.cachedValue = None
+            self.children = []
+            self.id = 0
 
         @property
-        def displayName(self):
-            return self.label or datatypes.TypeManager.splitQualifiedName(self.instantiated.template.qualifiedName)[1]
-
+        def displayLabel(self):
+            if self.label:
+                return self.label
+            else:
+                return datatypes.TypeManager.splitQualifiedName(self.instantiatedType.template.qualifiedName)[1]
 
     def __init__(self):
         QAbstractItemModel.__init__(self)
-        self._types = list()
+        self._rows = []
+        self._rowDataDict = weakref.WeakValueDictionary()  # id -> RowData
+        self._lastRowDataId = 0
         self._cursor = None
-        self._lastId = 0
-        self._memberStrings = dict()
-
-    @property
-    def instantiatedTypes(self):
-        return [td.instantiated for td in self._types]
-
-    @instantiatedTypes.setter
-    def instantiatedTypes(self, new_types):
-        self.beginRemoveRows(QModelIndex(), 0, len(self._types))
-        self._types.clear()
-        self.endRemoveRows()
-
-        for type_to_add in new_types:
-            if not isinstance(type_to_add, (tuple, list)):
-                self.appendType(type_to_add)
-            else:
-                self.appendType(*type_to_add)
 
     @property
     def cursor(self):
@@ -52,159 +37,117 @@ class InspectorModel(QAbstractItemModel):
 
     @cursor.setter
     def cursor(self, new_cursor):
-        def compare_values(old_value, new_value, index):
-            if old_value is not None and new_value is not None:
-                try:
-                    matcher = difflib.SequenceMatcher(None, list(old_value.members.keys()),
-                                                      list(new_value.members.keys()), autojunk=False)
-                except TypeError:
-                    # in Python <3.2 there is no autojunk parameter
-                    matcher = difflib.SequenceMatcher(None, list(old_value.members.keys()),
-                                                      list(new_value.members.keys()))
-
-                for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-                    if tag == 'replace' or tag == 'equal':
-                        for i, j in zip(range(i1, i2), range(j1, j2)):
-                            i_name, j_name = tuple(old_value.members.keys())[i], tuple(new_value.members.keys())[j]
-                            compare_values(old_value.members[i_name], new_value.members[j_name],
-                                           self.index(j, 0, index))
-                    elif tag == 'delete':
-                        self.beginRemoveRows(index, i1, i2)
-                        self.endRemoveRows()
-                    elif tag == 'insert':
-                        self.beginInsertRows(index, j1, j2)
-                        self.endInsertRows()
-
-            index_parent = index.parent()
-            self.dataChanged.emit(index.sibling(index.row(), 0), index.sibling(index.row(),
-                                                                               self.columnCount(index_parent) - 1))
-
         self._cursor = new_cursor
-        for row_index, td in enumerate(self._types):
-            old_value = td.cachedValue
-            td.cachedValue = None
-            compare_values(old_value, self._getDecodedValue(td), self.index(row_index, 0))
+        for row_index, row_data in enumerate(self._rows):
+            self._updateRow(row_data, self.index(row_index, 0))
 
-    def insertType(self, index, template, context=None, label=None, notify_model=True):
-        if isinstance(template, str):
-            template = datatypes.globalTypeManager().getTemplateChecked(template)
-        elif template is None:
-            raise TypeError('template not found')
+    @property
+    def types(self):
+        return [rd.instantiated_type for rd in self._rows]
 
-        if context is None:
-            context = datatypes.InstantiateContext()
+    @types.setter
+    def types(self, new_types):
+        self.clearTypes()
+        for t in new_types:
+            self.appendType(t)
 
-        if index is None:
-            index = len(self._types)
+    def setTypeAtRow(self, row_index, new_type, label=None):
+        if 0 <= row_index < len(self._rows):
+            self._rows[row_index].instantiatedType = self._getType(new_type)
+            if label is not None:
+                self._rows[row_index].label = label
+            self._updateRow(self._rows[row_index], self.index(row_index, 0))
 
-        if notify_model:
-            self.beginInsertRows(QModelIndex(), index, index)
-        self._types.insert(index, self.TypeData(label, datatypes.InstantiatedType(template, context)))
-        if notify_model:
+    def insertTypeAtRow(self, row_index, new_type, label=None):
+        if 0 <= row_index <= len(self._rows):
+            # prepare RowData object
+            rd = self.RowData(self._getType(new_type), '')
+            rd.label = label or ''
+            rd.id = self._lastRowDataId + 1
+            self._lastRowDataId += 1
+
+            # insert row and register it, but do not initialize with value yet
+            self.beginInsertRows(QModelIndex(), row_index, row_index)
+            self._rows.insert(row_index, rd)
+            self._rowDataDict[rd.id] = rd
             self.endInsertRows()
-        return self.index(index, 0)
 
-    def appendType(self, template, context=None, display_name=None):
-        return self.insertType(None, template, context, display_name)
+            # and now decode value and append children
+            self._updateRow(rd, self.index(row_index, 0))
+            return self.index(row_index, 0)
 
-    def removeType(self, index, notify_model=True):
-        if 0 <= index < self.rowCount():
-            if notify_model:
-                self.beginRemoveRows(QModelIndex(), index, index)
-            del self._types[index]
-            if notify_model:
-                self.endRemoveRows()
+    def appendType(self, new_type, label=None):
+        return self.insertTypeAtRow(len(self._rows), new_type, label)
 
-    def replaceTypeAtIndex(self, index, template, context=None, display_name=None):
-        if 0 <= index < len(self._types):
-            self.removeType(index, notify_model=False)
-            self.insertType(index, template, context, display_name, notify_model=False)
-            self.dataChanged.emit(self.index(index, 0), self.index(index, self.columnCount()))
+    def removeTypeAtRow(self, row_index):
+        if 0 <= row_index < len(self._rows):
+            self.beginRemoveRows(QModelIndex(), row_index, row_index)
+            del self._rows[row_index]
+            self.endRemoveRows()
+
+    def clearTypes(self):
+        self.beginResetModel()
+        self._rows = []
+        self.endResetModel()
 
     def flags(self, index):
-        if index.isValid():
-            flags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
-            # if index.column() == 1:
-            #     flags |= Qt.ItemIsEditable
-            return flags
-        return 0
+        return Qt.ItemIsEnabled | Qt.ItemIsSelectable
 
     def data(self, index, role=Qt.DisplayRole):
-        if index.isValid():
-            value = self._valueFromIndex(index)
-            if value is not None:
-                parentValue = value.parentValue
+        row_data = self._rowDataFromIndex(index)
+        if row_data is None:
+            return None
+        value = row_data.value
 
-                if role == self.InstantiatedRole:
-                    return value.instantiatedType
-                elif role == self.DecodedValueRole:
-                    return value
-                elif role == Qt.DisplayRole or role == Qt.EditRole:
-                    if index.column() == 0:
-                        if parentValue is None:
-                            return self._types[index.row()].displayName
-                        elif 0 <= index.row() < len(parentValue.members):
-                            return tuple(parentValue.members.keys())[index.row()]
-                    else:
-                        if value.decodedValue is not None:
-                            return self._sanitizeString(str(value.decodedValue))
-                        elif value.decodeStatus == datatypes.Value.StatusInvalid and value.decodeStatusText:
-                            return '[{0}]'.format(value.decodeStatusText)
-                        else:
-                            return None
-                elif role == Qt.ForegroundRole:
-                    if value.decodeStatus == datatypes.Value.StatusInvalid:
-                        return QColor(Qt.red)
-                elif role == Qt.ToolTipRole:
-                    type_name = value.instantiatedType.template.qualifiedName
-                    t = utils.tr('Label: {0}\nType: {1}').format(index.data(self.LabelRole) or '<none>', type_name)
-                    if value.comment:
-                        t += '\n' + value.comment
-                    if value.decodeStatusText:
-                        if value.decodeStatus == datatypes.Value.StatusInvalid:
-                            status_desc = utils.tr('Error')
-                        elif value.decodeStatus == datatypes.Value.StatusWarning:
-                            status_desc = utils.tr('Warning')
-                        else:
-                            status_desc = utils.tr('Decode message')
-                        t += '\n{0}: {1}'.format(status_desc, value.decodeStatusText)
-                    return t
-                elif role == self.LabelRole:
-                    if parentValue is None:
-                        return self._types[index.row()].label or ''
-                    elif 0 <= index.row() < len(parentValue.members):
-                        return tuple(parentValue.members.keys())[index.row()]
+        if role == self.InstantiatedRole:
+            return row_data.instantiatedType
 
-    def _getDecodedValue(self, td):
-        if td.cachedValue is None and self._cursor is not None:
-            try:
-                template = td.instantiated.template
-                context = template.typeManager.prepareContext(td.instantiated.context, template, self._cursor)
-                td.cachedValue = td.instantiated.template.decode(context)
-            except datatypes.DecodeError as err:
-                td.cachedValue = err.value
-        return td.cachedValue
+        if value is None:
+            return None
+        elif role == self.ValueRole:
+            return value
+        elif role == self.DecodedValueRole:
+            return value.decodedValue
+        elif role == Qt.DisplayRole or role == Qt.EditRole:
+            if index.column() == 0:
+                return row_data.displayLabel
+            else:
+                if value.decodedValue is not None:
+                    return self._sanitizeString(str(value.decodedValue))
+                elif value.decodeStatus == datatypes.Value.StatusInvalid and value.decodeStatusText:
+                    return '[{0}]'.format(value.decodeStatusText)
+                else:
+                    return None
+        elif role == Qt.ForegroundRole:
+            if value.decodeStatus == datatypes.Value.StatusInvalid:
+                return QColor(Qt.red)
+        elif role == Qt.ToolTipRole:
+            type_name = row_data.instantiatedType.template.qualifiedName
+            t = utils.tr('Label: {0}\nType: {1}').format(row_data.label or '<none>', type_name)
+            if value.decodeStatusText:
+                if value.decodeStatus == datatypes.Value.StatusInvalid:
+                    status_desc = utils.tr('Error')
+                elif value.decodeStatus == datatypes.Value.StatusWarning:
+                    status_desc = utils.tr('Warning')
+                else:
+                    status_desc = utils.tr('Decode message')
+                t += '\n{0}: {1}'.format(status_desc, value.decodeStatusText)
+            if value.comment:
+                t += '\n' + utils.tr('Comment: ') + value.comment
+            return t
+        elif role == self.LabelRole:
+            return row_data.label
 
-    def index(self, row, column, parent=QModelIndex()):
-        if not self.hasIndex(row, column, parent):
-            return QModelIndex()
-
-        if not parent.isValid():
-            return self.indexFromValue(self._getDecodedValue(self._types[row]), row, column)
+    def rowCount(self, index=QModelIndex()):
+        if not index.isValid():
+            return len(self._rows)
         else:
-            parentValue = self._valueFromIndex(parent)
-            if parentValue is not None:
-                return self.indexFromValue(parentValue.members[tuple(parentValue.members.keys())[row]], row, column)
-        return QModelIndex()
+            row_data = self._rowDataFromIndex(index)
+            if row_data is not None:
+                return len(row_data.children)
+        return 0
 
-    def rowCount(self, parent=QModelIndex()):
-        if parent.isValid():
-            parentValue = self._valueFromIndex(parent)
-            return len(parentValue.members) if parentValue is not None else 0
-        else:
-            return len(self._types)
-
-    def columnCount(self, parent=QModelIndex()):
+    def columnCount(self, index=QModelIndex()):
         return 2
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
@@ -214,73 +157,151 @@ class InspectorModel(QAbstractItemModel):
             elif section == 1:
                 return utils.tr('Value')
 
-    def parent(self, index):
-        if index.isValid():
-            value = self._valueFromIndex(index)
-            if value is not None:
-                return self.indexFromValue(value.parentValue)
+    def index(self, row, column, parent_index=QModelIndex()):
+        if self.hasIndex(row, column, parent_index):
+            if parent_index.isValid():
+                parent_row_data = self._rowDataFromIndex(parent_index)
+                if parent_row_data is None:
+                    return QModelIndex()
+                row_data_id = parent_row_data.children[row].id
+            else:
+                row_data_id = self._rows[row].id
+            return self.createIndex(row, column, row_data_id)
         return QModelIndex()
+
+    def parent(self, index):
+        row_data = self._rowDataFromIndex(index)
+        if row_data is not None:
+            return self.indexFromValue(row_data.value.parentValue)
+        return QModelIndex()
+
+    def indexFromValue(self, value):
+        def _find_row_of_value(row_data, value):
+            for rd_index, rd in enumerate(row_data.children):
+                if rd.value is value:
+                    return rd_index
+            return -1
+
+        if value is None:
+            return QModelIndex()
+
+        parents_chain = []
+        c_value = value
+        while c_value is not None:
+            parents_chain.insert(0, c_value)
+            c_value = c_value.parentValue
+
+        # find index of topmost parent value at top level
+        row_index = utils.first((i for i, rd in enumerate(self._rows) if rd.value is parents_chain[0]), None)
+        if row_index is None:
+            return QModelIndex()
+        row_data = self._rows[row_index]
+
+        # now find index of each parent in its parent row data object, and last index will be row that we can use to
+        # create desired QModelIndex
+        for parent in parents_chain[1:]:
+            row_index = _find_row_of_value(row_data, parent)
+            if row_index < 0:
+                return QModelIndex()  # rly? why?
+            row_data = row_data.children[row_index]
+
+        return self.createIndex(row_index, 0, row_data.id)
+
+    def _updateRow(self, row_data, index, new_value=None, new_label=None):
+        # reinitialize row identified by given model index with new value
+        if new_value is None:
+            if self._cursor is not None:
+                try:
+                    template = row_data.instantiatedType.template
+                    context = template.typeManager.prepareContext(row_data.instantiatedType.context,
+                                                                  template, self._cursor)
+                    new_value = row_data.instantiatedType.template.decode(context)
+                except datatypes.DecodeError as err:
+                    new_value = err.value
+            else:
+                new_value = datatypes.Value()
+
+        old_children = row_data.children[:]
+        children_to_update = row_data.children
+
+        old_children_names = [rd.label for rd in old_children]
+        new_children_names = list(new_value.members.keys())
+
+        # find differences
+        try:
+            matcher = difflib.SequenceMatcher(None, old_children_names, new_children_names, autojunk=False)
+        except TypeError:
+            # in Python <3.2 there is no autojunk parameter
+            matcher = difflib.SequenceMatcher(None, old_children_names, new_children_names)
+
+        # now process differences between old and new members
+        diff = 0
+        for opcode, i1, i2, j1, j2 in matcher.get_opcodes():
+            if opcode == 'equal' or opcode == 'replace':
+                for i, j in zip(range(i1, i2), range(j1, j2)):
+                    member_value = new_value.members[new_children_names[j]]
+                    self._updateRow(children_to_update[i + diff], index.child(i + diff, 0), member_value,
+                                    new_children_names[j])
+            elif opcode == 'insert':
+                self.beginInsertRows(index, i1 + diff, i1 + diff + j2 - j1 - 1)
+                for j in range(j1, j2):
+                    child_row_data = self._buildRowData(new_value, new_children_names[j])
+                    children_to_update.insert(i1 + diff + j - j1, child_row_data)
+                    self._rowDataDict[child_row_data.id] = child_row_data
+                self.endInsertRows()
+                diff += j2 - j1
+            elif opcode == 'delete':
+                self.beginRemoveRows(index, i1 + diff, i2 + diff)
+                del children_to_update[i1+diff:i2+diff]
+                self.endRemoveRows()
+                diff -= i2 - i1
+
+        if new_label is not None:
+            row_data.label = new_label
+        row_data.value = new_value
+        daddy_index = index.parent()
+        self.dataChanged.emit(index.sibling(index.row(), 0), index.sibling(index.row(),
+                                                                           self.columnCount(daddy_index) - 1))
+
+    def _buildRowData(self, parent_value, member_name):
+        row_value = parent_value.members[member_name]
+        rd = self.RowData(row_value.instantiatedType, member_name)
+        rd.value = row_value
+        rd.id = self._lastRowDataId + 1
+        self._lastRowDataId += 1
+        for child_member_name in row_value.members:
+            self._buildRowData(row_value, child_member_name)
+        return rd
+
+    def _getType(self, t):
+        """Transforms type argument given to methods to InstantiatedType object. Possible arguments are AbstractTemplate
+        (empty context will be used) or template name (global type manager and empty context will be used)
+        """
+        if isinstance(t, datatypes.InstantiatedType):
+            return t
+        elif isinstance(t, datatypes.AbstractTemplate):
+            return datatypes.InstantiatedType(t, datatypes.InstantiateContext())
+        elif isinstance(t, str):
+            t = datatypes.globalTypeManager().getTemplate(t)
+            return datatypes.InstantiatedType(t, datatypes.InstantiateContext())
+        else:
+            raise ValueError('object of type {0} is not type, template or template name'.format(type(t)))
+
+    def _rowDataFromIndex(self, index):
+        return self._rowDataDict.get(index.internalId()) if index.isValid() else None
 
     _trans_dict = {'\x00': '\\0', '\x07': '\\a', '\x08': '\\b', '\x09': '\\t', '\x0a': '\\n', '\x0b': '\\v',
                    '\x0c': '\\f', '\x0d': '\\r', '\x1b': '\\e', '\x7f': '\\x7f', '\u2028': '\\u2028',
                    '\u2029': '\\u2029'}
     for x in range(1, 32):
         if x not in _trans_dict:
-            _trans_dict[chr(x)] = '\\x' + str(x)
+            _trans_dict[chr(x)] = '\\x' + hex(x)[2:]
 
     _sanitize_trans_table = str.maketrans(_trans_dict)
 
     @staticmethod
     def _sanitizeString(text):
         return text.translate(InspectorModel._sanitize_trans_table)
-
-    def topParentIndex(self, value):
-        while value is not None and value.parentValue is not None:
-            value = value.parentValue
-        return self.indexFromValue(value)
-
-    def indexFromValue(self, value, row=None, column=0):
-        if value is None:
-            if row is not None:
-                return self.createIndex(row, column)
-            return QModelIndex()
-
-        if row is None:
-            if value.parentValue is None:
-                row = utils.indexOf(self._types, lambda td: td.cachedValue is value)
-            else:
-                parentValue = value.parentValue
-                row = utils.indexOf(parentValue.members, lambda key: parentValue.members[key] is value)
-
-            if row is None:
-                return QModelIndex()
-
-        if value.parentValue is None:
-            top_row = row
-        else:
-            d = value
-            while d.parentValue is not None:
-                d = value.parentValue
-            top_row = utils.indexOf(self._types, lambda td: td.cachedValue is d)
-
-        member_name = str(top_row) + '-' + value.getFullMemberName()
-        str_id = utils.keyFromValue(self._memberStrings, lambda x: x == member_name)
-        if str_id is None:
-            self._lastId += 1
-            self._memberStrings[self._lastId] = member_name
-            str_id = self._lastId
-
-        return self.createIndex(row, column, str_id)
-
-    def _valueFromIndex(self, index):
-        if index.isValid() and index.internalId() in self._memberStrings:
-            m_str = self._memberStrings[index.internalId()]
-            top_row = int(m_str[:m_str.index('-')])
-            member = m_str[m_str.index('-') + 1:]
-            if not member:
-                return self._getDecodedValue(self._types[top_row])
-            else:
-                return self._getDecodedValue(self._types[top_row]).getMemberValue(member)
 
 
 class InspectorWidget(QWidget):
@@ -293,21 +314,27 @@ class InspectorWidget(QWidget):
         self.inspectorView.setModel(self.inspectorModel)
         self.inspectorView.setAlternatingRowColors(True)
 
-        self.btnAddType = QToolButton(self)
-        self.btnAddType.setIcon(QIcon(':/main/images/plus.png'))
-        self.btnAddType.clicked.connect(self._addType)
-        self.btnEditType = QToolButton(self)
-        self.btnEditType.setIcon(QIcon(':/main/images/pencil.png'))
-        self.btnEditType.clicked.connect(self._editType)
-        self.btnRemoveType = QToolButton(self)
-        self.btnRemoveType.setIcon(QIcon(':/main/images/minus.png'))
-        self.btnRemoveType.clicked.connect(self._removeType)
+        def crb(icon_path, tooltip, slot):
+            btn = QToolButton(self)
+            btn.setIcon(QIcon(icon_path))
+            btn.setToolTip(utils.tr(tooltip))
+            btn.clicked.connect(slot)
+            return btn
+
+        self.btnAddType = crb(':/main/images/plus.png', 'Add type', self._addType)
+        self.btnEditType = crb(':/main/images/pencil.png', 'Edit selected type', self._editType)
+        self.btnRemoveType = crb(':/main/images/minus.png', 'Remove selected type', self._removeType)
+        self.btnExpandAll = crb(':/main/images/expand-all16.png', 'Expand all', self.inspectorView.expandAll)
+        self.btnCollapseAll = crb(':/main/images/collapse-all16.png', 'Collapse all', self.inspectorView.collapseAll)
 
         tool_layout = QHBoxLayout()
         for btn in (self.btnAddType, self.btnEditType, self.btnRemoveType):
             btn.setAutoRaise(True)
             tool_layout.addWidget(btn)
         tool_layout.addStretch()
+        for btn in (self.btnExpandAll, self.btnCollapseAll):
+            btn.setAutoRaise(True)
+            tool_layout.addWidget(btn)
 
         self.setLayout(QVBoxLayout())
         self.layout().setContentsMargins(0, 0, 0, 0)
@@ -325,22 +352,22 @@ class InspectorWidget(QWidget):
     def _addType(self):
         dlg = TypeChooseDialog(self)
         if dlg.exec_() == TypeChooseDialog.Accepted:
-            new_index = self.inspectorModel.appendType(dlg.template, dlg.context, dlg.description)
+            new_index = self.inspectorModel.appendType(dlg.instantiated, dlg.description)
             if new_index.isValid():
                 self.inspectorView.setCurrentIndex(new_index)
 
     def _editType(self):
         c_index = self.inspectorView.currentIndex()
-        if c_index.isValid():
+        if c_index.isValid() and not c_index.parent().isValid():
             dlg = TypeReplaceDialog(self, c_index.data(InspectorModel.InstantiatedRole),
                                     c_index.data(InspectorModel.LabelRole))
             if dlg.exec_() == TypeReplaceDialog.Accepted:
-                self.inspectorModel.replaceTypeAtIndex(c_index.row(), dlg.template, dlg.context, dlg.description)
+                self.inspectorModel.setTypeAtRow(c_index.row(), dlg.instantiated, dlg.description)
 
     def _removeType(self):
         c_index = self.inspectorView.currentIndex()
-        if c_index.isValid():
-            self.inspectorModel.removeType(c_index.row())
+        if c_index.isValid() and not c_index.parent().isValid():
+            self.inspectorModel.removeTypeAtRow(c_index.row())
 
 
 class TypeChooseDialog(utils.Dialog):

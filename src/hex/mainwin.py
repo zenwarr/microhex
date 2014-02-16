@@ -858,17 +858,36 @@ class InspectorDockWidget(QDockWidget):
         for type_name in ('int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64', 'float'):
             self.inspector.inspectorModel.appendType(type_name)
 
-        self.inspector.inspectorModel.appendType('zero_string', datatypes.InstantiateContext.buildContext(limit=1024))
+        inst = datatypes.InstantiatedType(datatypes.globalTypeManager().getTemplate('zero_string'),
+                                          datatypes.InstantiateContext(limit=1024))
+        self.inspector.inspectorModel.appendType(inst)
 
         context = datatypes.InstantiateContext()
-        context.fields = [
+        context['fields'] = [
             datatypes.Structure.Field('a', datatypes.globalTypeManager().getTemplate('uint8')),
             datatypes.Structure.Field('b', datatypes.globalTypeManager().getTemplate('fixed_string'))
         ]
-        context.links = [
+        context['links'] = [
             datatypes.Structure.Link('a', 'b.size')
         ]
-        self.inspector.inspectorModel.appendType('struct', context, 'struct_demo')
+        inst = datatypes.InstantiatedType(datatypes.globalTypeManager().getTemplate('struct'), context)
+        self.inspector.inspectorModel.appendType(inst, 'struct_demo')
+
+        context = datatypes.InstantiateContext()
+        context['fields'] = [
+            datatypes.Structure.Field('a_ign', datatypes.globalTypeManager().getTemplate('bool')),
+            datatypes.Structure.Field('a1', datatypes.globalTypeManager().getTemplate('uint8')),
+            datatypes.Structure.Field('a2', datatypes.globalTypeManager().getTemplate('uint8')),
+            datatypes.Structure.Field('b_ign', datatypes.globalTypeManager().getTemplate('bool')),
+            datatypes.Structure.Field('b', datatypes.globalTypeManager().getTemplate('uint8'))
+        ]
+        context['links'] = [
+            datatypes.Structure.Link('a_ign', 'a1.ignore_field'),
+            datatypes.Structure.Link('a_ign', 'a2.ignore_field'),
+            datatypes.Structure.Link('b_ign', 'b.ignore_field')
+        ]
+        inst = datatypes.InstantiatedType(datatypes.globalTypeManager().getTemplate('struct'), context)
+        self.inspector.inspectorModel.appendType(inst, 'dyn_struct')
 
     def _updateCursor(self):
         new_cursor = None
@@ -879,6 +898,7 @@ class InspectorDockWidget(QDockWidget):
 
     def _selectFromIndex(self, index):
         if index.isValid() and self.hexWidget is not None:
-            decoded = index.data(inspector.InspectorModel.DecodedValueRole)
+            decoded = index.data(inspector.InspectorModel.ValueRole)
             if decoded is not None:
+                self.hexWidget.endEditIndex(save=True)
                 self.hexWidget.selections = [Selection(decoded.bufferRange)]

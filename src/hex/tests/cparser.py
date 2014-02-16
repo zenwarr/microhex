@@ -5,7 +5,7 @@ import hex.utils as utils
 
 
 def has_field(context, field_name):
-    return utils.first(field for field in context.fields if field.name == field_name) is not None
+    return utils.first(field for field in context['fields'] if field.name == field_name) is not None
 
 
 class TestCParser(unittest.TestCase):
@@ -17,7 +17,7 @@ class TestCParser(unittest.TestCase):
         parse_context = self.prs.parseText(code)
         self.assertEqual(len(parse_context.templates), 1)
         A_context = parse_context.templates['A'].defaultsContext
-        self.assertEqual(len(A_context.fields), 3)
+        self.assertEqual(len(A_context['fields']), 3)
 
         self.assertTrue(has_field(A_context, 'memb_a'))
         self.assertTrue(has_field(A_context, 'memb_b'))

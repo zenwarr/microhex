@@ -174,14 +174,14 @@ class AbstractTemplate:
         self.qualifiedName = ''
         self.typeManager = None
         self.defaultAlignHint = 1  #todo: needs comment
-        self.adjustableContextProperties = {'endianess': int}
+        self.adjustableContextProperties = {'endianess': int, 'ignore_field': bool}
         if adjustable_context_properties is not None:
             self.adjustableContextProperties.update(adjustable_context_properties)
         self.defaultsContext = InstantiateContext()
 
     def setContextDefaults(self, context):
         """Use this method to set uninitialized context attributes to defaults."""
-        context.setDefaultsFromContext(self.defaultsContext)
+        context.setDefaults(self.defaultsContext)
 
     def decode(self, context) -> Value:
         """Should raise DecodeError if something goes wrong while decoding. You still can get Value (broken one) from
@@ -221,32 +221,19 @@ class InstantiatedType:
         self.context = context
 
 
-class InstantiateContext(object):
-    def __init__(self):
-        self.cursor = None
-        self.endianess = LittleEndian
-        self.alignHint = 0
+class InstantiateContext(dict):
+    def __init__(self, iterable=None, **kwargs):
+        dict.__init__(self, iterable or tuple(), **kwargs)
+        self['cursor'] = None
+        self['endianess'] = LittleEndian
+        self['alignHint'] = 0
 
-    def setDefaults(self, **defaults):
+    def setDefaults(self, dc=None, **defaults):
+        if dc is not None:
+            for key in dc.keys():
+                self.setdefault(key, dc[key])
         for key in defaults.keys():
-            if not hasattr(self, key):
-                setattr(self, key, defaults[key])
-
-    def setDefaultsFromContext(self, def_context):
-        for attr_name in dir(def_context):
-            if not attr_name.startswith('_') and not utils.isCallable(getattr(def_context, attr_name)):
-                if not hasattr(self, attr_name):
-                    setattr(self, attr_name, getattr(def_context, attr_name))
-
-    @staticmethod
-    def buildContext(**params):
-        context = InstantiateContext()
-        for param_name, param_value in params.items():
-            setattr(context, param_name, param_value)
-        return context
-
-    def get(self, name, default=None):
-        return getattr(self, name) if hasattr(self, name) else default
+            self.setdefault(key, defaults[key])
 
 
 class AbstractFormatTypeTemplate(AbstractTemplate):
@@ -259,8 +246,8 @@ class AbstractFormatTypeTemplate(AbstractTemplate):
         def_value = Value.buildValue(InstantiatedType(self, context), None, None)
 
         try:
-            data_to_decode = context.cursor.read(0, self.fixedSize)
-            def_value.bufferRange = context.cursor.bufferRange(0, self.fixedSize)
+            data_to_decode = context['cursor'].read(0, self.fixedSize)
+            def_value.bufferRange = context['cursor'].bufferRange(0, self.fixedSize)
             def_value.cachedBufferData = data_to_decode
         except IndexError:
             raise self.decodeError(utils.tr('no enough data available'), def_value)
@@ -318,7 +305,7 @@ class AbstractIntegerTemplate(AbstractFormatTypeTemplate):
 
     def _getFormatString(self, context):
         width_format = self._WidthFormatDict[self._width]
-        return ('<' if context.endianess == LittleEndian else '>') + (width_format if self._signed else
+        return ('<' if context['endianess'] == LittleEndian else '>') + (width_format if self._signed else
                                                                       width_format.upper())
 
     def createConfigWidget(self, parent):
@@ -346,7 +333,7 @@ class FloatTemplate(AbstractFormatTypeTemplate):
         self.defaultAlignHint = 4
 
     def _getFormatString(self, context):
-        return ('<' if context.endianess == LittleEndian else '>') + 'f'
+        return ('<' if context['endianess'] == LittleEndian else '>') + 'f'
 
     def createConfigWidget(self, parent):
         return OnlyEndianessConfigWidget(parent, self)
@@ -383,7 +370,7 @@ class DoubleTemplate(AbstractFormatTypeTemplate):
         self.defaultAlignHint = 8
 
     def _getFormatString(self, context):
-        return ('<' if context.endianess == LittleEndian else '>') + 'd'
+        return ('<' if context['endianess'] == LittleEndian else '>') + 'd'
 
     def createConfigWidget(self, parent):
         return OnlyEndianessConfigWidget(parent, self)
@@ -414,9 +401,9 @@ class PaddingBytesTemplate(AbstractTemplate):
             size = context.get('size', 0)
             if size < 0:
                 raise self.decodeError(utils.tr('padding with negative size ({0})'.format(size)), value)
-            data = context.cursor.read(0, size)
+            data = context['cursor'].read(0, size)
             value.cachedBufferData = data
-            value.bufferRange = context.cursor.bufferRange(0, size)
+            value.bufferRange = context['cursor'].bufferRange(0, size)
             value.decodedValue = data
             return value
         except IndexError:
@@ -440,11 +427,11 @@ class Structure(AbstractTemplate):
     to 0 (default value).
 
     Context parameters:
-    include_padding: if False, values of PaddingBytesTemplate will not be inserted between fields. Otherwise each
-    field pushed away from previous field will have PaddingBytesTemplate value as its predencer.
     fields: list of fields (each of .Field class)
     links: list of links (each of .Link class)
     linkImpls: list of custom object that react on changes in values of decoded fields (each of .LinkImpl class).
+
+    If field context has 'ignore_field' parameter value set to True, this field will be skipped by decoder.
     """
 
     class Field:
@@ -453,7 +440,7 @@ class Structure(AbstractTemplate):
             self.template = template
             self.typeContext = type_context or InstantiateContext()
             if align_hint > 0:
-                self.typeContext.alignHint = align_hint
+                self.typeContext['alignHint'] = align_hint
 
         def setContextPropertyFromValue(self, prop_name, value):
             return self.setContextPropertyFromRawValue(prop_name, value.decodedValue)
@@ -475,8 +462,8 @@ class Structure(AbstractTemplate):
                                               'provided, but {2} required').format(prop_name, str(type(value)),
                                                                                    str(required_type)))
 
-                if not hasattr(self.typeContext, prop_name) or getattr(self.typeContext, prop_name) != value:
-                    setattr(self.typeContext, prop_name, value)
+                if prop_name not in self.typeContext or self.typeContext[prop_name] != value:
+                    self.typeContext[prop_name] = value
                     return True
             else:
                 # Find field with corresponding name and recursively set property for it.
@@ -523,11 +510,11 @@ class Structure(AbstractTemplate):
 
         @property
         def dependentFieldIndex(self):
-            return utils.indexOf(self.keepingContext.fields, lambda field: field is self.dependentField)
+            return utils.indexOf(self.keepingContext['fields'], lambda field: field is self.dependentField)
 
         @property
         def currentFieldIndex(self):
-            return utils.indexOf(self.keepingContext.fields, lambda field: field is self.currentField)
+            return utils.indexOf(self.keepingContext['fields'], lambda field: field is self.currentField)
 
         def update(self, new_value, current_context):
             assert(self.keepingContext is not current_context)
@@ -540,20 +527,20 @@ class Structure(AbstractTemplate):
                                                    'links': (list, tuple), 'linkImpls': (list, tuple)})
 
     def setContextDefaults(self, context):
-        context.setDefaults(include_padding=False, fields=[], links=[], linkImpls=[])
+        context.setDefaults(fields=[], links=[], linkImpls=[])
         AbstractTemplate.setContextDefaults(self, context)
 
     def decode(self, context):
         result_value = Value.buildValue(InstantiatedType(self, context))
         self.createLayout(result_value, context)
 
-        cursor = context.cursor.clone()
+        cursor = context['cursor'].clone()
 
         stored_cursor_positions = list()
         field_index = 0
-        while field_index < len(context.fields):
+        while field_index < len(context['fields']):
             try:
-                field = context.fields[field_index]
+                field = context['fields'][field_index]
 
                 # if we rolled back to field, restore old cursor position
                 if field_index < len(stored_cursor_positions):
@@ -566,21 +553,29 @@ class Structure(AbstractTemplate):
                     stored_cursor_positions[field_index] = cursor.position
                     del stored_cursor_positions[field_index+1:]
 
+                if field.typeContext.get('ignore_field', False):
+                    if field.name in result_value.members:
+                        del result_value.members[field.name]
+                    field_index += 1
+                    continue
+                elif field.name not in result_value.members:
+                    self._createDefaultField(result_value, field)
+
                 field_template = field.template
                 if field_template is None:
                     raise self.decodeError(utils.tr('no template for field {0}').format(field.name), result_value)
 
-                type_manager = context.typeManager or globalTypeManager()
+                type_manager = context['typeManager'] or globalTypeManager()
                 field_context = type_manager.prepareContext(field.typeContext, field_template, cursor)
 
                 # determine start position for this field respecting field alignment.
-                field_align_hint = field_context.alignHint if field_context.alignHint > 0 else field_template.defaultAlignHint
-                if field_align_hint > 1 and (cursor.position - context.cursor.position) % field_align_hint:
-                    cursor.advance(field_align_hint - ((cursor.position - context.cursor.position) % field_align_hint))
+                field_align_hint = field_context['alignHint'] if field_context['alignHint'] > 0 else field_template.defaultAlignHint
+                if field_align_hint > 1 and (cursor.position - context['cursor'].position) % field_align_hint:
+                    cursor.advance(field_align_hint - ((cursor.position - context['cursor'].position) % field_align_hint))
 
                 # build list of LinkImpls for field context
                 # first collect it from our context links
-                for link in context.links:
+                for link in context['links']:
                     if link.source.startswith(field.name + '.'):
                         # does field that will be parsed can have its own fields?
                         if not isinstance(field.template, Structure):  #todo: just test if template is complex
@@ -590,7 +585,7 @@ class Structure(AbstractTemplate):
 
                         # find field that should react on changes in inner fields of field being parsed
                         dest_field_name = link.destination[:link.destination.index('.')]
-                        dest_field = utils.first(field for field in context.fields if field.name == dest_field_name)
+                        dest_field = utils.first(field for field in context['fields'] if field.name == dest_field_name)
                         if dest_field is None:
                             raise self.decodeError(utils.tr('while processing link {0}->{1}: no field called {2}')
                                                    .format(link.source, link.destination, dest_field_name),
@@ -600,15 +595,15 @@ class Structure(AbstractTemplate):
 
                         impl = self.LinkImpl(link.source[link.source.index('.') + 1:], dest_field, dest_prop, field,
                                              context)
-                        field_context.linkImpls.append(impl)
+                        field_context['linkImpls'].append(impl)
 
                 # second, find LinkImpls that should be transferred to field
-                for link_impl in context.linkImpls:
+                for link_impl in context['linkImpls']:
                     if link_impl.sourceFieldName.startswith(field.name + '.'):
                         # copy this impl, but adjust sourceFieldName - remove field name
                         cloned_impl = copy.copy(link_impl)
                         cloned_impl.sourceFieldName = link_impl.sourceFieldName[link_impl.sourceFieldName.index('.')+1:]
-                        field_context.linkImpls.append(cloned_impl)
+                        field_context['linkImpls'].append(cloned_impl)
 
                 # decode field value
                 try:
@@ -620,12 +615,12 @@ class Structure(AbstractTemplate):
                     raise self.decodeError(utils.tr('while decoding field "{0}": {1}').format(field.name, str(err)),
                                            result_value)
 
-                impls = context.linkImpls[:]
+                impls = context['linkImpls'][:]
                 # find links that should be updated and add them to impls list
-                for link in context.links:
+                for link in context['links']:
                     if link.source == field.name:
                         dest_field_name = link.destination[:link.destination.index('.')]
-                        dest_field = utils.first(field for field in context.fields if field.name == dest_field_name)
+                        dest_field = utils.first(field for field in context['fields'] if field.name == dest_field_name)
                         dest_prop = link.destination[link.destination.index('.') + 1:]
                         impls.append(self.LinkImpl(link.source, dest_field, dest_prop, field, context))
 
@@ -645,31 +640,34 @@ class Structure(AbstractTemplate):
                 else:
                     raise
 
-        result_value.bufferRange = context.cursor.bufferRange(0, cursor.position - context.cursor.position)
+        result_value.bufferRange = context['cursor'].bufferRange(0, cursor.position - context['cursor'].position)
         return result_value
 
     def createLayout(self, value, context):
         for field in context.get('fields', ()):
-            field_value = Value.buildValue(InstantiatedType(field.template, field.typeContext))
-            field_value.parentValue = value
-            field.template.createLayout(field_value, field.typeContext)
-            value.members[field.name] = field_value
+            self._createDefaultField(value, field)
+
+    def _createDefaultField(self, value, field):
+        field_value = Value.buildValue(InstantiatedType(field.template, field.typeContext))
+        field_value.parentValue = value
+        field.template.createLayout(field_value, field.typeContext)
+        value.members[field.name] = field_value
 
 
 class StructureContextBuilder:
     def __init__(self, type_manager=None):
         self.typeManager = type_manager or globalTypeManager()
-        self.context = InstantiateContext.buildContext(fields=list(), links=list())
+        self.context = InstantiateContext(fields=list(), links=list())
 
     def addField(self, name, template, context=None, align_hint=0):
         if isinstance(template, str):
             template = self.typeManager.getTemplateChecked(template)
         elif template is None:
             raise TypeError('template not found')
-        self.context.fields.append(Structure.Field(name, template, context, align_hint))
+        self.context['fields'].append(Structure.Field(name, template, context, align_hint))
 
     def addLink(self, src, dst):
-        self.context.links.append(Structure.Link(src, dst))
+        self.context['links'].append(Structure.Link(src, dst))
 
 
 class AbstractTypeConfigWidget(QWidget):
@@ -702,11 +700,11 @@ class OnlyEndianessConfigWidget(AbstractTypeConfigWidget):
         self.layout().addRow(utils.tr('Endianess:'), self.cmbEndianess)
 
     def initFromContext(self, context):
-        self.cmbEndianess.setCurrentIndex(int(context.endianess == BigEndian))
+        self.cmbEndianess.setCurrentIndex(int(context['endianess'] == BigEndian))
 
     def createContext(self):
         context = InstantiateContext()
-        context.endianess = LittleEndian if self.cmbEndianess.currentIndex() == 0 else BigEndian
+        context['endianess'] = LittleEndian if self.cmbEndianess.currentIndex() == 0 else BigEndian
         return context
 
 
@@ -732,8 +730,8 @@ class ZeroStringConfigWidget(AbstractTypeConfigWidget):
 
     def createContext(self):
         context = InstantiateContext()
-        context.encoding = self.cmbEncoding.encoding
-        context.limit = self.spnLimit.value()
+        context['encoding'] = self.cmbEncoding.encoding
+        context['limit'] = self.spnLimit.value()
         return context
 
     @property
@@ -759,21 +757,21 @@ class ZeroStringTemplate(AbstractTemplate):
     def decode(self, context):
         def_value = Value.buildValue(InstantiatedType(self, context))
 
-        cloned_cursor = context.cursor.clone()
+        cloned_cursor = context['cursor'].clone()
 
-        if isinstance(context.encoding, encodings.AbstractCodec):
-            encoding = context.encoding
+        if isinstance(context['encoding'], encodings.AbstractCodec):
+            encoding = context['encoding']
         else:
-            encoding = encodings.getCodec(context.encoding)
+            encoding = encodings.getCodec(context['encoding'])
         if encoding is None:
-            raise self.decodeError('no encoding {0} found'.format(context.encoding), def_value)
+            raise self.decodeError('no encoding {0} found'.format(context['encoding']), def_value)
 
         bytes_parsed = 0
         parsed_chars = list()
         with cloned_cursor.activate():
             unterminated = False
             while cloned_cursor.isAtValidPosition:
-                if context.limit >= 0 and len(parsed_chars) >= context.limit:
+                if context['limit'] >= 0 and len(parsed_chars) >= context['limit']:
                     break
 
                 try:
@@ -790,8 +788,8 @@ class ZeroStringTemplate(AbstractTemplate):
             else:
                 unterminated = True
 
-            def_value.bufferRange = context.cursor.bufferRange(0, bytes_parsed)
-            def_value.cachedBufferData = context.cursor.read(0, bytes_parsed)
+            def_value.bufferRange = context['cursor'].bufferRange(0, bytes_parsed)
+            def_value.cachedBufferData = context['cursor'].read(0, bytes_parsed)
             def_value.decodedValue = ''.join(parsed_chars)
             if unterminated:
                 def_value.decodeStatus = Value.StatusWarning
@@ -810,23 +808,19 @@ class FixedStringTemplate(AbstractTemplate):
         context.setDefaults(encoding=encodings.getCodec('utf-8'), size=0)
         AbstractTemplate.setContextDefaults(self, context)
 
-    @property
-    def fixedSize(self):
-        return 0
-
     def decode(self, context):
         def_value = Value.buildValue(InstantiatedType(self, context))
 
-        cloned_cursor = context.cursor.limited(context.size)
-        if isinstance(context.encoding, encodings.AbstractCodec):
-            encoding = context.encoding
+        cloned_cursor = context['cursor'].limited(context['size'])
+        if isinstance(context['encoding'], encodings.AbstractCodec):
+            encoding = context['encoding']
         else:
-            encoding = encodings.getCodec(context.encoding)
+            encoding = encodings.getCodec(context['encoding'])
         if encoding is None:
-            raise self.decodeError('no encoding {0} found'.format(context.encoding), def_value)
+            raise self.decodeError('no encoding {0} found'.format(context['encoding']), def_value)
 
         decoded_chars = list()
-        while cloned_cursor.position - context.cursor.position < context.size:
+        while cloned_cursor.position - context['cursor'].position < context['size']:
             try:
                 char_data = encoding.getCharacterData(cloned_cursor)
                 decoded_chars.append(char_data.unicode)
@@ -834,8 +828,8 @@ class FixedStringTemplate(AbstractTemplate):
             except encodings.EncodingError as err:
                 raise self.decodeError('while decoding character: {0}'.format(err), def_value)
 
-        def_value.bufferRange = context.cursor.bufferRange(0, cloned_cursor.position - context.cursor.position)
-        def_value.cachedBufferData = context.cursor.read(0, cloned_cursor.position - context.cursor.position)
+        def_value.bufferRange = context['cursor'].bufferRange(0, cloned_cursor.position - context['cursor'].position)
+        def_value.cachedBufferData = context['cursor'].read(0, cloned_cursor.position - context['cursor'].position)
         def_value.decodedValue = ''.join(decoded_chars)
         return def_value
 
@@ -865,8 +859,8 @@ class FixedStringConfigWidget(AbstractTypeConfigWidget):
 
     def createContext(self):
         context = InstantiateContext()
-        context.encoding = self.cmbEncoding.encoding
-        context.size = self.spnSize.value()
+        context['encoding'] = self.cmbEncoding.encoding
+        context['size'] = self.spnSize.value()
         return context
 
     @property
@@ -875,6 +869,34 @@ class FixedStringConfigWidget(AbstractTypeConfigWidget):
 
     def _onEncodingChanged(self):
         self.descriptionChanged.emit(self.description)
+
+
+class BooleanTemplate(AbstractTemplate):
+    def __init__(self):
+        AbstractTemplate.__init__(self, 'bool', {'baseType': AbstractTemplate})
+
+    def setContextDefaults(self, context):
+        context.setDefaults(baseType=globalTypeManager().getTemplate('builtins.uint8'))
+        AbstractTemplate.setContextDefaults(self, context)
+
+    def decode(self, context):
+        def_value = Value.buildValue(InstantiatedType(self, context))
+
+        try:
+            undervalue = context['baseType'].decode(context)
+        except DecodeError as err:
+            undervalue = err.value
+
+        def_value.bufferRange, def_value.cachedBufferData = undervalue.bufferRange, undervalue.cachedBufferData
+        def_value.comment = undervalue.comment
+        if undervalue.decodedValue is None:
+            raise self.decodeError('base value is <none>', def_value)
+        def_value.decodedValue = bool(undervalue.decodedValue)
+        return def_value
+
+    def createConfigWidget(self, parent):
+        #todo
+        pass
 
 
 class PlatformProfile:
@@ -1026,9 +1048,9 @@ class TypeManager:
         """
         if context is None:
             context = InstantiateContext()
-        context.cursor = cursor
+        context['cursor'] = cursor
         context.setDefaults(endianess=self.platformProfile.endianess)
-        context.typeManager = self
+        context['typeManager'] = self
         template.setContextDefaults(context)
         return context
 
@@ -1052,6 +1074,7 @@ class TypeManager:
         self.install('builtins.double', DoubleTemplate())
         self.install('builtins.fixed_string', FixedStringTemplate())
         self.install('builtins.zero_string', ZeroStringTemplate())
+        self.install('builtins.bool', BooleanTemplate())
         self.install('builtins.struct', Structure())
 
     def installPlatform(self):

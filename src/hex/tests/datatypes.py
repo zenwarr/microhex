@@ -86,10 +86,10 @@ class TypeManagementTest(unittest.TestCase):
     def test_defaulted_template(self):
         manager = datatypes.TypeManager()
         template = self.DummyTemplate()
-        template.defaultsContext.defaultField = True
+        template.defaultsContext['defaultField'] = True
         manager.install('builtins.template', template)
         manager.decode('template', utils.DataCursor(b''))
-        self.assertTrue(template.decode.call_args[0][0].defaultField)
+        self.assertTrue(template.decode.call_args[0][0].get('defaultField'))
 
 
 class Int8Test(unittest.TestCase):
@@ -131,7 +131,7 @@ class UInt16Test(unittest.TestCase):
 
     def test_decode_be(self):
         context = datatypes.InstantiateContext()
-        context.endianess = datatypes.BigEndian
+        context['endianess'] = datatypes.BigEndian
         cursor = utils.DataCursor(b'\x30\xff')
         self.assertEqual(self.manager.decode('uint16', cursor, context).decodedValue, 0x30ff)
 
@@ -182,19 +182,29 @@ class FixedStringTest(unittest.TestCase):
         self.assertEqual((decoded.bufferRange.startPosition, decoded.bufferRange.size, decoded.decodedValue),
                          (0, 0, ''))
 
-        context = datatypes.InstantiateContext.buildContext(size=4)
+        context = datatypes.InstantiateContext(size=4)
         decoded = self.manager.decode('fixed_string', utils.DataCursor(d), context)
         self.assertEqual((decoded.bufferRange.startPosition, decoded.bufferRange.size, decoded.decodedValue),
                          (0, 4, 'Hell'))
 
     def test_decode_short(self):
-        context = datatypes.InstantiateContext.buildContext(size=10)
+        context = datatypes.InstantiateContext(size=10)
         self.assertRaises(datatypes.DecodeError, lambda: self.manager.decode('fixed_string', utils.DataCursor(b''), context))
 
     def test_decode_partial(self):
-        context = datatypes.InstantiateContext.buildContext(size=4, encoding='utf-16le')
+        context = datatypes.InstantiateContext(size=4, encoding='utf-16le')
         cursor = utils.DataCursor(b'h\x00i\x00', override_buffer_length=3)
         self.assertRaises(datatypes.DecodeError, lambda: self.manager.decode('fixed_string', cursor, context))
+
+
+class BooleanTemplateTest(unittest.TestCase):
+    manager = datatypes.globalTypeManager()
+
+    def test_decode_int(self):
+        d = b'\x00'
+        decoded = self.manager.decode('bool', utils.DataCursor(d))
+        self.assertEqual((decoded.bufferRange.startPosition, decoded.bufferRange.size, decoded.decodedValue),
+                         (0, 1, False))
 
 
 class TypesModelTest(unittest.TestCase):
@@ -253,21 +263,21 @@ class StructureTest(unittest.TestCase):
 
     def test_one_field_struct(self):
         context = datatypes.InstantiateContext()
-        context.fields = [datatypes.Structure.Field('a', self.typeManager.getTemplate('uint8'))]
+        context['fields'] = [datatypes.Structure.Field('a', self.typeManager.getTemplate('uint8'))]
         value = self.typeManager.decode('struct', utils.DataCursor(b'\xfe'), context)
         self.assertEqual(len(value.members), 1)
         self.assertEqual(value.members['a'].decodedValue, 0xfe)
 
     def test_one_field_struct_auto_resolving_field(self):
         context = datatypes.InstantiateContext()
-        context.fields = [datatypes.Structure.Field('a', self.typeManager.getTemplate('uint8'))]
+        context['fields'] = [datatypes.Structure.Field('a', self.typeManager.getTemplate('uint8'))]
         value = self.typeManager.decode('struct', utils.DataCursor(b'\xfe'), context)
         self.assertEqual(len(value.members), 1)
         self.assertEqual(value.members['a'].decodedValue, 0xfe)
 
     def test_two_field_structure(self):
         context = datatypes.InstantiateContext()
-        context.fields = [
+        context['fields'] = [
             datatypes.Structure.Field('a', self.typeManager.getTemplate('uint8')),
             datatypes.Structure.Field('b', self.typeManager.getTemplate('zero_string'))
         ]
@@ -280,17 +290,17 @@ class StructureTest(unittest.TestCase):
 
     def test_custom_context(self):
         context = datatypes.InstantiateContext()
-        context.fields = [
+        context['fields'] = [
             datatypes.Structure.Field('a', self.typeManager.getTemplate('uint8')),
             datatypes.Structure.Field('b', self.typeManager.getTemplate('zero_string'),
-                                      datatypes.InstantiateContext.buildContext(encoding='utf-16le'))
+                                      datatypes.InstantiateContext(encoding='utf-16le'))
         ]
         value = self.typeManager.decode('struct', utils.DataCursor(b'\xfeY\x00e\x00s\x00!\x00\x00\x00'), context)
         self.assertEqual(value.members['b'].decodedValue, 'Yes!')
 
     def test_field_alignment(self):
         context = datatypes.InstantiateContext()
-        context.fields = [
+        context['fields'] = [
             datatypes.Structure.Field('a', self.typeManager.getTemplate('uint8'), align_hint=1),
             datatypes.Structure.Field('b', self.typeManager.getTemplate('uint8'), align_hint=4)
         ]
@@ -304,7 +314,7 @@ class StructureTest(unittest.TestCase):
 
     def test_default_field_alignment(self):
         context = datatypes.InstantiateContext()
-        context.fields = [
+        context['fields'] = [
             datatypes.Structure.Field('a', self.typeManager.getTemplate('uint8')),
             datatypes.Structure.Field('b', self.typeManager.getTemplate('uint32'))
         ]
@@ -318,11 +328,11 @@ class StructureTest(unittest.TestCase):
 
     def test_forward_link_on_same_level(self):
         context = datatypes.InstantiateContext()
-        context.fields = [
+        context['fields'] = [
             datatypes.Structure.Field('a', self.typeManager.getTemplate('uint8'), align_hint=1),
             datatypes.Structure.Field('b', self.typeManager.getTemplate('fixed_string'), align_hint=1)
         ]
-        context.links = [
+        context['links'] = [
             datatypes.Structure.Link('a', 'b.size')
         ]
 
@@ -335,17 +345,17 @@ class StructureTest(unittest.TestCase):
 
     def test_inner_link(self):
         a_context = datatypes.InstantiateContext()
-        a_context.fields = [
+        a_context['fields'] = [
             datatypes.Structure.Field('b', self.typeManager.getTemplate('uint8'), align_hint=1),
             datatypes.Structure.Field('c', self.typeManager.getTemplate('float'), align_hint=1)
         ]
 
         context = datatypes.InstantiateContext()
-        context.fields = [
+        context['fields'] = [
             datatypes.Structure.Field('a', self.typeManager.getTemplate('struct'), a_context, align_hint=1),
             datatypes.Structure.Field('d', self.typeManager.getTemplate('fixed_string'), align_hint=1)
         ]
-        context.links = [
+        context['links'] = [
             datatypes.Structure.Link('a.b', 'd.size')
         ]
 
@@ -355,12 +365,12 @@ class StructureTest(unittest.TestCase):
 
     def test_backdep_link_same_level(self):
         context = datatypes.InstantiateContext()
-        context.fields = [
+        context['fields'] = [
             datatypes.Structure.Field('dep_str', self.typeManager.getTemplate('fixed_string'), align_hint=1),
             datatypes.Structure.Field('encoding', self.typeManager.getTemplate('zero_string'), align_hint=1)
         ]
-        context.fields[0].typeContext.size = 4
-        context.links = [
+        context['fields'][0].typeContext['size'] = 4
+        context['links'] = [
             datatypes.Structure.Link('encoding', 'dep_str.encoding')
         ]
 
@@ -370,22 +380,22 @@ class StructureTest(unittest.TestCase):
 
     def test_backdep_link_different_levels(self):
         a_context = datatypes.InstantiateContext()
-        a_context.fields = [
+        a_context['fields'] = [
             datatypes.Structure.Field('inner_fs', self.typeManager.getTemplate('fixed_string'), align_hint=1)
         ]
-        a_context.fields[0].typeContext.size = 4
+        a_context['fields'][0].typeContext['size'] = 4
 
         b_context = datatypes.InstantiateContext()
-        b_context.fields = [
+        b_context['fields'] = [
             datatypes.Structure.Field('inner_size', self.typeManager.getTemplate('int8'), align_hint=1)
         ]
 
         context = datatypes.InstantiateContext()
-        context.fields = [
+        context['fields'] = [
             datatypes.Structure.Field('a', self.typeManager.getTemplate('struct'), a_context),
             datatypes.Structure.Field('b', self.typeManager.getTemplate('struct'), b_context)
         ]
-        context.links = [
+        context['links'] = [
             datatypes.Structure.Link('b.inner_size', 'a.inner_fs.size')
         ]
 
@@ -416,16 +426,16 @@ class StructureFieldTest(unittest.TestCase):
         self.assertFalse(field.hasProperty('float'))
         self.assertFalse(field.hasProperty('another.int'))
 
-        context.fields = [datatypes.Structure.Field('another', self.dummy_template, context)]
+        context['fields'] = [datatypes.Structure.Field('another', self.dummy_template, context)]
         self.assertTrue(field.hasProperty('another.int'))
 
     def test_set_prop(self):
         context = datatypes.InstantiateContext()
         field = datatypes.Structure.Field('some', self.dummy_template, context)
         field.setContextPropertyFromRawValue('int', 10)
-        self.assertEqual(getattr(context, 'int'), 10)
+        self.assertEqual(context['int'], 10)
         self.assertRaises(ValueError, lambda: field.setContextPropertyFromRawValue('int', '10'))
 
-        context.fields = [datatypes.Structure.Field('another', self.dummy_template, context)]
+        context['fields'] = [datatypes.Structure.Field('another', self.dummy_template, context)]
         field.setContextPropertyFromRawValue('another.str', '10')
-        self.assertEqual(getattr(context.fields[0].typeContext, 'str'), '10')
+        self.assertEqual(context['fields'][0].typeContext['str'], '10')
