@@ -1,0 +1,16 @@
+Currently Microhex requires:
+    - Python version 3.2 or greater (http://python.org/download)
+    - C preprocessor (cpp) tool (optional, required for parsing data type definitions from C-language headers)
+
+The following libraries are not required if you are using binary installed for Windows (as these thing already
+bundled with installer):
+    - Qt version 4.8.x or greater (http://qt-project.org/downloads). Note that Qt 5 is not supported yet.
+    - PyQt (based on Qt 4.8 or greater, but not Qt 5.x) (http://www.riverbankcomputing.co.uk/software/pyqt/download)
+    - pycparser module (optional, required for parsing data type definitions from C-language headers)
+      For Ubuntu, you should install python3-pycparser package or use pip.
+
+The following libraries and application are only required if you are building Microhex from sources, binary installation
+does not require it.
+    - gcc or MinGW C++ compiler with support for C++11 standard (g++ version 4.6 or greater)
+      (http://sourceforge.net/projects/mingw)
+    - SIP bindings generator (http://www.riverbankcomputing.co.uk/software/sip/download)

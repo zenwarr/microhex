@@ -1,3 +1,0 @@
-rename freezeSize to fixedSize
-do not change document read-only flag when device read-onlyness was changed
-cover alternate branches with tests

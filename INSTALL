@@ -1,32 +1,29 @@
 Before building application, make sure that all required programs and components are installed on your
-system. Currently Microhex requires:
-    - Python version 3.2 or greater (http://python.org/download)
-    - Qt version 4.8.x or greater (http://qt-project.org/downloads)
-    - PyQt (based on Qt 4.8 or greater, but not Qt 5.x) (http://www.riverbankcomputing.co.uk/software/pyqt/download)
-    - gcc or MinGW C++ compiler with support for C++11 standard (g++ version 4.6 or greater)
-      (http://sourceforge.net/projects/mingw)
-    - SIP bindings generator (http://www.riverbankcomputing.co.uk/software/sip/download)
-    - pycparser module (optional, required for parsing data type definitions from C-language headers)
-      For Ubuntu, you should install python3-pycparser package or use pip.
-    - C preprocessor (cpp) tool (optional, required for parsing data type definitions from C-language headers)
+system. See REQUIREMENTS file for details.
 
-Next step is to set proper values in config.pri file.
-Note for Linux users: beware of installing application into /usr/bin (or another
-system directory) as it can lead to problems when you want to uninstall software. Instead of this, use a package
-manager (if you are reading this text in far future and i had made package for your favourite distro ;) ) or install
-Microhex into your profile directory and create soft link in /usr/bin pointing to installed microhex.py.
+Next step is to set proper values in config.pri file. Here you should adjust paths to tool used by build system and
+set directory where Microhex files will be installed.
+Note for Linux users: beware of installing application into /usr/bin (or another system directory) as it can lead
+to problems when uninstalling software. Instead of this, use a package manager (if you are reading this text in
+far future and i had made package for your favourite distro ;) ) or install Microhex into your profile directory
+and create soft link in /usr/bin pointing to installed microhex.py.
 
+Next step is to compile translation files. If you only need English, you can skip this step.
 Open a console in source root directory. If you want to compile all available translations, run the following command:
     lrelease microhex.pro
-or go to src/translations directory and compile only desired translation files.
+or go to src/translations directory and compile only desired translation files by running
+    lrelease TRANSLATION_FILE
+where TRANSLATION_FILE is one of translation files (*.ts) provided with application.
 
-And final step. To build and install application, run following commands:
+Final step. Open a console in source root directory (where 'docs' and 'src' directories are located).
+Run following commands:
     mkdir build && cd build
     qmake ..
     make install
 Depending on system configuration, last command may be different (for example, mingw32-make if you are using MinGW).
+After installation is complete, you can safely remove created 'build' directory with temporary files.
 
-After all, you can start Microhex by executing command in installation directory:
+Now you can start Microhex by executing command in directory where Microhex had been installed:
     python3 ./microhex.py
 or by double-clicking on microhex.py icon if you are using Windows and .py files are associated with Python 3.x
 interpreter.
