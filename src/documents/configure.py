@@ -19,7 +19,8 @@ os.system(' '.join((config.sip_bin, '-c', build_dir, '-b', build_file, '-g', '-e
 
 makefile = pyqtconfig.QtGuiModuleMakefile(configuration=config, build_file=build_file,
                                            dir=build_dir, makefile='Makefile-sip', install_dir=install_dir)
-makefile.extra_cxxflags = ['-std=c++0x']
+makefile.extra_cxxflags = ['-std=c++0x', '-include cmath']  # workaround for PyQt bug when compiling PyQt with MinGW
+                                                            # http://bugs.python.org/issue11566
 makefile.extra_libs = ['documents']
 makefile.extra_lib_dirs = ['.']
 makefile.extra_include_dirs.append(sources_dir)

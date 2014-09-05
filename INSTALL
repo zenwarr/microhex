@@ -1,12 +1,8 @@
 Before building application, make sure that all required programs and components are installed on your
 system. See REQUIREMENTS file for details.
 
-Next step is to set proper values in config.pri file. Here you should adjust paths to tool used by build system and
+First step is to set proper values in config.pri file. Here you should adjust paths to tools used by build system and
 set directory where Microhex files will be installed.
-Note for Linux users: beware of installing application into /usr/bin (or another system directory) as it can lead
-to problems when uninstalling software. Instead of this, use a package manager (if you are reading this text in
-far future and i had made package for your favourite distro ;) ) or install Microhex into your profile directory
-and create soft link in /usr/bin pointing to installed microhex.py.
 
 Next step is to compile translation files. If you only need English, you can skip this step.
 Open a console in source root directory. If you want to compile all available translations, run the following command:
@@ -15,7 +11,7 @@ or go to src/translations directory and compile only desired translation files b
     lrelease TRANSLATION_FILE
 where TRANSLATION_FILE is one of translation files (*.ts) provided with application.
 
-Final step. Open a console in source root directory (where 'docs' and 'src' directories are located).
+Final step. Open console in source root directory (where 'docs' and 'src' directories are located).
 Run following commands:
     mkdir build && cd build
     qmake ..
@@ -27,3 +23,9 @@ Now you can start Microhex by executing command in directory where Microhex had 
     python3 ./microhex.py
 or by double-clicking on microhex.py icon if you are using Windows and .py files are associated with Python 3.x
 interpreter.
+
+NOTE:
+If you are using PyQt4 >= 4.10 and get error like this while executing 'make' step:
+    cannot import module pyqtconfig
+you should rebuild PyQt from sources using its old-style configure.py script instead of recommended
+configure-ng.py. This will enable currently deprecated pyqtconfig module required for Microhex to build.
