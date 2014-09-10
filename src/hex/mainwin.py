@@ -37,6 +37,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle(QApplication.applicationName())
         self.setWindowIcon(QIcon(':/main/images/hex.png'))
+        self.setMinimumSize(600, 400)
 
         self.subWidgets = []
         self._activeSubWidget = None
