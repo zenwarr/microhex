@@ -790,6 +790,8 @@ class ZeroStringTemplate(AbstractTemplate):
 
             def_value.bufferRange = context['cursor'].bufferRange(0, bytes_parsed)
             def_value.cachedBufferData = context['cursor'].read(0, bytes_parsed)
+            if unterminated and not parsed_chars:
+                raise self.decodeError(utils.tr('no enough data available'), def_value)
             def_value.decodedValue = ''.join(parsed_chars)
             if unterminated:
                 def_value.decodeStatus = Value.StatusWarning
