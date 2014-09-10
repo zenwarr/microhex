@@ -207,7 +207,9 @@ QList<int> ComplexAction::alternativeBranchesIds()const {
     return result;
 }
 
-
+/*
+ * Document class provides high-level functions for editing data.
+ */
 Document::Document(const std::shared_ptr<AbstractDevice> &device) : _spanChain(std::make_shared<SpanChain>()),
     _currentUndoAction(std::make_shared<ComplexAction>(std::shared_ptr<Document>(), "initial state")),
     _undoDisabled(false), _fixedSize(false), _readOnly(false), _currentAtomicOperationIndex(),
@@ -243,6 +245,10 @@ const std::shared_ptr<AbstractDevice> &Document::getDevice() const {
     return _device;
 }
 
+/*
+ * Note that device URL is not unique for device. For example, all BufferDevices share exactly
+ * same URL (microdata://)
+ */
 QUrl Document::getUrl() const {
     ReadLocker locker(_lock);
     return _device ? _device->getUrl() : QUrl();
@@ -257,11 +263,16 @@ bool Document::isFixedSize() const {
     return _fixedSize;
 }
 
+/*
+ * Turns fixed size mode on and off. In fixed size mode all operations leading to changing
+ * size of data will fail. Fixed size mode can only be changed if device->isFixedSize() is false.
+ * Otherwise fixed size mode of document is always true.
+ */
 void Document::setFixedSize(bool fixed_size) {
     WriteLocker locker(_lock);
     if (fixed_size != _fixedSize) {
         if (!fixed_size && _device && _device->isFixedSize()) {
-            throw DocumentError("failed to turn fixed size mode off for device with fixed size");
+            throw DocumentError("cannot turn fixed size mode off for device with fixed size");
         }
         _fixedSize = fixed_size;
         emit fixedSizeChanged(fixed_size);
@@ -273,45 +284,68 @@ bool Document::isReadOnly() const {
     return _readOnly;
 }
 
+/*
+ * Turns read only mode on and off. In read only mode all operations leading to changing
+ * data will fail. Read only mode can only be changed if device->isReadOnly() is false.
+ * Otherwise read only mode of document is always true.
+ */
 void Document::setReadOnly(bool read_only) {
     WriteLocker locker(_lock);
     if (read_only != _readOnly) {
         if (!read_only && _device && _device->isReadOnly()) {
-            throw DocumentError("failed to turn read only mode off for read only device");
+            throw DocumentError("cannot turn read only mode off for read only device");
         }
         _readOnly = read_only;
         emit readOnlyChanged(read_only);
     }
 }
 
+/*
+ * Reads :length: bytes starting from :position:. If no :length: bytes available, it will return
+ * as many bytes as possible.
+ */
 QByteArray Document::read(qulonglong position, qulonglong length) const {
     ReadLocker locker(_lock);
     return _spanChain->read(position, length);
 }
 
+/*
+ * Reads all available data from document.
+ */
 QByteArray Document::readAll() const {
     ReadLocker locker(_lock);
     return _spanChain->read(0, _spanChain->getLength());
 }
 
+/*
+ * Inserts span at given position. See Document::insertChain doc for details.
+ */
 void Document::insertSpan(qulonglong position, const std::shared_ptr<AbstractSpan> &span, char fill_byte) {
     insertChain(position, SpanChain::fromSpans(SpanList() << span), fill_byte);
 }
 
+/*
+ * Inserts given chain at :position:, shifting all data after :position: right. It is possible to
+ * insert data even if position > this->getLength(), in this case space between current end of document
+ * and insert position will be occupied by FillSpan initialized with :fill_byte:.
+ * Given chain is cloned, so it is safe to modify :chain: after passing as argument to this function.
+ */
 void Document::insertChain(qulonglong position, const std::shared_ptr<SpanChain> &chain, char fill_byte) {
-    /** Inserts given chain at :position:, shifting all data after :position: right. It is possible to
-     *  insert data even if position > this->getLength(), in this case space between current end of document
-     *  and insert position will be occupied by FillSpan initialized with :fill_byte:.
-     *  Given chain is cloned, so it is safe to modify :chain: after passing as argument to this function.
-     */
     _insertChain(position, chain, fill_byte, false, 1);
 }
 
+/*
+ * Appends span to the end of document. See Document::appendChain for details.
+ */
 void Document::appendSpan(const std::shared_ptr<AbstractSpan> &span) {
     WriteLocker locker(_lock);
     insertChain(_spanChain->getLength(), SpanChain::fromSpans(SpanList() << span));
 }
 
+/*
+ * Appends given chain to the end of document. Given chain is cloned, so it is safe to modify
+ * :chain: after passing as argument to this function.
+ */
 void Document::appendChain(const std::shared_ptr<SpanChain> &chain) {
     WriteLocker locker(_lock);
     insertChain(_spanChain->getLength(), chain);
@@ -364,11 +398,12 @@ void Document::writeSpan(qulonglong position, const std::shared_ptr<AbstractSpan
     writeChain(position, SpanChain::fromSpans(SpanList() << span), fill_byte);
 }
 
+/*
+ * Writes given chain at :position:, overwriting existing data. Document will be expanded if required.
+ * Space between write position and end of document will be occupied by FillSpan initialized by :fill_byte:.
+ * Given chain is cloned, so it is safe to modify :chain: after passing as argument to this function.
+ */
 void Document::writeChain(qulonglong position, const std::shared_ptr<SpanChain> &chain, char fill_byte) {
-    /** Writes given chain at :position:, overwriting existing data. Document will be expanded if required.
-     *  Space between write position and end of document will be occupied by FillSpan initialized by :fill_byte:.
-     *  Given chain is cloned, so it is safe to modify :chain: after passing as argument to this function.
-     */
     _writeChain(position, chain, fill_byte, false, 1);
 }
 
@@ -566,22 +601,29 @@ QList<int> Document::getAlternativeBranchesIds()const {
     return _currentUndoAction->alternativeBranchesIds();
 }
 
+/*
+ * Saves data to specified device. If no device was specified, underlying device will be used.
+ */
 void Document::save(const std::shared_ptr<AbstractDevice> &write_device, bool switch_devices) {
     WriteLocker locker(_lock);
 
     auto device_to_write = write_device ? write_device : _device;
     auto device_to_read = _device;
 
-    if (device_to_write == _device && !isModified()) {
-        return;
-    }
-
     if (!device_to_read || !device_to_write) {
         throw DocumentError();
     }
 
+    // save to underlying device only if document was modified
+    if (device_to_write == _device && !isModified()) {
+        return;
+    }
+
+    // Saver object encapsulates algorithm of writing data to device. For example, FileDevice
+    // can create QuickFileSaver object which will overwrite only modified bytes.
     auto saver = device_to_write->createSaver(shared_from_this(), device_to_read);
 
+    // build list of DeviceSpan that should be dissolved
     QList<std::shared_ptr<PrimitiveDeviceSpan>> spans_to_dissolve;
     if (device_to_read == device_to_write || switch_devices) {
         spans_to_dissolve = _prepareToUpdateDevice(switch_devices ? device_to_write : device_to_read);
@@ -614,7 +656,11 @@ void Document::save(const std::shared_ptr<AbstractDevice> &write_device, bool sw
         }
 
         for (auto span : spans_to_dissolve) {
-            span->dissolve();
+            try {
+                span->dissolve();
+            } catch (...) {
+                // do nothing
+            }
         }
     }
 
@@ -670,65 +716,77 @@ void Document::_onDeviceReadOnlyChanged(bool new_read_only) {
     }
 }
 
-QList<std::shared_ptr<PrimitiveDeviceSpan> > Document::_prepareToUpdateDevice(const std::shared_ptr<AbstractDevice> &write_device) {
-    // build map of device spans that will stay in resulting device
-    QMap<std::shared_ptr<PrimitiveDeviceSpan>, qulonglong> new_span_positions;
+struct SAVED_RANGE {
+    qulonglong oldPos;
+    qulonglong newPos;
+    qulonglong length = 0;
+};
 
+QList<std::shared_ptr<PrimitiveDeviceSpan> > Document::_prepareToUpdateDevice(
+        const std::shared_ptr<AbstractDevice> &write_device) {
+    // Saved range (SR) is range of device data that exist in device both before and after saving
+    // operation (although its offset from beginning of device can differ).
+
+    // collect list of SRs
+    QList<SAVED_RANGE> saved_ranges;
     qulonglong current_position = 0;
     for (auto span : _spanChain->getSpans()) {
-        if (std::dynamic_pointer_cast<DeviceSpan>(span)) {
-            auto map = std::dynamic_pointer_cast<DeviceSpan>(span)->getPrimitives();
+        auto device_span = std::dynamic_pointer_cast<DeviceSpan>(span);
+        if (device_span) {
+            auto map = device_span->getPrimitives();
             for (auto primitive_span : map.keys()) {
-                new_span_positions[primitive_span] = map[primitive_span] + current_position;
+                if (primitive_span->getDevice() == write_device) {
+                    SAVED_RANGE sr;
+                    sr.length = primitive_span->getLength();
+                    sr.oldPos = primitive_span->getDeviceOffset();
+                    sr.newPos = current_position + map[primitive_span];
+                    saved_ranges.push_back(sr);
+                }
             }
         }
         current_position += span->getLength();
     }
 
+    // iterate over list of all PrimitiveDeviceSpans referencing :write_device: data and
+    // determine replacement for each one
     QList<std::shared_ptr<PrimitiveDeviceSpan>> spans_to_dissolve;
-
-    // now process all spans that should be dissolved. These spans can reside in undo stack or
-    // another documents. We should find spans that needs to be updated, and update them to keep referring to
-    // same data.
     for (auto span : write_device->getSpans()) {
-        // now determine replacement for this span. We can split span into several ones, if part of
-        // data will remain unmodified in new device
         SpanList replacement;
 
-        qulonglong current_offset = span->getDeviceOffset();
-        while (current_offset < span->getDeviceOffset() + span->getLength()) {
-            // find spans from new device that will contain current byte
-            QList<std::shared_ptr<PrimitiveDeviceSpan>> hitted;
-            for (auto span_to_test_for_hit : new_span_positions.keys()) {
-                if (span_to_test_for_hit->getDeviceOffset() <= current_offset &&
-                        current_offset < span_to_test_for_hit->getDeviceOffset() + span_to_test_for_hit->getLength()) {
-                    hitted.append(span_to_test_for_hit);
+        qulonglong cur_device_pos = span->getDeviceOffset();
+        while (cur_device_pos < span->getDeviceOffset() + span->getLength()) {
+            // collect list of SRs this byte hits.
+            QList<SAVED_RANGE> hitted_srs;
+            for (auto sr : saved_ranges) {
+                if (sr.oldPos <= cur_device_pos && cur_device_pos < sr.oldPos + sr.length) {
+                    hitted_srs.append(sr);
                 }
             }
 
-            if (hitted.isEmpty()) {
-                // there is no spans that contain this data. It means that data are removed from document,
-                // but we still need them. We will store this data in DataSpan
-                // first determine length of data that we should store by finding closest span to the right.
-                std::shared_ptr<PrimitiveDeviceSpan> closest = nullptr;
-                qulonglong closest_distance = -1;
-                for (auto span_to_test : new_span_positions.keys()) {
-                    qulonglong dev_offset = span_to_test->getDeviceOffset();
-                    if (dev_offset > current_offset && (!closest || dev_offset - current_offset < closest_distance)) {
-                        closest = span_to_test;
-                        closest_distance = dev_offset - current_offset;
+            if (hitted_srs.isEmpty()) {
+                // there is no SRs containing this byte. It means that this
+                // data will not be present in device after saving, but we still need it. We should
+                // back removed device data in DataSpan.
+                // Now we determine how many bytes we should store. First find closest SR to the
+                // right of current byte.
+                SAVED_RANGE closest;
+                qulonglong closest_dist = std::numeric_limits<qulonglong>::max();
+                for (auto sr : saved_ranges) {
+                    if (sr.oldPos > cur_device_pos && (!closest.length || sr.oldPos - cur_device_pos < closest_dist)) {
+                        closest = sr;
+                        closest_dist = sr.oldPos - cur_device_pos;
                     }
                 }
 
                 qulonglong data_to_store_length;
-                if (!closest) {
-                    // there is no another spans till the end of device... We should store all remaining data
-                    data_to_store_length = span->getLength() - (current_offset - span->getDeviceOffset());
+                if (!closest.length) {
+                    // there is no another SRs till the end of device... We should store all remaining data
+                    data_to_store_length = span->getLength() - (cur_device_pos - span->getDeviceOffset());
                 } else {
-                    // another span starts near...
-                    data_to_store_length = closest->getDeviceOffset() - current_offset;
+                    // another SR is near...
+                    data_to_store_length = closest.oldPos - cur_device_pos;
                 }
-                data_to_store_length = std::min(span->getDeviceOffset() + span->getLength() - current_offset,
+                data_to_store_length = std::min(span->getDeviceOffset() + span->getLength() - cur_device_pos,
                                                 data_to_store_length);
 
                 // now replace with data span. Problem is that we can have no enough memory to keep
@@ -738,30 +796,32 @@ QList<std::shared_ptr<PrimitiveDeviceSpan> > Document::_prepareToUpdateDevice(co
                 bool ok = false;
                 QByteArray data_to_store;
                 try {
-                    data_to_store = write_device->read(current_offset, data_to_store_length);
+                    data_to_store = write_device->read(cur_device_pos, data_to_store_length);
                     ok = true;
                 } catch (const std::bad_alloc &) {
                     // not enough memory
-                    throw;
+                    ok = false;
                 }
 
                 if (!ok || qulonglong(data_to_store.length()) != data_to_store_length) {
                     throw DocumentError("failed to save document data - some data from device you want to write into "
-                                        "should be kept, but system has no enough free RAM to do it. Try clearing "
+                                        "should be kept, but system has no enough free RAM to do it, or data is "
+                                        "unavailable. Try clearing "
                                         "undo history, or save another document that depends on data from this device.");
                 }
 
                 replacement.append(std::make_shared<DataSpan>(data_to_store));
             } else {
-                // part of data is kept by another span that will remain in new device.
-                // choose span that keeps more data.
-                std::shared_ptr<PrimitiveDeviceSpan> choosen = hitted.first();
-                qulonglong offset = current_offset - choosen->getDeviceOffset();
+                // part of data hits SR. Find out how many bytes we have
+                //TODO: iterate over SRs and choose longest one!
+                SAVED_RANGE choosen = hitted_srs.first();
+                qulonglong offset = cur_device_pos - choosen.oldPos;
+                qulonglong length = std::min(span->getDeviceOffset() + span->getLength() - cur_device_pos,
+                                             choosen.length - offset);
 
-                replacement.append(write_device->createSpan(new_span_positions[choosen] + offset,
-                                                            choosen->getLength() - offset));
+                replacement.append(write_device->createSpan(choosen.newPos + offset, length));
             }
-            current_offset += replacement.last()->getLength();
+            cur_device_pos += replacement.last()->getLength();
         }
         span->prepareToDissolve(replacement);
         spans_to_dissolve.append(span);

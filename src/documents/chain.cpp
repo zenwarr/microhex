@@ -7,22 +7,49 @@
 #include "devices.h"
 #include "base.h"
 
+/**
+ * SpanChain is a sequence of spans. Chain represents piece of data that can be
+ * freely modified while single spans always remain immutable.
+ * Each span in chain has assotiated savepoint index. This index makes it
+ * possible to determine if span data should be marked as modified relative
+ * to current device state. Document has current savepoint index too.
+ * Document savepoint index equals to 0 initially, and increments each time
+ * Document::save() member function completes successfully, and decrements
+ * when user undoes document to previous state.
+ * Savepoint index of span equals to current savepoint index of document in the
+ * moment of adding this span to document. So, bytes belonging to spans with
+ * savepoint index >= current savepoint index of document are highlighted
+ * as modified in editor. You can use Document::isRangeModified member function
+ * to determine if any byte in given range is modified.
+ * Unlike span, chain can have zero length.
+ * All SpanChain functions are thread-safe.
+ */
 
 SpanChain::SpanChain() : _length(), _lock(std::make_shared<ReadWriteLock>()) {
 
 }
 
+/*
+ * Clones spans from another chain and assigns list of cloned spans to this
+ * chain. Savepoints are copied.
+ */
 SpanChain &SpanChain::operator=(const SpanChain &other) {
     _setSpans(other._spans);
     return *this;
 }
 
+/*
+ * Creates chain from pure list of spans. Savepoints are initialized to -1.
+ */
 std::shared_ptr<SpanChain> SpanChain::fromSpans(const SpanList &spans) {
     auto chain = std::make_shared<SpanChain>();
     chain->setSpans(spans);
     return chain;
 }
 
+/**
+ * Creates new chain from another one. Savepoints are copied.
+ */
 std::shared_ptr<SpanChain> SpanChain::fromChain(const SpanChain &chain) {
     auto new_chain = std::make_shared<SpanChain>();
     new_chain->_setSpans(chain._spans);
@@ -42,6 +69,10 @@ SpanList SpanChain::getSpans() const {
     return _spanDataListToSpans(_spans);
 }
 
+/**
+ * Replaces spans with another ones from list. Old spans will be lost.
+ * Savepoints are initialized to -1.
+ */
 void SpanChain::setSpans(const SpanList &spans) {
     WriteLocker locker(_lock);
 
@@ -55,6 +86,10 @@ void SpanChain::setSpans(const SpanList &spans) {
     std::swap(new_length, _length);
 }
 
+/**
+ * Copies spans from SpanData list of another chain. Old spans will be lost.
+ * Savepoints are copied.
+ */
 void SpanChain::_setSpans(const QList<std::shared_ptr<SpanChain::SpanData>> &spans) {
     WriteLocker locker(_lock);
 
@@ -76,17 +111,16 @@ void SpanChain::clear() {
     setSpans(SpanList());
 }
 
+/**
+ *  Read as much data as possible starting from :offset:, but not more than :length: bytes.
+ */
 QByteArray SpanChain::read(qulonglong offset, qulonglong length) const {
-    /** Read as much data as possible starting from :offset:, but not more than :length: bytes.
-     */
     ReadLocker locker(_lock);
 
     if (offset > _length) {
         return QByteArray();
     } else if (_length - offset < length) {
         length = _length - offset;
-    } else if (length > qulonglong(INT_MAX)) {
-        throw std::overflow_error("integer overflow");
     }
 
     qulonglong left_offset, right_offset;
@@ -94,8 +128,12 @@ QByteArray SpanChain::read(qulonglong offset, qulonglong length) const {
     QByteArray result;
     for (int span_index = 0; span_index < spans.length(); ++span_index) {
         qulonglong pos = !span_index ? left_offset : 0;
-        qulonglong size = span_index == spans.length() - 1 ? (right_offset - pos) + 1 : spans[span_index]->getLength() - pos;
+        qulonglong size = span_index == spans.length() - 1 ?
+                    (right_offset - pos) + 1 : spans[span_index]->getLength() - pos;
         size = std::min(size, length - result.length());
+        if (size + (qulonglong)result.size() > qulonglong(INT_MAX)) {
+            throw std::overflow_error("integer overflow");
+        }
         result += spans[span_index]->read(pos, size);
     }
     return result;
@@ -106,15 +144,16 @@ QByteArray SpanChain::readAll() const {
     return read(0, this->getLength());
 }
 
+/**
+ * Returns list of spans that contain :length: of bytes from :offset:.
+ * It is not guarantied that first span in returned list starts at :offset:
+ * or last span ends at :offset: + :length: - 1. You can additionally get
+ * :left_offset: (offset of first byte in range from start of first returned
+ * span) and :right_offset: (offset of last byte in requested range in the last
+ * returned span).
+ **/
 SpanList SpanChain::spansInRange(qulonglong offset, qulonglong length, qulonglong *left_offset,
                                  qulonglong *right_offset) const {
-    /** Returns list of spans that contain :length: of bytes from :offset:. It is not guarantied that first
-     *  span in returned list starts at :offset: or last span ends at :offset: + :length: - 1. You can additionally
-     *  get :left_offset: (number of bytes between first byte of first returned span and byte at :offset:, including
-     *  first byte) and :right_offset: (number of bytes between first byte of last returned span and byte at :offset:,
-     *  including first byte).
-     **/
-
     ReadLocker locker(_lock);
 
     if (left_offset) {
@@ -139,9 +178,10 @@ SpanList SpanChain::spansInRange(qulonglong offset, qulonglong length, qulonglon
     return _spanDataListToSpans(_spans.mid(first_span_index, last_span_index - first_span_index + 1));
 }
 
+/**
+ * Same as SpanChain::spanAtOffset function, but returns index of span in _spans list
+ **/
 int SpanChain::_findSpanIndex(qulonglong offset, qulonglong *span_offset) const {
-    /** Same as SpanChain::spanAtOffset function, but returns index of span in _spans list
-     **/
     ReadLocker locker(_lock);
 
     if (span_offset) {
@@ -166,24 +206,24 @@ int SpanChain::_findSpanIndex(qulonglong offset, qulonglong *span_offset) const 
     return -1;
 }
 
+/**
+ * Looks for span that holds byte at :offset:, additionally can return :span_offset: which indicates
+ * offset of requested byte in returned span. If :offset: is out of bounds,
+ * -1 is returned and :span_offset: set to 0.
+ **/
 std::shared_ptr<AbstractSpan> SpanChain::spanAtOffset(qulonglong offset, qulonglong *span_offset) const {
-    /** Looks for span that holds byte at :offset:, additionally can return :span_offset: which indicates
-     *  number of bytes between first byte of returned span and :offset:, including first byte. If :offset:
-     *  is out of bounds, -1 is returned and :span_offset: is initialized to 0.
-     **/
-
     ReadLocker locker(_lock);
 
     int span_index = _findSpanIndex(offset, span_offset);
     return span_index >= 0 ? _spans[span_index]->span : nullptr;
 }
 
+/**
+ * Same as SpanChain::spansInRange, but splits chain at :offset: and :offset: + :length:, so
+ * it is guaranteed that first span in returned list holds byte at :offset: and last span holds
+ * byte at :offset: + :length: - 1
+ **/
 SpanList SpanChain::takeSpans(qulonglong offset, qulonglong length) {
-    /** Same as SpanChain::spansInRange, but first splits chain at :offset: and :offset: + :length:, so
-     *  it is guaranteed that first span in returned list holds byte at :offset: and last span holds
-     *  byte at :offset: + :length: - 1
-     **/
-
     WriteLocker locker(_lock);
 
     if (offset >= _length) {
@@ -201,6 +241,10 @@ SpanList SpanChain::takeSpans(qulonglong offset, qulonglong length) {
     return spansInRange(offset, length);
 }
 
+/**
+ * Acts like SpanChain::spansInRange, but returns not just a list of spans,
+ * but new chain initialized with spans in desired range. Savepoints are copied.
+ */
 std::shared_ptr<SpanChain> SpanChain::takeChain(qulonglong offset, qulonglong length) const {
     ReadLocker locker(_lock);
 
@@ -221,8 +265,13 @@ std::shared_ptr<SpanChain> SpanChain::takeChain(qulonglong offset, qulonglong le
     return result;
 }
 
+/*
+ * Just like takeChain, but additionally prepares chain for external use
+ * (for example, clipboard) - it tries to convert all DeviceSpans to DataSpans
+ * to unbind it from device data.
+ * Savepoints of all spans in created chain are resetted to -1.
+ */
 std::shared_ptr<SpanChain> SpanChain::exportRange(qulonglong offset, qulonglong length, int ram_limit)const {
-    // just like takeSpans, but this chain remains unchanged.
     ReadLocker locker(_lock);
 
     auto result = takeChain(offset, length);
@@ -252,17 +301,19 @@ std::shared_ptr<SpanChain> SpanChain::exportRange(qulonglong offset, qulonglong 
     return result;
 }
 
+/*
+ * Set equal savepoint index for all spans.
+ */
 void SpanChain::setCommonSavepoint(int savepoint) {
-    /** Sets savepoint index for all spans.
-     **/
     for (auto span_data : _spans) {
         span_data->savepoint = savepoint;
     }
 }
 
+/*
+ * Returns savepoint for :span: if span is in chain, otherwise returns -1.
+ */
 int SpanChain::spanSavepoint(const std::shared_ptr<AbstractSpan> &span) {
-    /** Returns savepoint for :span:, if span is in chain; otherwise returns -1
-     **/
     for (auto span_data : _spans) {
         if (span_data->span == span) {
             return span_data->savepoint;
@@ -271,10 +322,11 @@ int SpanChain::spanSavepoint(const std::shared_ptr<AbstractSpan> &span) {
     return -1;
 }
 
+/*
+ * After calling this function you can be sure that there is boundary between spans at :offset:. It means that
+ * byte at :offset: is first byte of span (if exists). If :offset: is invalid, function has no effect.
+ */
 void SpanChain::splitSpans(qulonglong offset) {
-    /** After calling this function you can be sure that there is boundary between spans at :offset:. It means that
-        byte at :offset: is first byte of span (if exists). If :offset: is invalid, function has no effect.
-    */
     WriteLocker locker(_lock);
 
     qulonglong span_offset = 0;
@@ -291,12 +343,12 @@ void SpanChain::insertSpan(qulonglong offset, const std::shared_ptr<AbstractSpan
     insertChain(offset, SpanChain::fromSpans(SpanList() << span));
 }
 
+/*
+ * Inserts data from :chain: into this chain. Savepoints from :chain: are copied too.
+ * If :offset: equals to length of this chain, data is appended, if :offset: is greater than this
+ * chain length, OutOfBoundsError will be thrown.
+ */
 void SpanChain::insertChain(qulonglong offset, const std::shared_ptr<SpanChain> &chain) {
-    /** Inserts data from :chain: into this chain. Savepoints from :chain: are copied too.
-     *  If :offset: equals to length of this chain, data is appended, if :offset: is greater than this
-     *  chain length, OutOfBoundsError will be thrown.
-     **/
-
     WriteLocker locker(_lock);
 
     int span_index; // index of span before which we will insert our chain
@@ -323,11 +375,11 @@ void SpanChain::insertChain(qulonglong offset, const std::shared_ptr<SpanChain> 
     std::swap(new_length, _length);
 }
 
+/*
+ * Removes exactly :length: bytes starting from :offset:. If :length: bytes cannot be removed,
+ * OutOfBoundsError will be thrown.
+ */
 void SpanChain::remove(qulonglong offset, qulonglong length) {
-    /** Removes exactly :length: bytes starting from :offset:. If :length: bytes cannot be removed,
-     *  OutOfBoundsError will be thrown.
-     **/
-
     WriteLocker locker(_lock);
 
     if (length && (offset >= _length || offset + length > _length)) {

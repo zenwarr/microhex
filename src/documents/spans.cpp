@@ -5,6 +5,18 @@
 #include "chain.h"
 #include "devices.h"
 
+/*******************************************************************************
+ * Span is a block of bytes. Span can hold bytes in byte array of reference
+ * it in underlying device, or hold pattern for generating byte sequence, etc.
+ * Span data is immutable. Span cannot have zero length.
+ * AbstractSpan.split creates two spans: first one holds [0; offset] bytes of
+ * original span, second one holds (offset, span size) bytes. Original span
+ * remains untouched. Splitting span at zero offset results in OutOfBoundsError
+ * exception thrown.
+ * AbstractSpan and all derived classes are not thread-safe, but all member
+ * functions are reentarable.
+ ******************************************************************************/
+
 AbstractSpan::AbstractSpan() {
 
 }
@@ -17,10 +29,16 @@ void AbstractSpan::put(const std::shared_ptr<AbstractSaver> &saver) const {
     saver->putSpan(shared_from_this());
 }
 
+/*
+ * Returns true only if range is entirely within span bounds
+*/
 bool AbstractSpan::_isRangeValid(qulonglong offset, qulonglong size)const {
     return offset < this->getLength() && offset + size <= this->getLength();
 }
 
+/*
+ * DataSpan holds data in QByteArray.
+*/
 DataSpan::DataSpan(const QByteArray &data) : _data(data) {
 
 }
@@ -43,6 +61,9 @@ QPair<std::shared_ptr<AbstractSpan>, std::shared_ptr<AbstractSpan>> DataSpan::sp
     return qMakePair(std::shared_ptr<AbstractSpan>(f), std::shared_ptr<AbstractSpan>(s));
 }
 
+/*
+ * FillSpan holds :repeat_count: bytes with :fill_byte: value each
+ */
 FillSpan::FillSpan(qulonglong repeat_count, char fill_byte) : _fillByte(fill_byte), _repeatCount(repeat_count) {
 
 }
@@ -71,7 +92,20 @@ QPair<std::shared_ptr<AbstractSpan>, std::shared_ptr<AbstractSpan>> FillSpan::sp
                      std::shared_ptr<AbstractSpan>(s));
 }
 
-PrimitiveDeviceSpan::PrimitiveDeviceSpan(const std::shared_ptr<AbstractDevice> &device, qulonglong deviceOffset, qulonglong length)
+/*
+ * DeviceSpan has more complex structure. Each DeviceSpan contains chain of
+ * other spans, but only PrimitiveDeviceSpan references device data directly.
+ * Initially, when DeviceSpan is created and initialized with device position
+ * and length of data it must hold, DeviceSpan's chain contains single
+ * PrimitiveDeviceSpan referencing desired data. Sometimes device data changes
+ * but DeviceSpan should still reference exactly same data as it was before change
+ * (for example, when user saves document data to device, DeviceSpans remaining
+ * in undo stack have to hold original data). To achive this we silently
+ * replace chain in DeviceSpan with another chain to keep data safe. This
+ * process is called span dissolving. See Document.save function for details.
+ */
+PrimitiveDeviceSpan::PrimitiveDeviceSpan(const std::shared_ptr<AbstractDevice> &device,
+                                         qulonglong deviceOffset, qulonglong length)
     : _device(device), _deviceOffset(deviceOffset), _length(length) {
 
 }
@@ -153,6 +187,9 @@ QPair<std::shared_ptr<AbstractSpan>, std::shared_ptr<AbstractSpan> > DeviceSpan:
     return qMakePair(std::shared_ptr<AbstractSpan>(f), std::shared_ptr<AbstractSpan>(s));
 }
 
+/*
+ * returns map {PrimitiveDeviceSpan: [its offset from beginning of span]}
+ */
 QMap<std::shared_ptr<PrimitiveDeviceSpan>, qulonglong> DeviceSpan::getPrimitives() const {
     QMap<std::shared_ptr<PrimitiveDeviceSpan>, qulonglong> result;
     qulonglong position = 0;

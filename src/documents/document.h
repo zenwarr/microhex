@@ -68,11 +68,6 @@ public:
     bool canRedo()const;
     QList<int> getAlternativeBranchesIds()const;
 
-    void beginTransaction(const QString &name=QString());
-    void commitTransaction();
-    void rollbackTransaction();
-    bool isInTransaction()const { return !_transactions.empty(); }
-
     void save(const std::shared_ptr<AbstractDevice> &write_device=std::shared_ptr<AbstractDevice>(),
               bool switch_devices=false);
     bool checkCanQuickSave()const;
@@ -94,13 +89,6 @@ signals:
     void fixedSizeChanged(bool);
 
 protected:
-    class TransactionData {
-    public:
-        QString name;
-        std::shared_ptr<SpanChain> spanChain;
-        int currentAtomicOperationIndex;
-    };
-
     std::shared_ptr<AbstractDevice> _device;
     std::shared_ptr<SpanChain> _spanChain;
     std::shared_ptr<ComplexAction> _currentUndoAction;
@@ -111,7 +99,6 @@ protected:
     int _currentAtomicOperationIndex;
     int _savepoint;
     std::shared_ptr<ReadWriteLock> _lock;
-    std::stack<std::shared_ptr<TransactionData>> _transactions;
 
     Document(const std::shared_ptr<SpanChain> &chain);
     void _insertChain(qulonglong position, const std::shared_ptr<SpanChain> &chain, char fill_byte, bool from_undo, int op_increment);

@@ -61,7 +61,7 @@ private:
         ~SpanData();
 
         std::shared_ptr<AbstractSpan> span;
-        std::weak_ptr<SpanChain> chain;
+        std::weak_ptr<SpanChain> chain; // equals to SpanChain where this span lives
         int savepoint;
         bool connected;
 

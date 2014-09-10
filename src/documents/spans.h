@@ -73,7 +73,7 @@ public:
     qulonglong getDeviceOffset()const { return _deviceOffset; }
 
     void prepareToDissolve(const QList<std::shared_ptr<AbstractSpan>> &replacement);
-    void cancelDissolve();
+    void cancelDissolve(); // should never throw!
     void dissolve();
 
 private:

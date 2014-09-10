@@ -15,39 +15,38 @@ except ImportError:
     print('pycparser module should be installed to parse C headers')
 
 
-class ParseError(Exception): pass
+class ParseError(Exception):
+    pass
 
 
 class CParser:
-    class Context:
+    class ParseContext:
         def __init__(self):
             self.templates = dict()
 
     def __init__(self, type_manager=None, namespaces=None):
-        self.cppPath = 'cpp'
-        self.cppArgs = ''
-        self.typeManager = type_manager or datatypes.globalTypeManager()
-        self.namespaces = namespaces or ['platform']
+        self.cppPath = 'cpp'  # path to C preprocessor
+        self.cppArgs = ''  # additional arguments to C preprocessor
+        self.tabWidth = 4  # tab width is required to correct indents in embedded Python code
+        self.typeManager = type_manager or datatypes.globalTypeManager()  # used as source of templates
+        self.namespaces = namespaces or ['platform']  # additional namespaces where parser will search for templates
 
     def parseText(self, text, d_filename=''):
         """Returns dictionary where key is template name and value is context for this type.
+        d_filename will be used in error messages.
         """
-        if not has_pycparser:
-            raise ParseError('pycparser is not installed')
-        elif not self.cppPath:
-            raise ParseError('cpp should be configured to parse headers, adjust cparser.cpp_path setting variable')
+        self._ensureConfigured()
 
-        parse_context = self.Context()
+        parse_context = self.ParseContext()
 
-        # before clearing code from preprocessor directives and comments we should extract meta-information from it
+        # we should extract meta-information from code before clearing it from preprocessor directives and comments
         self._extractMeta(parse_context, text)
 
-        # now process code. Create temp file and write our code into it.
+        # now feed preprocessor. Create temp file and write our code into it.
         with tempfile.NamedTemporaryFile('w+t') as temp_file:
-            #todo
-            # note that we should first create header for typedefs of primitive types already known to manager
-            # and include this header in parsed code.
-
+            # to enable use of already known types in header, we should generate C definitions for them and include
+            # before header code. We should skip them in generated AST.
+            temp_file.write(self._generateTypedefsCode(parse_context) + '\n\n')
             temp_file.write(text)
             temp_file.flush()
 
@@ -56,11 +55,15 @@ class CParser:
             except pycparser.plyparser.ParseError as err:
                 raise ParseError(str(err))
 
+        # now process AST
         for ext in ast.ext:
             if isinstance(ext, pycparser.c_ast.Decl):
-                if ext.name is None:
-                    if isinstance(ext.type, pycparser.c_ast.Struct):
-                        self._processStruct(parse_context, ext.type)
+                if isinstance(ext.type, pycparser.c_ast.Struct):
+                    # something like 'struct A { int x; }'
+                    self._processStruct(parse_context, ext.type)
+                elif isinstance(ext.type, pycparser.c_ast.TypeDecl) and isinstance(ext.type.type, pycparser.c_ast.Struct):
+                    # something like 'struct A { int x; } my_var;'
+                    self._processStruct(parse_context, ext.type.type)
             elif isinstance(ext, pycparser.c_ast.Typedef):
                 self._processTypedef(parse_context, ext)
 
@@ -401,7 +404,16 @@ class CParser:
         def __init__(self, code):
             self.code = code
 
+    def _ensureConfigured(self):
+        if not has_pycparser:
+            raise ParseError('pycparser is not installed')
+        elif not self.cppPath:
+            raise ParseError('cpp should be configured to parse headers, adjust cparser.cpp_path setting variable')
+
+    def _generateTypedefsCode(self, parse_context):
+        pass
+
 
 globalCParser = utils.createSingleton(CParser)
-for attr_name, setting_name in dict(cppPath='CppPath', cppArgs='CppArgs').items():
-    setattr(globalCParser(), attr_name, settings.globalSettings().get(getattr(appsettings, 'CParser_' + setting_name)))
+for attr_name, setting_name in dict(cppPath='cpp_path', cppArgs='cpp_args', tabWidth='tab_width').items():
+    setattr(globalCParser(), attr_name, settings.globalSettings().get(getattr(appsettings, 'cparser' + setting_name)))

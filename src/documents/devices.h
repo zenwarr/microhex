@@ -139,7 +139,7 @@ public:
 
     virtual void begin() = 0;
     virtual void putSpan(const std::shared_ptr<const AbstractSpan> &span) = 0;
-    virtual void fail() { }
+    virtual void fail() { } // should never throw!
     virtual void complete() { }
 };
 

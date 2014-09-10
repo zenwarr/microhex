@@ -26,7 +26,7 @@ def runTests():
         hex.tests.cursor,
         hex.tests.inspector,
         hex.tests.encodings,
-        # hex.tests.cparser
+        hex.tests.cparser
     )
 
     for module in module_list:
