@@ -80,7 +80,7 @@ class SearchResultsWidget(QWidget):
     def _onResultClicked(self, index):
         if index.isValid():
             match_range = index.data(SearchResultsModel.MatchRangeRole)
-            self.hexWidget.emphasize(hexwidget.EmphasizeRange(QColor(Qt.red), match_range.clone()))
+            self.hexWidget.emphasize(hexwidget.EmphasizeRange(QColor(Qt.green), match_range.clone()))
             self.hexWidget.selections = [hexwidget.Selection(match_range.clone())]
 
 
