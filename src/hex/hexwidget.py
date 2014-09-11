@@ -14,7 +14,6 @@ import hex.settings as settings
 import hex.appsettings as appsettings
 from hex.models import ModelIndex, ColumnModel, FrameModel, StandardEditDelegate, index_range
 
-
 class Theme(object):
     Components = ('background', 'text', 'border', 'inactiveText', 'caretBackground', 'caretBorder',
                   'selectionBackground', 'selectionBorder', 'cursorBackground', 'cursorBorder',
@@ -744,15 +743,23 @@ class Column(QObject):
 
     def _updateCachedRow(self, row_index):
         row_data = RowData()
-        row_data.html = '<div class="row">'
+        row_data_html = ['<div class="row">']
+        row_data_text = []
+        current_char_index = 0
+        current_html_char_index = 0
         column_count = self.frameModel.columnCount(row_index)
+        index = None
+        active_index = self.frameModel.activeDelegate and self.frameModel.activeDelegate.index
         for column_index in range(column_count):
-            index = self.frameModel.toSourceIndex(self.frameModel.index(row_index, column_index))
+            if index is None:
+                index = self.frameModel.toSourceIndex(self.frameModel.index(row_index, column_index))
+            else:
+                index = index.next
             index_data = IndexData(index)
-            if self.frameModel.activeDelegate is not None and self.frameModel.activeDelegate.index == index:
+            if active_index == index:
                 index_data.delegate = self.frameModel.activeDelegate
-            index_data.firstCharIndex = len(row_data.text)
-            index_data.firstHtmlCharIndex = len(row_data.html)
+            index_data.firstCharIndex = current_char_index
+            index_data.firstHtmlCharIndex = current_html_char_index
             index_text = index_data.text
 
             if index_text is not None:
@@ -771,18 +778,25 @@ class Column(QObject):
                         index_html = '<span class="{0}">{1}</span>'.format(css_class, prepared_text)
                 else:
                     index_html = prepared_text
+                index_html = index_text
 
-                row_data.html += index_html
-                row_data.text += index_text
+                row_data_html.append(index_html)
+                current_html_char_index += len(index_html)
+                row_data_text.append(index_text)
+                current_char_index += len(index_text)
                 index_data.html = index_html
 
             if self.spaced and column_index + 1 < column_count:
-                row_data.text += ' '
-                row_data.html += '&nbsp;'
+                row_data_text.append(' ')
+                current_char_index += 1
+                row_data_html.append('&nbsp;')
+                current_html_char_index += 6
 
             row_data.items.append(index_data)
 
-        row_data.html += '</div>'
+        row_data_html.append('</div>')
+        row_data.html = ''.join(row_data_html)
+        row_data.text = ''.join(row_data_text)
         self._cache[row_index] = row_data
 
     def _onFrameScrolled(self, new_first_row, old_first_row):
