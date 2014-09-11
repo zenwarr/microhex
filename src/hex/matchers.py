@@ -77,9 +77,10 @@ class AbstractMatcher(operations.Operation):
 
 
 class BinaryMatcher(AbstractMatcher):
-    def __init__(self, document, find_what, title=None):
+    def __init__(self, document, find_what, intersect=False, title=None):
         AbstractMatcher.__init__(self, document, title)
         self._findWhat = find_what
+        self._intersect = intersect
         self._finder = documents.BinaryFinder(document, find_what)
 
     def doWork(self):
@@ -90,7 +91,10 @@ class BinaryMatcher(AbstractMatcher):
             match_position, found = self._finder.findNext(current_position, self.document.length - current_position)
             if found:
                 self.addResult(str(self._resultCount), Match(self.document, match_position, len(self._findWhat)))
-                current_position = match_position + 1
+                if self._intersect:
+                    current_position = match_position + 1
+                else:
+                    current_position = match_position + len(self._findWhat)
             else:
                 current_position += step
 
