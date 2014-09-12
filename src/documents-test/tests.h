@@ -3,6 +3,8 @@
 
 #include <QObject>
 #include <QTemporaryFile>
+#include <QDir>
+#include <QUuid>
 #include <QtTest/QTest>
 #include <QtTest/QSignalSpy>
 #include <QDebug>
@@ -595,6 +597,16 @@ private slots:
         QCOMPARE(frame_doc->readAll(), QByteArray("fuckip"));
         QCOMPARE(frame_doc->getLength(), qulonglong(6));
         QCOMPARE(frame_doc->isReadOnly(), true);
+    }
+
+    void testSaveDocumentWithoutDevice() {
+        auto doc = std::make_shared<Document>();
+        doc->insertSpan(0, std::make_shared<DataSpan>("Hello, World!"));
+        QString filename = QDir::temp().absoluteFilePath(QUuid::createUuid().toString() + ".microhex-tmp");
+        FileLoadOptions options;
+        options.forceNew = true;
+        auto save_device = deviceFromFile(filename, options);
+        doc->save(save_device, true);
     }
 
 private:

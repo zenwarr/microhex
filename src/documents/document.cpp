@@ -610,7 +610,7 @@ void Document::save(const std::shared_ptr<AbstractDevice> &write_device, bool sw
     auto device_to_write = write_device ? write_device : _device;
     auto device_to_read = _device;
 
-    if (!device_to_read || !device_to_write) {
+    if (!device_to_write) {
         throw DocumentError();
     }
 
@@ -625,9 +625,7 @@ void Document::save(const std::shared_ptr<AbstractDevice> &write_device, bool sw
 
     // build list of DeviceSpan that should be dissolved
     QList<std::shared_ptr<PrimitiveDeviceSpan>> spans_to_dissolve;
-    if (device_to_read == device_to_write || switch_devices) {
-        spans_to_dissolve = _prepareToUpdateDevice(switch_devices ? device_to_write : device_to_read);
-    }
+    spans_to_dissolve = _prepareToUpdateDevice(device_to_write);
 
     saver->begin();
     try {
@@ -654,13 +652,13 @@ void Document::save(const std::shared_ptr<AbstractDevice> &write_device, bool sw
         if (getLength()) {
             _spanChain->setSpans(SpanList() << std::make_shared<DeviceSpan>(_device, 0, _device->getLength()));
         }
+    }
 
-        for (auto span : spans_to_dissolve) {
-            try {
-                span->dissolve();
-            } catch (...) {
-                // do nothing
-            }
+    for (auto span : spans_to_dissolve) {
+        try {
+            span->dissolve();
+        } catch (...) {
+            // do nothing
         }
     }
 
