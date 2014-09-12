@@ -778,7 +778,6 @@ class Column(QObject):
                         index_html = '<span class="{0}">{1}</span>'.format(css_class, prepared_text)
                 else:
                     index_html = prepared_text
-                index_html = index_text
 
                 row_data_html.append(index_html)
                 current_html_char_index += len(index_html)
