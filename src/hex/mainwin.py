@@ -433,7 +433,7 @@ class MainWindow(QMainWindow):
     @forActiveWidget
     def saveAs(self):
         hex_widget = self.activeSubWidget.hexWidget
-        if hex_widget.document.device is not None:
+        if not utils.isNone(hex_widget.document.device):
             url = hex_widget.document.device.url
             filename = url.toLocalFile() if url.isLocalFile() else ''
         else:
@@ -444,7 +444,17 @@ class MainWindow(QMainWindow):
             options = documents.FileLoadOptions()
             options.forceNew = True
             save_device = documents.deviceFromUrl(QUrl.fromLocalFile(filename), options)
-            hex_widget.save(save_device, switch_to_device=True)
+            try:
+                hex_widget.save(save_device, switch_to_device=True)
+            except RuntimeError as err:
+                msgbox = QMessageBox(self)
+                msgbox.setIcon(QMessageBox.Critical)
+                msgbox.setWindowTitle(utils.tr('Error saving document'))
+                msgbox.setTextFormat(Qt.RichText)
+                msgbox.setText(utils.tr('Failed to save document data to <br><b>{0}</b><br>due to following error:<br><b>{1}</b>')
+                               .format(utils.htmlEscape(save_device.url.toString()), utils.htmlEscape(str(err))))
+                msgbox.addButton(QMessageBox.Ok)
+                msgbox.exec_()
 
     def newDocument(self):
         e = documents.Document()
@@ -590,10 +600,22 @@ class MainWindow(QMainWindow):
 
     @forActiveWidget
     def save(self):
-        if not self.activeSubWidget.hexWidget.document.device:
+        if utils.isNone(self.activeSubWidget.hexWidget.document.device):
             self.saveAs()
         else:
-            self.activeSubWidget.hexWidget.save()
+            try:
+                self.activeSubWidget.hexWidget.save()
+            except RuntimeError as err:
+                msgbox = QMessageBox(self)
+                msgbox.setIcon(QMessageBox.Critical)
+                msgbox.setWindowTitle(utils.tr('Error saving document'))
+                msgbox.setTextFormat(Qt.RichText)
+                msgbox.setText(utils.tr('Failed to save document data to <br><b>{0}</b><br>due to following error:<br><b>{1}</b>')
+                               .format(utils.htmlEscape(self.activeSubWidget.hexWidget.document.device.url.toString()),
+                                       utils.htmlEscape(str(err))))
+                msgbox.addButton(QMessageBox.Ok)
+                msgbox.exec_()
+
 
     @forActiveWidget
     def zoomIn(self):
@@ -883,9 +905,9 @@ class InspectorDockWidget(QDockWidget):
             datatypes.Structure.Field('b', datatypes.globalTypeManager().getTemplate('uint8'))
         ]
         context['links'] = [
-            datatypes.Structure.Link('a_ign', 'a1.ignore_field'),
-            datatypes.Structure.Link('a_ign', 'a2.ignore_field'),
-            datatypes.Structure.Link('b_ign', 'b.ignore_field')
+            datatypes.Structure.Link('a_ign', 'a1.ignoreField'),
+            datatypes.Structure.Link('a_ign', 'a2.ignoreField'),
+            datatypes.Structure.Link('b_ign', 'b.ignoreField')
         ]
         inst = datatypes.InstantiatedType(datatypes.globalTypeManager().getTemplate('struct'), context)
         self.inspector.inspectorModel.appendType(inst, 'dyn_struct')

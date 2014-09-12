@@ -27,7 +27,7 @@ LittleEndian, BigEndian = range(2)
 """
 This module is for encoding and decoding binary data. Functionality is based on the following classes:
     - Template classes. Derived from AbstractTemplate base class.
-      Represents template for binary data format encoder/decoder. There is template class for all binary format classes
+      Represents template for binary data format encoder/decoder. There is template class for each binary format
       Microhex can parse (numbers, strings, enumerations, structures). Each template can have set of parameters (for
       example, template for zero-terminated string has character encoding as its parameter, and template that parses
       32-bit width integers has parameters that determine endianess and presence of sign). Parameters' values are
@@ -58,7 +58,7 @@ class Value(object):
     enumeration value, decoder can provide both integer representation of it (.decodedValue) and name of constant
     associated with decoded value (.alternativeText). You can use .data() method with FormatAlternativeText to access
     value of this attribute.
-    .members is for complex values like a structures or arrays. Arrays are just like a structures, but with fields
+    .members is for complex values like a structures or arrays. Arrays are just like structures, but with fields
     named as indexes ('0', '1', should be strings).
     .parentValue is used in complex values too. All values in .members dictionary should reference its parent by
     value in .parentValue attribute.
@@ -132,6 +132,7 @@ class Value(object):
         return result
 
     def getMemberValue(self, name):
+        """Returns None if no member with given name"""
         if '.' not in name:
             return self.members.get(name, None)
         else:
@@ -173,8 +174,8 @@ class AbstractTemplate:
         self.realName = real_name
         self.qualifiedName = ''
         self.typeManager = None
-        self.defaultAlignHint = 1  #todo: needs comment
-        self.adjustableContextProperties = {'endianess': int, 'ignore_field': bool}
+        self.defaultAlignHint = 1
+        self.adjustableContextProperties = {'endianess': int, 'ignoreField': bool}
         if adjustable_context_properties is not None:
             self.adjustableContextProperties.update(adjustable_context_properties)
         self.defaultsContext = InstantiateContext()
@@ -185,7 +186,8 @@ class AbstractTemplate:
 
     def decode(self, context) -> Value:
         """Should raise DecodeError if something goes wrong while decoding. You still can get Value (broken one) from
-        exception class.
+        exception class. You should not use this function directly as it does not correcly prepares
+        context for decoding. Use TemplateManager.decode instead.
         """
         raise NotImplementedError()
 
@@ -431,7 +433,7 @@ class Structure(AbstractTemplate):
     links: list of links (each of .Link class)
     linkImpls: list of custom object that react on changes in values of decoded fields (each of .LinkImpl class).
 
-    If field context has 'ignore_field' parameter value set to True, this field will be skipped by decoder.
+    If field context has 'ignoreField' parameter value set to True, this field will be skipped by decoder.
     """
 
     class Field:
@@ -553,7 +555,7 @@ class Structure(AbstractTemplate):
                     stored_cursor_positions[field_index] = cursor.position
                     del stored_cursor_positions[field_index+1:]
 
-                if field.typeContext.get('ignore_field', False):
+                if field.typeContext.get('ignoreField', False):
                     if field.name in result_value.members:
                         del result_value.members[field.name]
                     field_index += 1
