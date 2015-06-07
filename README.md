@@ -1,5 +1,7 @@
 # I'm sorry, but this project is discontinued.
 
+# Now Microhex is relaunched and is developed using web technologies stack (no more Python, sorry) http://github.com/zenwarr/microhex-js
+
 Microhex is crossplatform (Windows and Linux) hex-editing software based on Python and Qt.
 
 In actual version the following features are available:
